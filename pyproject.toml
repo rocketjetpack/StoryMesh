@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "storymesh"
+version = "0.1.0"
+description = "Production-grade agentic AI workflow for generating original fiction synopses."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [{name = "Kali McLennan"}]
+
+dependencies = [
+    "pydantic>=2.0",
+    "orjson",
+    "rapidfuzz",
+    "diskcache",
+    "httpx",
+    "typer",
+    "python-dotenv"
+]
+
+[project.optional-dependencies]
+openai = ["openai>=2.24.0"]
+anthropic = ["anthropic>=0.84.0"]
+gemini = ["google-generativeai>=0.8.6"]
+dev = ["pytest", "pytest-cov", "ruff", "mypy"]
+
+[project.scripts]
+storymesh = "storymesh.cli:app"
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+ignore = ["ANN101", "ANN102"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=storymesh --cov-report=term-missing"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
