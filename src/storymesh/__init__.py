@@ -1,8 +1,7 @@
 from storymesh.orchestration.pipeline import StoryMeshPipeline
 from storymesh.schemas.result import GenerationResult
-from storymesh.version import __version__ as storymesh_version
+from storymesh.versioning.package import __version__
 
-__version__ = storymesh_version
 __all__ = ["generate_synopsis", "GenerationResult"]
 
 def generate_synopsis(genre: str) -> GenerationResult:

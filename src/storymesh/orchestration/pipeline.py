@@ -1,5 +1,5 @@
 from storymesh.schemas.result import GenerationResult
-from storymesh.version import __version__ as storymesh_version
+from storymesh.versioning.package import __version__ as storymesh_version
 
 
 class StoryMeshPipeline:

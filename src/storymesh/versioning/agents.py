@@ -1,0 +1,5 @@
+GENRE_NORMALIZER_AGENT_VERSION = "1.0"
+
+AGENT_VERSIONS: dict[str, str] = {
+    "Genre Normalizer": GENRE_NORMALIZER_AGENT_VERSION,
+}
