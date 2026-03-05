@@ -1,16 +1,16 @@
 # StoryMesh
 
-StoryMesh is a production-grade, agentic AI workflow that generates **original fiction book synopses** from structured genre input.
+StoryMesh is an agentic AI workflow that generates **original fiction book synopses** from structured genre input.
 
 The system is built on a strict **One-Agent-One-Tool** philosophy, combining deterministic constraint mapping with controlled LLM creativity. It emphasizes:
 
-- Legal defensibility (no scraping, no copyrighted text storage)
 - Novelty enforcement as a first-class system concern
 - Strict JSON contracts between agents
 - Observability and reproducibility
 - Vendor-agnostic LLM integration
+- Legal defensibility (no scraping, no copyrighted text storage)
 
-StoryMesh is designed to be modular, inspectable, and extensible — suitable for research, productization, or publishing-facing applications.
+StoryMesh is designed to be modular, inspectable, and extensible.
 
 ---
 
@@ -24,13 +24,14 @@ Pipeline stages:
 
 1. Genre normalization
 2. Bestseller seeding
-3. Metadata enrichment
-4. Theme aggregation
-5. Multi-model proposal generation
-6. Evaluation + similarity analysis
-7. Final synthesis
+3. Seed ranking
+4. Book profile synthesis
+5. Theme aggregation
+6. Proposal generation
+7. Rubric evaluation
+8. Final synthesis
 
-Each stage is implemented as a narrow agent with a strict JSON schema.
+Each stage is implemented as a narrow agent with a strict JSON schema. Orchestration is handled by a graph-based DAG controller.
 
 ---
 
@@ -45,7 +46,7 @@ Each agent:
 - Has strict Pydantic input/output schemas
 - Is independently testable and cacheable
 
-Orchestration is handled via a graph-based controller (e.g., LangGraph or custom DAG).
+This design keeps each node auditable and replaceable without breaking the broader pipeline.
 
 ---
 
@@ -53,15 +54,14 @@ Orchestration is handled via a graph-based controller (e.g., LangGraph or custom
 
 ### 0. GenreNormalizerAgent
 
-**Purpose:**  
-Transforms raw genre input into a structured constraint object.
+**Purpose:**
+Transforms raw genre input into a structured constraint object that governs all downstream generation.
 
-**Hybrid design:**
-- LLM classification (temperature = 0)
-- Deterministic constraint expansion
+**Design:**
+- LLM classification at temperature = 0 for determinism
+- Deterministic constraint expansion from a fixed taxonomy
 
-**Output Schema (simplified):**
-
+**Output Schema:**
 ```json
 {
   "normalized_genres": [],
@@ -76,57 +76,50 @@ Transforms raw genre input into a structured constraint object.
 }
 ```
 
-This agent defines the structural boundaries of generation.
-
 ---
 
 ### 1. NYTBestsellerFetcherAgent
 
-**Tool:** NYT Books API  
-**Purpose:** Retrieve historical bestseller data aligned with normalized genres.
+**Tool:** NYT Books API
+**Purpose:** Retrieve historical bestseller data aligned with the normalized genre constraints.
+
+**Notes:**
+- Aggressive caching is required due to API rate limits.
+- Only title, author, and list metadata are stored — no copyrighted content.
 
 **Output:**
-
 ```json
 {
   "seed_books": []
 }
 ```
 
-Aggressive caching is required due to API rate limits.
-
 ---
 
 ### 2. SeedRankerAgent
 
-**Tool:** Deterministic scoring function  
-Ranks and filters seed books to a manageable set (e.g., 20–30).
+**Tool:** Deterministic scoring function
+**Purpose:** Rank and filter the raw seed list to a manageable working set (20–30 books).
+
+Scoring factors include genre alignment, recency, and list frequency. This is a fully deterministic node — no LLM call is made.
+
+**Output:**
+```json
+{
+  "ranked_books": []
+}
+```
 
 ---
 
-### 3. Metadata Enrichment Agents
+### 3. BookProfileSynthesizerAgent
 
-Optional enrichment:
+**Tool:** LLM call
+**Purpose:** Produce a compressed structured summary for each ranked seed book based on available metadata.
 
-- GoogleBooksMetadataAgent
-- HardcoverMetadataAgent
+No copyrighted text is stored. Summaries are derived, structured, and compressed.
 
-These agents retrieve:
-- Publisher descriptions
-- Categories
-- Ratings
-- Identifiers
-
-Important:
-- No long copyrighted text is stored.
-- Only derived structured summaries are retained.
-
----
-
-### 4. BookProfileSynthesizerAgent
-
-Produces structured summaries:
-
+**Output (per book):**
 ```json
 {
   "plot_skeleton": {},
@@ -135,14 +128,16 @@ Produces structured summaries:
 }
 ```
 
-All summaries are compressed and structured.
-
 ---
 
-### 5. ThemeAggregatorAgent
+### 4. ThemeAggregatorAgent
 
-Aggregates seed book profiles into a `ThemePack`:
+**Tool:** LLM call
+**Purpose:** Aggregate all book profiles into a single `ThemePack` representing the genre's structural landscape.
 
+This is the pipeline's primary knowledge-compression step. It distills what the genre demands, what it tends to overuse, and where space exists for innovation.
+
+**Output:**
 ```json
 {
   "genre_obligations": [],
@@ -153,18 +148,16 @@ Aggregates seed book profiles into a `ThemePack`:
 }
 ```
 
-This replaces scraped review analysis.
-
 ---
 
-### 6. Proposal Generation Agents (Parallel)
+### 5. ProposalAgent
 
-- OpenAIProposalAgent
-- GeminiProposalAgent
-- AnthropicProposalAgent
+**Tool:** LLM call (single provider)
+**Purpose:** Generate a structured fiction proposal that satisfies the genre constraints while targeting identified innovation axes.
 
-Each produces:
+The proposal conforms to a strict schema, ensuring downstream agents can operate on predictable fields.
 
+**Output:**
 ```json
 {
   "logline": "",
@@ -179,65 +172,63 @@ Each produces:
 }
 ```
 
-All outputs conform to identical schemas.
+**Design note:** The provider is configurable via environment variable. The schema is intentionally provider-agnostic, making it straightforward to extend to parallel multi-provider generation in a future iteration.
 
 ---
 
-### 7. RubricJudgeAgent
+### 6. RubricJudgeAgent
 
-Evaluates proposals across:
+**Tool:** LLM call
+**Purpose:** Evaluate the proposal against a structured rubric and return scored feedback.
+
+**Rubric dimensions:**
 
 - Genre fit
-- Coherence
+- Internal coherence
 - Emotional arc
 - Market hook
 - Novelty
 - Sequel potential
 
----
+**Output:**
+```json
+{
+  "scores": {},
+  "feedback": {},
+  "pass": true
+}
+```
 
-### 8. SimilarityRiskAgent
-
-Compares proposals against:
-
-- Seed plot structures
-- Aggregated ThemePack
-
-Flags:
-- Structural overlap
-- Derivative arcs
-- Excessive similarity
-
-Novelty enforcement is a first-class concern.
+If the proposal does not pass, the pipeline triggers a single regeneration attempt from the ProposalAgent before halting. There is no unbounded retry loop.
 
 ---
 
-### 9. SynthesisWriterAgent
+### 7. SynthesisWriterAgent
 
-Produces:
+**Tool:** LLM call
+**Purpose:** Produce the final polished synopsis from the approved proposal and its rubric feedback.
 
-- Final polished synopsis
-- Optional back-cover copy
-- Optional pitch package
+**Output:**
+```json
+{
+  "final_synopsis": "",
+  "back_cover_copy": ""
+}
+```
 
 ---
 
 ## Pydantic Schemas
 
-StoryMesh uses strict Pydantic models for:
+StoryMesh uses strict Pydantic v2 models for:
 
 - Inter-agent contracts
 - Validation of LLM outputs
-- JSON-only enforcement
-- Retry logic
+- JSON-only enforcement at LLM boundaries
+- Retry logic on schema violations
 - Downstream stability
 
-Schemas are versioned and validated at every boundary.
-
-Future:
-- Schema registry
-- JSON schema export
-- Snapshot-based drift testing
+Schemas are versioned. Every agent boundary is a validated checkpoint — malformed output from one agent never silently propagates to the next.
 
 ---
 
@@ -245,31 +236,28 @@ Future:
 
 StoryMesh intentionally avoids:
 
-- Scraping Goodreads
-- Scraping Amazon
-- Storing copyrighted review text
-- Long-form copyrighted summaries
+- Scraping Goodreads or Amazon
+- Storing copyrighted review text or long-form summaries
+- Reproducing publisher copy verbatim
 
 Instead it uses:
 
-- Bestseller signals
-- Ratings metadata
-- Structured summaries
+- NYT bestseller signals (titles, authors, list metadata)
+- Derived structured summaries (plot skeletons, market signals)
 - Aggregated thematic extraction
 
-All outputs are AI-generated and explicitly acknowledged as such.
+All final outputs are AI-generated and explicitly acknowledged as such.
 
 ---
 
 ## Production-Grade Features
 
-- Strict JSON schema validation
-- Rate limiting and retry logic
-- API response caching
-- Budget-aware LLM routing
-- Single-revision regeneration rule
+- Strict Pydantic v2 schema validation at every agent boundary
+- Rate limiting and retry logic for external API calls
+- Disk-based API response caching (`diskcache`)
 - Deterministic hashing for reproducibility
-- Novelty guardrails
+- Single-revision regeneration rule (no unbounded loops)
+- Novelty guardrails via ThemePack + RubricJudge
 
 ---
 
@@ -277,44 +265,37 @@ All outputs are AI-generated and explicitly acknowledged as such.
 
 ## Core Dependencies
 
-- Python 3.10+
-- pydantic
-- rapidfuzz
-- diskcache or redis
-- orjson
-- OpenAI / Anthropic SDK (for classification + generation)
-
-## Optional
-
-- LangGraph (for orchestration)
-- FastAPI (for API layer)
-- Docker (deployment)
-- CI/CD pipeline (TBD)
+- Python 3.12+
+- `pydantic >= 2.0`
+- `rapidfuzz`
+- `diskcache`
+- `orjson`
+- `httpx`
+- `typer`
+- `python-dotenv`
+- Anthropic, OpenAI, or Gemini SDK (one required)
 
 ---
 
 # Setup
-
 ```bash
 git clone https://github.com/<your-username>/storymesh.git
 cd storymesh
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[anthropic]"  # or openai, or gemini
 ```
 
 Create a `.env` file:
-
 ```
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
+EXTERNAL_LLM_PLATFORM=OPENAI|ANTHROPIC|GEMINI
+EXTERNAL_LLM_API_KEY=      # or OPENAI_API_KEY / GOOGLE_API_KEY
 NYT_API_KEY=
-GOOGLE_BOOKS_API_KEY=
-HARDCOVER_API_KEY=
+STORYMESH_CACHE_DIR=.cache/storymesh
+STORYMESH_LOG_LEVEL=INFO
 ```
 
-Run initial tests:
-
+Run tests:
 ```bash
 pytest
 ```
@@ -323,24 +304,22 @@ pytest
 
 # Usage
 
-## CLI (Planned)
-
+## CLI
 ```bash
-storymesh generate --genre "post-apocalyptic eco-thriller romance"
+storymesh generate "post-apocalyptic eco-thriller romance"
 ```
 
 Output:
-
 ```json
 {
   "final_synopsis": "...",
+  "back_cover_copy": "...",
   "scores": {},
-  "similarity_risk": {}
+  "metadata": {}
 }
 ```
 
-## Python (Planned)
-
+## Python
 ```python
 from storymesh import generate_synopsis
 
@@ -352,14 +331,17 @@ print(result.final_synopsis)
 
 # Development Roadmap
 
-- [ ] Finalize taxonomy for GenreNormalizerAgent
-- [ ] Implement strict schema validation
-- [ ] Integrate NYT Books API client
-- [ ] Implement ThemeAggregator clustering
-- [ ] Add SimilarityRisk structural comparison
-- [ ] Add orchestration layer
-- [ ] Add observability + logging
-- [ ] Add drift monitoring
+- [x] Project scaffolding, CI, versioning infrastructure
+- [ ] Finalize GenreNormalizerAgent taxonomy and schema
+- [ ] Implement NYTBestsellerFetcherAgent with caching
+- [ ] Implement SeedRankerAgent (deterministic scoring)
+- [ ] Implement BookProfileSynthesizerAgent
+- [ ] Implement ThemeAggregatorAgent
+- [ ] Implement ProposalAgent
+- [ ] Implement RubricJudgeAgent with regeneration rule
+- [ ] Implement SynthesisWriterAgent
+- [ ] Wire DAG orchestrator (pipeline.py)
+- [ ] Add observability and structured logging
 
 ---
 
@@ -369,6 +351,7 @@ print(result.final_synopsis)
 - Defined One-Agent-One-Tool philosophy
 - Designed full agent graph
 - Established legal and novelty constraints
+- Set up packaging, CI, linting, type checking, and test scaffolding
 
 ## v0.2 — GenreNormalizerAgent (In Progress)
 - Hybrid classification design
@@ -379,7 +362,7 @@ print(result.final_synopsis)
 
 # Vision
 
-StoryMesh aims to demonstrate that AI-generated fiction can be:
+StoryMesh demonstrates that AI-generated fiction can be:
 
 - Structurally rigorous
 - Market-aware
@@ -393,10 +376,10 @@ It treats originality as a systems problem, not a stylistic accident.
 
 # License
 
-TBD
+MIT
 
 ---
 
 # Status
 
-Active development.
+Active development. Core pipeline not yet implemented — see roadmap above.
