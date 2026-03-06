@@ -32,6 +32,8 @@ storymesh = "storymesh.cli:app"
 
 [tool.ruff]
 target-version = "py312"
+# I absolutely despise 88 character lines. I find it makes readability much worse.
+line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
