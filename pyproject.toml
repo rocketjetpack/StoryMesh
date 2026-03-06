@@ -19,7 +19,6 @@ dependencies = [
     "httpx",
     "typer",
     "python-dotenv",
-    "re"
 ]
 
 [project.optional-dependencies]
