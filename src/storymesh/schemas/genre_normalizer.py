@@ -35,6 +35,11 @@ class GenreMapEntry(BaseModel):
         description="List of default tones associated with the normalized genre."
     )
 
+    alternates: list[str] = Field(
+        default_factory=list,
+        description="List of alternate names for the normalized genre."
+    )
+
     @model_validator(mode="after")
     def check_at_least_one_genre_or_subgenre(self) -> GenreMapEntry:
         """
@@ -55,6 +60,11 @@ class ToneMapEntry(BaseModel):
     normalized_tones: list[str] = Field(
         min_length=1,
         description="List of normalized tone names that map to some tone descriptor."
+    )
+
+    alternates: list[str] = Field(
+        default_factory=list,
+        description="List of alternate names for the normalized genre."
     )
 
 # -------- Resolution Tracking Schema --------
@@ -80,7 +90,7 @@ class GenreResolution(BaseModel):
     )
 
     canonical_genres: list[str] = Field(
-        default_factory=list,
+        min_length=1,
         description="The normalized genre names that the input token maps to."
     )
 

@@ -1,0 +1,354 @@
+{
+  "dark": {
+    "alternates": [],
+    "normalized_tones": ["dark", "grim"]
+  },
+  "lighthearted": {
+    "alternates": ["light", "lite", "light-hearted"],
+    "normalized_tones": ["lighthearted", "breezy"]
+  },
+  "gritty": {
+    "alternates": [],
+    "normalized_tones": ["gritty", "raw"]
+  },
+  "raw": {
+    "alternates": [],
+    "normalized_tones": ["raw", "unflinching"]
+  },
+  "whimsical": {
+    "alternates": [],
+    "normalized_tones": ["whimsical", "playful"]
+  },
+  "playful": {
+    "alternates": [],
+    "normalized_tones": ["playful", "whimsical"]
+  },
+  "optimistic": {
+    "alternates": [],
+    "normalized_tones": ["optimistic", "hopeful"]
+  },
+  "hopeful": {
+    "alternates": [],
+    "normalized_tones": ["hopeful", "optimistic"]
+  },
+  "uplifting": {
+    "alternates": [],
+    "normalized_tones": ["uplifting", "hopeful", "inspiring"]
+  },
+  "bleak": {
+    "alternates": [],
+    "normalized_tones": ["bleak", "desolate"]
+  },
+  "brooding": {
+    "alternates": [],
+    "normalized_tones": ["brooding", "melancholic"]
+  },
+  "melancholic": {
+    "alternates": ["melancholy"],
+    "normalized_tones": ["melancholic", "wistful"]
+  },
+  "bittersweet": {
+    "alternates": ["bitter-sweet"],
+    "normalized_tones": ["bittersweet", "tender"]
+  },
+  "nostalgic": {
+    "alternates": [],
+    "normalized_tones": ["nostalgic", "wistful"]
+  },
+  "wistful": {
+    "alternates": [],
+    "normalized_tones": ["wistful", "longing"]
+  },
+  "tense": {
+    "alternates": [],
+    "normalized_tones": ["tense", "suspenseful"]
+  },
+  "suspenseful": {
+    "alternates": [],
+    "normalized_tones": ["suspenseful", "tense"]
+  },
+  "fast-paced": {
+    "alternates": ["fast paced", "fastpaced"],
+    "normalized_tones": ["fast-paced", "propulsive"]
+  },
+  "slow-burn": {
+    "alternates": ["slow burn", "slowburn"],
+    "normalized_tones": ["slow-burn", "deliberate"]
+  },
+  "cerebral": {
+    "alternates": [],
+    "normalized_tones": ["cerebral", "intellectual"]
+  },
+  "philosophical": {
+    "alternates": [],
+    "normalized_tones": ["philosophical", "cerebral"]
+  },
+  "thought-provoking": {
+    "alternates": ["thought provoking"],
+    "normalized_tones": ["thought-provoking", "cerebral"]
+  },
+  "lyrical": {
+    "alternates": [],
+    "normalized_tones": ["lyrical", "poetic"]
+  },
+  "poetic": {
+    "alternates": [],
+    "normalized_tones": ["poetic", "lyrical"]
+  },
+  "spare": {
+    "alternates": [],
+    "normalized_tones": ["spare", "minimalist"]
+  },
+  "minimalist": {
+    "alternates": [],
+    "normalized_tones": ["minimalist", "spare"]
+  },
+  "lush": {
+    "alternates": [],
+    "normalized_tones": ["lush", "rich", "ornate"]
+  },
+  "atmospheric": {
+    "alternates": [],
+    "normalized_tones": ["atmospheric", "immersive"]
+  },
+  "immersive": {
+    "alternates": [],
+    "normalized_tones": ["immersive", "atmospheric"]
+  },
+  "eerie": {
+    "alternates": [],
+    "normalized_tones": ["eerie", "unsettling"]
+  },
+  "creepy": {
+    "alternates": [],
+    "normalized_tones": ["creepy", "unsettling"]
+  },
+  "unsettling": {
+    "alternates": [],
+    "normalized_tones": ["unsettling", "disquieting"]
+  },
+  "haunting": {
+    "alternates": [],
+    "normalized_tones": ["haunting", "lingering", "eerie"]
+  },
+  "dreamlike": {
+    "alternates": ["dreamy"],
+    "normalized_tones": ["dreamlike", "ethereal"]
+  },
+  "surreal": {
+    "alternates": [],
+    "normalized_tones": ["surreal", "dreamlike"]
+  },
+  "humorous": {
+    "alternates": ["funny"],
+    "normalized_tones": ["humorous", "comedic"]
+  },
+  "comedic": {
+    "alternates": [],
+    "normalized_tones": ["comedic", "humorous"]
+  },
+  "witty": {
+    "alternates": [],
+    "normalized_tones": ["witty", "clever"]
+  },
+  "sarcastic": {
+    "alternates": [],
+    "normalized_tones": ["sarcastic", "sardonic"]
+  },
+  "sardonic": {
+    "alternates": [],
+    "normalized_tones": ["sardonic", "sarcastic"]
+  },
+  "satirical": {
+    "alternates": [],
+    "normalized_tones": ["satirical", "sharp", "irreverent"]
+  },
+  "irreverent": {
+    "alternates": [],
+    "normalized_tones": ["irreverent", "sardonic"]
+  },
+  "darkly comic": {
+    "alternates": ["darkly comedic", "dark comedy", "dark humor", "dark humour"],
+    "normalized_tones": ["darkly comic", "gallows humor"]
+  },
+  "warm": {
+    "alternates": [],
+    "normalized_tones": ["warm", "heartfelt"]
+  },
+  "heartfelt": {
+    "alternates": ["heart-felt"],
+    "normalized_tones": ["heartfelt", "warm"]
+  },
+  "cozy": {
+    "alternates": ["cosy"],
+    "normalized_tones": ["cozy", "comforting"]
+  },
+  "comforting": {
+    "alternates": [],
+    "normalized_tones": ["comforting", "cozy"]
+  },
+  "intimate": {
+    "alternates": [],
+    "normalized_tones": ["intimate", "personal"]
+  },
+  "emotional": {
+    "alternates": [],
+    "normalized_tones": ["emotional", "affecting"]
+  },
+  "gut-wrenching": {
+    "alternates": ["gut wrenching", "gutwrenching"],
+    "normalized_tones": ["gut-wrenching", "devastating"]
+  },
+  "devastating": {
+    "alternates": [],
+    "normalized_tones": ["devastating", "gut-wrenching"]
+  },
+  "romantic": {
+    "alternates": [],
+    "normalized_tones": ["romantic", "passionate"]
+  },
+  "passionate": {
+    "alternates": [],
+    "normalized_tones": ["passionate", "intense"]
+  },
+  "steamy": {
+    "alternates": [],
+    "normalized_tones": ["steamy", "sensual"]
+  },
+  "sensual": {
+    "alternates": [],
+    "normalized_tones": ["sensual", "steamy"]
+  },
+  "epic": {
+    "alternates": [],
+    "normalized_tones": ["epic", "grand"]
+  },
+  "grand": {
+    "alternates": [],
+    "normalized_tones": ["grand", "epic"]
+  },
+  "sweeping": {
+    "alternates": [],
+    "normalized_tones": ["sweeping", "expansive"]
+  },
+  "cinematic": {
+    "alternates": [],
+    "normalized_tones": ["cinematic", "visual", "vivid"]
+  },
+  "gory": {
+    "alternates": [],
+    "normalized_tones": ["gory", "visceral", "graphic"]
+  },
+  "violent": {
+    "alternates": [],
+    "normalized_tones": ["violent", "brutal"]
+  },
+  "brutal": {
+    "alternates": [],
+    "normalized_tones": ["brutal", "unflinching"]
+  },
+  "unflinching": {
+    "alternates": [],
+    "normalized_tones": ["unflinching", "raw"]
+  },
+  "edgy": {
+    "alternates": [],
+    "normalized_tones": ["edgy", "provocative"]
+  },
+  "provocative": {
+    "alternates": [],
+    "normalized_tones": ["provocative", "transgressive"]
+  },
+  "transgressive": {
+    "alternates": [],
+    "normalized_tones": ["transgressive", "boundary-pushing"]
+  },
+  "introspective": {
+    "alternates": [],
+    "normalized_tones": ["introspective", "reflective"]
+  },
+  "reflective": {
+    "alternates": [],
+    "normalized_tones": ["reflective", "introspective"]
+  },
+  "contemplative": {
+    "alternates": [],
+    "normalized_tones": ["contemplative", "meditative"]
+  },
+  "meditative": {
+    "alternates": [],
+    "normalized_tones": ["meditative", "contemplative"]
+  },
+  "quiet": {
+    "alternates": [],
+    "normalized_tones": ["quiet", "understated"]
+  },
+  "understated": {
+    "alternates": [],
+    "normalized_tones": ["understated", "subtle"]
+  },
+  "gentle": {
+    "alternates": [],
+    "normalized_tones": ["gentle", "tender"]
+  },
+  "tender": {
+    "alternates": [],
+    "normalized_tones": ["tender", "gentle"]
+  },
+  "empowering": {
+    "alternates": [],
+    "normalized_tones": ["empowering", "inspiring"]
+  },
+  "inspiring": {
+    "alternates": ["inspirational"],
+    "normalized_tones": ["inspiring", "uplifting"]
+  },
+  "triumphant": {
+    "alternates": [],
+    "normalized_tones": ["triumphant", "victorious"]
+  },
+  "tragic": {
+    "alternates": [],
+    "normalized_tones": ["tragic", "sorrowful"]
+  },
+  "fatalistic": {
+    "alternates": [],
+    "normalized_tones": ["fatalistic", "resigned"]
+  },
+  "cynical": {
+    "alternates": [],
+    "normalized_tones": ["cynical", "jaded"]
+  },
+  "paranoid": {
+    "alternates": [],
+    "normalized_tones": ["paranoid", "anxiety-inducing"]
+  },
+  "claustrophobic": {
+    "alternates": [],
+    "normalized_tones": ["claustrophobic", "confining"]
+  },
+  "expansive": {
+    "alternates": [],
+    "normalized_tones": ["expansive", "wide-ranging"]
+  },
+  "charming": {
+    "alternates": [],
+    "normalized_tones": ["charming", "delightful"]
+  },
+  "quirky": {
+    "alternates": [],
+    "normalized_tones": ["quirky", "offbeat"]
+  },
+  "offbeat": {
+    "alternates": [],
+    "normalized_tones": ["offbeat", "quirky"]
+  },
+  "earnest": {
+    "alternates": [],
+    "normalized_tones": ["earnest", "sincere"]
+  },
+  "sincere": {
+    "alternates": [],
+    "normalized_tones": ["sincere", "earnest"]
+  }
+}

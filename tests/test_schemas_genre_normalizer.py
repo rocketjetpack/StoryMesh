@@ -150,9 +150,9 @@ class TestGenreResolution:
         assert _genre_resolution(confidence=0.0).confidence == 0.0
         assert _genre_resolution(confidence=1.0).confidence == 1.0
 
-    def test_empty_canonical_genres_allowed(self) -> None:
-        gr = _genre_resolution(canonical_genres=[])
-        assert gr.canonical_genres == []
+    def test_empty_canonical_genres_raises_validationerror(self) -> None:
+        with pytest.raises(ValidationError):
+            _genre_resolution(canonical_genres=[])
 
     def test_all_resolution_methods(self) -> None:
         for method in ResolutionMethod:
@@ -314,3 +314,20 @@ class TestGenreNormalizerAgentOutput:
         assert out.tone_conflicts is None
         assert out.unresolved_tokens == []
         assert out.tone_resolutions == []
+
+# ---------------------------------------------------------------------------
+# Round Trip JSON Validation
+# ---------------------------------------------------------------------------
+
+class TestRoundTrip:
+    def test_input_roundtrip(self) -> None:
+        original = GenreNormalizerAgentInput(
+            raw_genre = "dark fantasy romance enemies-to-lovers",
+            allow_llm_fallback = False,
+        )
+
+        json_str = original.model_dump_json()
+
+        reconstructed = GenreNormalizerAgentInput.model_validate_json(json_str)
+
+        assert reconstructed == original

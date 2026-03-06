@@ -1,0 +1,590 @@
+{
+  "fantasy": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": [],
+    "default_tones": ["wondrous", "adventurous", "epic"]
+  },
+  "high fantasy": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": ["high_fantasy"],
+    "default_tones": ["epic", "grand", "heroic"]
+  },
+  "low fantasy": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": ["low_fantasy"],
+    "default_tones": ["grounded", "gritty", "understated"]
+  },
+  "dark fantasy": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": ["dark_fantasy"],
+    "default_tones": ["dark", "ominous", "brooding"]
+  },
+  "urban fantasy": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": ["urban_fantasy"],
+    "default_tones": ["edgy", "fast-paced", "contemporary"]
+  },
+  "epic fantasy": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": ["epic_fantasy"],
+    "default_tones": ["epic", "grand", "sweeping"]
+  },
+  "portal fantasy": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": ["portal_fantasy"],
+    "default_tones": ["wondrous", "adventurous", "whimsical"]
+  },
+  "grimdark": {
+    "alternates": ["grim dark", "grim-dark"],
+    "genres": ["fantasy"],
+    "subgenres": ["grimdark"],
+    "default_tones": ["bleak", "brutal", "cynical"]
+  },
+  "sword and sorcery": {
+    "alternates": ["sword & sorcery", "sword-and-sorcery"],
+    "genres": ["fantasy"],
+    "subgenres": ["sword_and_sorcery"],
+    "default_tones": ["adventurous", "pulpy", "action-driven"]
+  },
+  "gaslamp fantasy": {
+    "alternates": ["gaslight fantasy"],
+    "genres": ["fantasy"],
+    "subgenres": ["gaslamp_fantasy"],
+    "default_tones": ["atmospheric", "mannered", "mysterious"]
+  },
+  "mythic fantasy": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": ["mythic_fantasy"],
+    "default_tones": ["reverent", "epic", "primal"]
+  },
+  "science fiction": {
+    "alternates": ["sci-fi", "sci fi", "scifi", "sf"],
+    "genres": ["science_fiction"],
+    "subgenres": [],
+    "default_tones": ["speculative", "cerebral", "adventurous"]
+  },
+  "hard science fiction": {
+    "alternates": ["hard sci-fi", "hard scifi", "hard sf"],
+    "genres": ["science_fiction"],
+    "subgenres": ["hard_science_fiction"],
+    "default_tones": ["rigorous", "cerebral", "awe-inspiring"]
+  },
+  "soft science fiction": {
+    "alternates": ["soft sci-fi", "soft scifi"],
+    "genres": ["science_fiction"],
+    "subgenres": ["soft_science_fiction"],
+    "default_tones": ["humanistic", "philosophical", "introspective"]
+  },
+  "space opera": {
+    "alternates": [],
+    "genres": ["science_fiction"],
+    "subgenres": ["space_opera"],
+    "default_tones": ["epic", "sweeping", "adventurous"]
+  },
+  "cyberpunk": {
+    "alternates": ["cyber punk", "cyber-punk"],
+    "genres": ["science_fiction"],
+    "subgenres": ["cyberpunk"],
+    "default_tones": ["gritty", "dystopian", "noir"]
+  },
+  "steampunk": {
+    "alternates": ["steam punk", "steam-punk"],
+    "genres": ["science_fiction"],
+    "subgenres": ["steampunk"],
+    "default_tones": ["adventurous", "whimsical", "inventive"]
+  },
+  "solarpunk": {
+    "alternates": ["solar punk", "solar-punk"],
+    "genres": ["science_fiction"],
+    "subgenres": ["solarpunk"],
+    "default_tones": ["optimistic", "hopeful", "ecological"]
+  },
+  "biopunk": {
+    "alternates": ["bio punk", "bio-punk"],
+    "genres": ["science_fiction"],
+    "subgenres": ["biopunk"],
+    "default_tones": ["unsettling", "cerebral", "dystopian"]
+  },
+  "dieselpunk": {
+    "alternates": ["diesel punk", "diesel-punk"],
+    "genres": ["science_fiction"],
+    "subgenres": ["dieselpunk"],
+    "default_tones": ["gritty", "industrial", "retro-futuristic"]
+  },
+  "military science fiction": {
+    "alternates": ["military sci-fi", "military scifi", "mil-sf", "milsf"],
+    "genres": ["science_fiction"],
+    "subgenres": ["military_science_fiction"],
+    "default_tones": ["tense", "action-driven", "strategic"]
+  },
+  "post-apocalyptic": {
+    "alternates": ["post apocalyptic", "postapocalyptic", "post-apoc"],
+    "genres": ["science_fiction"],
+    "subgenres": ["post_apocalyptic"],
+    "default_tones": ["bleak", "tense", "survivalist"]
+  },
+  "apocalyptic": {
+    "alternates": [],
+    "genres": ["science_fiction"],
+    "subgenres": ["apocalyptic"],
+    "default_tones": ["urgent", "catastrophic", "tense"]
+  },
+  "dystopian": {
+    "alternates": ["dystopia"],
+    "genres": ["science_fiction"],
+    "subgenres": ["dystopian"],
+    "default_tones": ["oppressive", "bleak", "cautionary"]
+  },
+  "utopian": {
+    "alternates": ["utopia"],
+    "genres": ["science_fiction"],
+    "subgenres": ["utopian"],
+    "default_tones": ["hopeful", "philosophical", "idealistic"]
+  },
+  "near-future": {
+    "alternates": ["near future", "nearfuture"],
+    "genres": ["science_fiction"],
+    "subgenres": ["near_future"],
+    "default_tones": ["plausible", "tense", "speculative"]
+  },
+  "first contact": {
+    "alternates": [],
+    "genres": ["science_fiction"],
+    "subgenres": ["first_contact"],
+    "default_tones": ["awe-inspiring", "tense", "cerebral"]
+  },
+  "time travel": {
+    "alternates": ["time-travel"],
+    "genres": ["science_fiction"],
+    "subgenres": ["time_travel"],
+    "default_tones": ["mind-bending", "adventurous", "bittersweet"]
+  },
+  "climate fiction": {
+    "alternates": ["cli-fi", "clifi"],
+    "genres": ["science_fiction"],
+    "subgenres": ["climate_fiction"],
+    "default_tones": ["cautionary", "urgent", "ecological"]
+  },
+  "afrofuturism": {
+    "alternates": ["afro-futurism", "afro futurism"],
+    "genres": ["science_fiction"],
+    "subgenres": ["afrofuturism"],
+    "default_tones": ["visionary", "cultural", "speculative"]
+  },
+  "speculative fiction": {
+    "alternates": ["spec fic", "specfic", "spec-fic"],
+    "genres": ["science_fiction"],
+    "subgenres": ["speculative"],
+    "default_tones": ["cerebral", "what-if", "philosophical"]
+  },
+  "romance": {
+    "alternates": [],
+    "genres": ["romance"],
+    "subgenres": [],
+    "default_tones": ["passionate", "warm", "emotional"]
+  },
+  "contemporary romance": {
+    "alternates": ["contemp romance"],
+    "genres": ["romance"],
+    "subgenres": ["contemporary_romance"],
+    "default_tones": ["warm", "relatable", "emotional"]
+  },
+  "historical romance": {
+    "alternates": [],
+    "genres": ["romance", "historical_fiction"],
+    "subgenres": ["historical_romance"],
+    "default_tones": ["passionate", "atmospheric", "sweeping"]
+  },
+  "paranormal romance": {
+    "alternates": ["pnr"],
+    "genres": ["romance"],
+    "subgenres": ["paranormal_romance"],
+    "default_tones": ["passionate", "dark", "supernatural"]
+  },
+  "romantic suspense": {
+    "alternates": [],
+    "genres": ["romance", "thriller"],
+    "subgenres": ["romantic_suspense"],
+    "default_tones": ["tense", "passionate", "fast-paced"]
+  },
+  "romantic comedy": {
+    "alternates": ["rom-com", "romcom", "rom com"],
+    "genres": ["romance"],
+    "subgenres": ["romantic_comedy"],
+    "default_tones": ["lighthearted", "witty", "charming"]
+  },
+  "enemies to lovers": {
+    "alternates": ["enemies-to-lovers"],
+    "genres": ["romance"],
+    "subgenres": ["enemies_to_lovers"],
+    "default_tones": ["passionate", "conflicted", "slow-burn"]
+  },
+  "friends to lovers": {
+    "alternates": ["friends-to-lovers"],
+    "genres": ["romance"],
+    "subgenres": ["friends_to_lovers"],
+    "default_tones": ["warm", "tender", "bittersweet"]
+  },
+  "forced proximity": {
+    "alternates": [],
+    "genres": ["romance"],
+    "subgenres": ["forced_proximity"],
+    "default_tones": ["tense", "intimate", "charged"]
+  },
+  "mystery": {
+    "alternates": [],
+    "genres": ["mystery"],
+    "subgenres": [],
+    "default_tones": ["suspenseful", "cerebral", "atmospheric"]
+  },
+  "cozy mystery": {
+    "alternates": ["cosy mystery"],
+    "genres": ["mystery"],
+    "subgenres": ["cozy_mystery"],
+    "default_tones": ["warm", "lighthearted", "witty"]
+  },
+  "whodunit": {
+    "alternates": ["who-done-it", "whodunnit"],
+    "genres": ["mystery"],
+    "subgenres": ["whodunit"],
+    "default_tones": ["cerebral", "suspenseful", "methodical"]
+  },
+  "hardboiled": {
+    "alternates": ["hard-boiled", "hard boiled"],
+    "genres": ["mystery"],
+    "subgenres": ["hardboiled"],
+    "default_tones": ["gritty", "cynical", "noir"]
+  },
+  "noir": {
+    "alternates": [],
+    "genres": ["mystery"],
+    "subgenres": ["noir"],
+    "default_tones": ["dark", "cynical", "fatalistic"]
+  },
+  "police procedural": {
+    "alternates": ["procedural"],
+    "genres": ["mystery"],
+    "subgenres": ["police_procedural"],
+    "default_tones": ["methodical", "tense", "gritty"]
+  },
+  "locked room": {
+    "alternates": ["locked-room", "locked room mystery"],
+    "genres": ["mystery"],
+    "subgenres": ["locked_room"],
+    "default_tones": ["cerebral", "claustrophobic", "suspenseful"]
+  },
+  "thriller": {
+    "alternates": [],
+    "genres": ["thriller"],
+    "subgenres": [],
+    "default_tones": ["tense", "fast-paced", "suspenseful"]
+  },
+  "psychological thriller": {
+    "alternates": ["psych thriller"],
+    "genres": ["thriller"],
+    "subgenres": ["psychological_thriller"],
+    "default_tones": ["unsettling", "cerebral", "paranoid"]
+  },
+  "legal thriller": {
+    "alternates": [],
+    "genres": ["thriller"],
+    "subgenres": ["legal_thriller"],
+    "default_tones": ["tense", "procedural", "high-stakes"]
+  },
+  "medical thriller": {
+    "alternates": [],
+    "genres": ["thriller"],
+    "subgenres": ["medical_thriller"],
+    "default_tones": ["urgent", "clinical", "suspenseful"]
+  },
+  "political thriller": {
+    "alternates": [],
+    "genres": ["thriller"],
+    "subgenres": ["political_thriller"],
+    "default_tones": ["conspiratorial", "tense", "cynical"]
+  },
+  "techno-thriller": {
+    "alternates": ["technothriller", "techno thriller", "tech thriller"],
+    "genres": ["thriller"],
+    "subgenres": ["techno_thriller"],
+    "default_tones": ["fast-paced", "cerebral", "high-stakes"]
+  },
+  "spy thriller": {
+    "alternates": ["espionage", "spy fiction", "spy novel"],
+    "genres": ["thriller"],
+    "subgenres": ["spy_thriller"],
+    "default_tones": ["tense", "paranoid", "atmospheric"]
+  },
+  "eco-thriller": {
+    "alternates": ["eco thriller", "ecothriller"],
+    "genres": ["thriller"],
+    "subgenres": ["eco_thriller"],
+    "default_tones": ["urgent", "cautionary", "suspenseful"]
+  },
+  "horror": {
+    "alternates": [],
+    "genres": ["horror"],
+    "subgenres": [],
+    "default_tones": ["dread", "unsettling", "visceral"]
+  },
+  "cosmic horror": {
+    "alternates": ["lovecraftian", "eldritch horror"],
+    "genres": ["horror"],
+    "subgenres": ["cosmic_horror"],
+    "default_tones": ["dread", "incomprehensible", "existential"]
+  },
+  "gothic horror": {
+    "alternates": [],
+    "genres": ["horror"],
+    "subgenres": ["gothic_horror"],
+    "default_tones": ["atmospheric", "brooding", "decadent"]
+  },
+  "gothic": {
+    "alternates": [],
+    "genres": ["horror"],
+    "subgenres": ["gothic"],
+    "default_tones": ["atmospheric", "brooding", "romantic"]
+  },
+  "southern gothic": {
+    "alternates": [],
+    "genres": ["horror", "literary_fiction"],
+    "subgenres": ["southern_gothic"],
+    "default_tones": ["decaying", "grotesque", "atmospheric"]
+  },
+  "body horror": {
+    "alternates": [],
+    "genres": ["horror"],
+    "subgenres": ["body_horror"],
+    "default_tones": ["visceral", "disturbing", "transgressive"]
+  },
+  "folk horror": {
+    "alternates": [],
+    "genres": ["horror"],
+    "subgenres": ["folk_horror"],
+    "default_tones": ["creeping", "pastoral", "ritualistic"]
+  },
+  "psychological horror": {
+    "alternates": ["psych horror"],
+    "genres": ["horror"],
+    "subgenres": ["psychological_horror"],
+    "default_tones": ["paranoid", "unsettling", "claustrophobic"]
+  },
+  "slasher": {
+    "alternates": [],
+    "genres": ["horror"],
+    "subgenres": ["slasher"],
+    "default_tones": ["visceral", "frantic", "violent"]
+  },
+  "haunted house": {
+    "alternates": [],
+    "genres": ["horror"],
+    "subgenres": ["haunted_house"],
+    "default_tones": ["dread", "claustrophobic", "atmospheric"]
+  },
+  "supernatural": {
+    "alternates": [],
+    "genres": ["horror"],
+    "subgenres": ["supernatural"],
+    "default_tones": ["eerie", "mysterious", "unsettling"]
+  },
+  "historical fiction": {
+    "alternates": ["historical"],
+    "genres": ["historical_fiction"],
+    "subgenres": [],
+    "default_tones": ["atmospheric", "immersive", "evocative"]
+  },
+  "alternate history": {
+    "alternates": ["alternative history", "alt-history", "alt history"],
+    "genres": ["historical_fiction"],
+    "subgenres": ["alternate_history"],
+    "default_tones": ["speculative", "atmospheric", "cerebral"]
+  },
+  "literary fiction": {
+    "alternates": ["litfic", "literary", "lit fic"],
+    "genres": ["literary_fiction"],
+    "subgenres": [],
+    "default_tones": ["introspective", "lyrical", "nuanced"]
+  },
+  "upmarket fiction": {
+    "alternates": ["upmarket"],
+    "genres": ["literary_fiction"],
+    "subgenres": ["upmarket"],
+    "default_tones": ["accessible", "thoughtful", "emotional"]
+  },
+  "book club fiction": {
+    "alternates": ["book club"],
+    "genres": ["literary_fiction"],
+    "subgenres": ["book_club_fiction"],
+    "default_tones": ["thought-provoking", "accessible", "emotional"]
+  },
+  "magical realism": {
+    "alternates": ["magic realism", "magical-realism"],
+    "genres": ["literary_fiction"],
+    "subgenres": ["magical_realism"],
+    "default_tones": ["dreamlike", "lyrical", "grounded"]
+  },
+  "absurdist": {
+    "alternates": ["absurdism", "absurdist fiction"],
+    "genres": ["literary_fiction"],
+    "subgenres": ["absurdist"],
+    "default_tones": ["darkly comic", "philosophical", "surreal"]
+  },
+  "satire": {
+    "alternates": ["satirical fiction"],
+    "genres": ["literary_fiction"],
+    "subgenres": ["satire"],
+    "default_tones": ["sharp", "irreverent", "darkly comic"]
+  },
+  "domestic fiction": {
+    "alternates": ["domestic drama"],
+    "genres": ["literary_fiction"],
+    "subgenres": ["domestic_fiction"],
+    "default_tones": ["intimate", "emotional", "quiet"]
+  },
+  "women's fiction": {
+    "alternates": ["womens fiction"],
+    "genres": ["literary_fiction"],
+    "subgenres": ["womens_fiction"],
+    "default_tones": ["emotional", "empowering", "relatable"]
+  },
+  "coming of age": {
+    "alternates": ["coming-of-age", "bildungsroman"],
+    "genres": ["literary_fiction"],
+    "subgenres": ["coming_of_age"],
+    "default_tones": ["nostalgic", "tender", "bittersweet"]
+  },
+  "family saga": {
+    "alternates": ["saga", "multi-generational"],
+    "genres": ["literary_fiction"],
+    "subgenres": ["family_saga"],
+    "default_tones": ["sweeping", "emotional", "multi-generational"]
+  },
+  "young adult": {
+    "alternates": ["ya"],
+    "genres": ["young_adult"],
+    "subgenres": [],
+    "default_tones": ["coming-of-age", "urgent", "emotional"]
+  },
+  "young adult fantasy": {
+    "alternates": ["ya fantasy", "ya fant"],
+    "genres": ["young_adult", "fantasy"],
+    "subgenres": ["ya_fantasy"],
+    "default_tones": ["adventurous", "coming-of-age", "wondrous"]
+  },
+  "young adult science fiction": {
+    "alternates": ["ya sci-fi", "ya scifi", "ya sf"],
+    "genres": ["young_adult", "science_fiction"],
+    "subgenres": ["ya_science_fiction"],
+    "default_tones": ["speculative", "coming-of-age", "urgent"]
+  },
+  "middle grade": {
+    "alternates": ["mg", "children's", "childrens"],
+    "genres": ["middle_grade"],
+    "subgenres": [],
+    "default_tones": ["adventurous", "warm", "imaginative"]
+  },
+  "new adult": {
+    "alternates": ["na"],
+    "genres": ["new_adult"],
+    "subgenres": [],
+    "default_tones": ["coming-of-age", "raw", "contemporary"]
+  },
+  "adventure": {
+    "alternates": [],
+    "genres": ["adventure"],
+    "subgenres": [],
+    "default_tones": ["exciting", "fast-paced", "adventurous"]
+  },
+  "action adventure": {
+    "alternates": ["action-adventure", "action"],
+    "genres": ["adventure"],
+    "subgenres": ["action_adventure"],
+    "default_tones": ["exciting", "fast-paced", "high-stakes"]
+  },
+  "survival": {
+    "alternates": ["survivalist"],
+    "genres": ["adventure"],
+    "subgenres": ["survival"],
+    "default_tones": ["tense", "visceral", "primal"]
+  },
+  "western": {
+    "alternates": [],
+    "genres": ["western"],
+    "subgenres": [],
+    "default_tones": ["rugged", "atmospheric", "laconic"]
+  },
+  "weird western": {
+    "alternates": [],
+    "genres": ["western", "fantasy"],
+    "subgenres": ["weird_western"],
+    "default_tones": ["eerie", "rugged", "uncanny"]
+  },
+  "crime": {
+    "alternates": ["crime fiction"],
+    "genres": ["crime"],
+    "subgenres": [],
+    "default_tones": ["gritty", "tense", "morally complex"]
+  },
+  "heist": {
+    "alternates": ["caper"],
+    "genres": ["crime"],
+    "subgenres": ["heist"],
+    "default_tones": ["clever", "fast-paced", "suspenseful"]
+  },
+  "wuxia": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": ["wuxia"],
+    "default_tones": ["epic", "martial", "philosophical"]
+  },
+  "xianxia": {
+    "alternates": [],
+    "genres": ["fantasy"],
+    "subgenres": ["xianxia"],
+    "default_tones": ["epic", "transcendent", "martial"]
+  },
+  "progression fantasy": {
+    "alternates": ["prog fantasy"],
+    "genres": ["fantasy"],
+    "subgenres": ["progression_fantasy"],
+    "default_tones": ["driven", "systematic", "satisfying"]
+  },
+  "litrpg": {
+    "alternates": ["lit rpg", "lit-rpg"],
+    "genres": ["fantasy", "science_fiction"],
+    "subgenres": ["litrpg"],
+    "default_tones": ["gamified", "adventurous", "systematic"]
+  },
+  "romantasy": {
+    "alternates": [],
+    "genres": ["romance", "fantasy"],
+    "subgenres": ["romantasy"],
+    "default_tones": ["passionate", "wondrous", "adventurous"]
+  },
+  "science fantasy": {
+    "alternates": [],
+    "genres": ["science_fiction", "fantasy"],
+    "subgenres": ["science_fantasy"],
+    "default_tones": ["imaginative", "epic", "boundary-blurring"]
+  },
+  "new weird": {
+    "alternates": [],
+    "genres": ["science_fiction", "fantasy", "horror"],
+    "subgenres": ["new_weird"],
+    "default_tones": ["surreal", "unsettling", "transgressive"]
+  },
+  "slipstream": {
+    "alternates": [],
+    "genres": ["literary_fiction", "science_fiction"],
+    "subgenres": ["slipstream"],
+    "default_tones": ["uncanny", "lyrical", "disorienting"]
+  }
+}

@@ -18,7 +18,8 @@ dependencies = [
     "diskcache",
     "httpx",
     "typer",
-    "python-dotenv"
+    "python-dotenv",
+    "re"
 ]
 
 [project.optional-dependencies]
