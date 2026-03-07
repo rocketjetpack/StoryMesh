@@ -49,6 +49,14 @@ class MappingStore:
         self.genre_index = self._build_genre_index(genre_entries)
         self.tone_index = self._build_tone_index(tone_entries)
 
+        self.genre_max_words: int = (
+            max((len(k.split()) for k in self.genre_index), default=0)
+        )
+
+        self.tone_max_words: int = ( 
+            max((len(k.split()) for k in self.tone_index), default=0)
+        )
+
         self._check_cross_file_collisions()
 
     def lookup_genre(self, key: str) -> GenreMapEntry | None:

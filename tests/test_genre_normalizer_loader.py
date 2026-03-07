@@ -175,6 +175,14 @@ class TestIndex:
         assert store.lookup_genre("scifi") == sci_fi_entry
         assert store.lookup_genre("Science Fiction") == sci_fi_entry
 
+    def test_genre_max_words(self, tmp_path: Path) -> None:
+        store = _make_store(tmp_path)
+        assert store.genre_max_words == 2
+
+    def test_tone_max_words(self, tmp_path: Path) -> None:
+        store = _make_store(tmp_path)
+        assert store.tone_max_words == 1
+
 # Deduplication
 class TestEntryDedupe:
     def test_primary_and_alternate_normalize_to_same_key(self, tmp_path: Path) -> None:

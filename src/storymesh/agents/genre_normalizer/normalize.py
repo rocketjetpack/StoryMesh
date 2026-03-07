@@ -31,8 +31,23 @@ def normalize_text(text: str) -> str:
     """
 
     text = text.lower()
-    text = text.replace("-", " ")
-    text = text.replace("_", " ")
-    text = re.sub(r"\s+", " ", text)
+    matchs_list = str.maketrans({
+        "-": " ",
+        "_": " ",
+        ",": " ",
+        "+": " ",
+        "&": " and ",
+        "/": " ",
+        "\"": " ",
+        "(": " ",
+        ")": " ",
+        ":": " ",
+        ";": " ",
+        ".": " ",
+        "!": " ",
+        "?": " ",
+    })
+    text = text.translate(matchs_list)
+    text = re.sub(r"\s+", " ", text) # Collapse multiple whitespace characters into a single space
     text = text.strip()
     return text
