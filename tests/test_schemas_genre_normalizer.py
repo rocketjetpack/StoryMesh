@@ -49,6 +49,7 @@ def _output(**overrides: object) -> GenreNormalizerAgentOutput:
         explicit_tones=[],
         effective_tone="adventurous",
         genre_resolutions=[_genre_resolution()],
+        tone_profile = ["adventurous"]
     )
     return GenreNormalizerAgentOutput(**(defaults | overrides))
 
@@ -227,6 +228,7 @@ class TestGenreNormalizerAgentOutput:
         out = _output()
         assert out.raw_input == "dark fantasy"
         assert out.normalized_genres == ["Fantasy"]
+        assert out.tone_profile == ["adventurous"]
         assert out.effective_tone == "adventurous"
         assert out.schema_version == GENRE_CONSTRAINT_SCHEMA_VERSION
 
@@ -237,6 +239,7 @@ class TestGenreNormalizerAgentOutput:
             explicit_tones=["dark"],
             effective_tone="dark",
             tone_conflicts=None,
+            tone_profile=["dark"]
         )
         assert out.effective_tone == "dark"
 
@@ -246,6 +249,7 @@ class TestGenreNormalizerAgentOutput:
             explicit_tones=["dark"],
             effective_tone="dark",
             tone_conflicts=["dark vs adventurous"],
+            tone_profile=["dark"]
         )
         assert out.tone_conflicts == ["dark vs adventurous"]
 
@@ -280,6 +284,7 @@ class TestGenreNormalizerAgentOutput:
             default_tones=[],
             explicit_tones=["dark"],
             effective_tone="dark",
+            tone_profile=["dark"]
         )
         assert out.effective_tone == "dark"
 
@@ -290,6 +295,7 @@ class TestGenreNormalizerAgentOutput:
                 explicit_tones=["dark"],
                 effective_tone="dark",
                 tone_conflicts=None,  # should be required
+                tone_profile=["dark"]
             )
 
     def test_no_tone_conflict_when_explicit_subset_of_default(self) -> None:

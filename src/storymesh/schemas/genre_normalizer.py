@@ -198,6 +198,11 @@ class GenreNormalizerAgentOutput(BaseModel):
         description="Any tokens from the raw input that failed normalization."
     )
 
+    tone_profile: list[str] = Field (
+        min_length = 1,
+        description="Ordered list of all applicable tones, ranked by priority."
+    )
+
     schema_version: str = GENRE_CONSTRAINT_SCHEMA_VERSION
 
     @model_validator(mode="after")
@@ -214,6 +219,14 @@ class GenreNormalizerAgentOutput(BaseModel):
                 "Effective tone must be derived from at least one default or explicit tone." # noqa E501
             )
 
+        return self
+
+    @model_validator(mode="after")
+    def check_effective_tone_matches_profile(self) -> GenreNormalizerAgentOutput:
+        if self.tone_profile[0] != self.effective_tone:
+            raise ValueError(
+                "effective_tone must match the first element of tone_profile."
+            )
         return self
 
     @model_validator(mode="after")
