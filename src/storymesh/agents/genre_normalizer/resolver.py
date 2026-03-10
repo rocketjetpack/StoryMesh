@@ -1,7 +1,7 @@
 """
 Genre and tone resolution logic for GenreNormalizerAgent.
 
-Implents a three-pass resolution pipeline:
+Implements a three-pass resolution pipeline:
 1. Greedy longest-match against the genre index
 2. Greedy longest-match against the tone index
 3. Fallback to LLM-based resolution for any remaining unmatched text

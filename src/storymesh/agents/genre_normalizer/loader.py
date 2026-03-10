@@ -27,7 +27,7 @@ class MappingLoadError(Exception):
 
 class MappingStore:
     """
-    Loads, validates, and indexes genre and tope map files.
+    Loads, validates, and indexes genre and tone map files.
 
     On initialization, reads both JSON files, validates each entry against
     Pydantic schemas, builds flat lookup indices with normalized keys, and
@@ -164,8 +164,9 @@ class MappingStore:
                     key_owners[normalized] = canonical_key
         return index   
 
+    @staticmethod
     def _build_tone_index(
-            self,
+            #self,
             entries: dict[str, dict[str, Any]],
         ) -> dict[str, ToneMapEntry]:
         """

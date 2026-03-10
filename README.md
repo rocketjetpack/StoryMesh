@@ -212,7 +212,6 @@ If the proposal does not pass, the pipeline triggers a single regeneration attem
 ```json
 {
   "final_synopsis": "",
-  "back_cover_copy": ""
 }
 ```
 
@@ -313,7 +312,6 @@ Output:
 ```json
 {
   "final_synopsis": "...",
-  "back_cover_copy": "...",
   "scores": {},
   "metadata": {}
 }

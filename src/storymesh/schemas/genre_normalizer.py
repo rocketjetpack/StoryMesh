@@ -64,7 +64,7 @@ class ToneMapEntry(BaseModel):
 
     alternates: list[str] = Field(
         default_factory=list,
-        description="List of alternate names for the normalized genre."
+        description="List of alternate names for the normalized tone."
     )
 
 # -------- Resolution Tracking Schema --------
@@ -72,7 +72,7 @@ class ResolutionMethod(StrEnum):
     """Document how a token was resolved during genre normalization."""
 
     STATIC_EXACT = "static_exact" # Came from an exact match in a local mapping file.
-    STATIC_FUZZY = "static_fuzzy" # Came form a fuzzy match in a local mapping file.
+    STATIC_FUZZY = "static_fuzzy" # Came from a fuzzy match in a local mapping file.
     LLM_LIVE = "llm_live" # Came from a LLM query run in this pass.
     LLM_CACHED = "llm_cached" # Came from a cached LLM response from a previous run.
 

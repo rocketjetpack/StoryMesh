@@ -27,7 +27,7 @@ class TestNormalizeText:
     def test_combined_transformations(self) -> None:
         assert normalize_text(" Sci_fi-Action  adventure") == "sci fi action adventure"
 
-    def text_comma_removal(self) -> None:
+    def test_comma_removal(self) -> None:
         assert normalize_text("sci-fi, action") == "sci fi action"
 
     def test_no_normalization_needed(self) -> None:
