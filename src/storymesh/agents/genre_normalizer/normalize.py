@@ -19,7 +19,7 @@ def normalize_text(text: str) -> str:
     """
     Normalize text by:
       - Converting to lowercase
-      - Replacing hyphens and understores with spaces
+      - Replacing hyphens and underscores with spaces
       - Collapsing multiple whitespace characters into a single space
       - Stripping leading and trailing whitespace
 
