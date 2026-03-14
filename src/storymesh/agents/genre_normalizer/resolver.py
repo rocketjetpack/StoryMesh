@@ -151,6 +151,7 @@ def resolve_genres(
             input_token = token,
             canonical_genres = entry.genres,
             default_tones = entry.default_tones,
+            subgenres = entry.subgenres,
             method = method,
             confidence = confidence
         ) for token, entry, method, confidence in matches if isinstance(entry, GenreMapEntry)

@@ -1,0 +1,335 @@
+"""
+Unit tests for storymesh.agents.genre_normalizer.agent.
+"""
+
+from pathlib import Path
+
+import orjson
+import pytest
+from pydantic import ValidationError
+
+from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent
+from storymesh.agents.genre_normalizer.loader import MappingStore
+from storymesh.schemas.genre_normalizer import (
+    GenreNormalizerAgentInput,
+    GenreNormalizerAgentOutput,
+)
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _write_json(path: Path, data: object) -> Path:
+    path.write_bytes(orjson.dumps(data))
+    return path
+
+
+def _test_genre_map() -> dict:
+    return {
+        "fantasy": {
+            "alternates": [],
+            "genres": ["fantasy"],
+            "subgenres": [],
+            "default_tones": ["wondrous", "adventurous", "epic"],
+        },
+        "dark fantasy": {
+            "alternates": [],
+            "genres": ["fantasy"],
+            "subgenres": ["dark_fantasy"],
+            "default_tones": ["dark", "ominous", "brooding"],
+        },
+        "science fiction": {
+            "alternates": ["sci-fi", "sci fi", "scifi"],
+            "genres": ["science_fiction"],
+            "subgenres": [],
+            "default_tones": ["speculative", "cerebral", "adventurous"],
+        },
+        "post-apocalyptic": {
+            "alternates": ["post apocalyptic"],
+            "genres": ["science_fiction"],
+            "subgenres": ["post_apocalyptic"],
+            "default_tones": ["bleak", "tense", "survivalist"],
+        },
+        "enemies to lovers": {
+            "alternates": ["enemies-to-lovers"],
+            "genres": ["romance"],
+            "subgenres": ["enemies_to_lovers"],
+            "default_tones": ["passionate", "conflicted", "slow-burn"],
+        },
+        "mystery": {
+            "alternates": [],
+            "genres": ["mystery"],
+            "subgenres": [],
+            "default_tones": ["suspenseful", "cerebral", "atmospheric"],
+        },
+        "romance": {
+            "alternates": [],
+            "genres": ["romance"],
+            "subgenres": [],
+            "default_tones": ["passionate", "warm", "emotional"],
+        },
+    }
+
+
+def _test_tone_map() -> dict:
+    return {
+        "optimistic": {
+            "alternates": [],
+            "normalized_tones": ["optimistic", "hopeful"],
+        },
+        "gritty": {
+            "alternates": [],
+            "normalized_tones": ["gritty", "raw"],
+        },
+        "dark": {
+            "alternates": [],
+            "normalized_tones": ["dark", "grim"],
+        },
+    }
+
+
+@pytest.fixture()
+def store(tmp_path: Path) -> MappingStore:
+    genre_path = _write_json(tmp_path / "genre_map.json", _test_genre_map())
+    tone_path = _write_json(tmp_path / "tone_map.json", _test_tone_map())
+    return MappingStore(genre_map_path=genre_path, tone_map_path=tone_path)
+
+
+@pytest.fixture()
+def agent(store: MappingStore) -> GenreNormalizerAgent:
+    return GenreNormalizerAgent(store=store)
+
+
+# ---------------------------------------------------------------------------
+# Construction
+# ---------------------------------------------------------------------------
+
+class TestAgentConstruction:
+    def test_construct_with_store(self, store: MappingStore) -> None:
+        agent = GenreNormalizerAgent(store=store)
+        assert agent is not None
+
+    def test_construct_with_paths(self, tmp_path: Path) -> None:
+        genre_path = _write_json(tmp_path / "genre_map.json", _test_genre_map())
+        tone_path = _write_json(tmp_path / "tone_map.json", _test_tone_map())
+        agent = GenreNormalizerAgent(
+            genre_map_path=genre_path,
+            tone_map_path=tone_path,
+        )
+        assert agent is not None
+
+    def test_construct_with_custom_threshold(self, store: MappingStore) -> None:
+        agent = GenreNormalizerAgent(store=store, fuzzy_threshold=0.90)
+        assert agent is not None
+
+
+# ---------------------------------------------------------------------------
+# Output Type and Contract
+# ---------------------------------------------------------------------------
+
+class TestOutputContract:
+    def test_returns_output_type(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        assert isinstance(result, GenreNormalizerAgentOutput)
+
+    def test_output_is_frozen(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        with pytest.raises(ValidationError):
+            result.raw_input = "changed"  # type: ignore[misc]
+
+    def test_raw_input_preserved(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="Dark Fantasy"))
+        assert result.raw_input == "Dark Fantasy"
+
+    def test_output_roundtrip(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        json_str = result.model_dump_json()
+        reconstructed = GenreNormalizerAgentOutput.model_validate_json(json_str)
+        assert reconstructed == result
+
+
+# ---------------------------------------------------------------------------
+# Simple Genre Resolution
+# ---------------------------------------------------------------------------
+
+class TestSimpleGenreResolution:
+    def test_single_genre(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        assert result.normalized_genres == ["fantasy"]
+        assert result.subgenres == []
+        assert len(result.genre_resolutions) == 1
+
+    def test_single_subgenre_entry(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="dark fantasy"))
+        assert "fantasy" in result.normalized_genres
+        assert "dark_fantasy" in result.subgenres
+
+    def test_multiple_genres(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy mystery"))
+        assert "fantasy" in result.normalized_genres
+        assert "mystery" in result.normalized_genres
+        assert len(result.genre_resolutions) == 2
+
+    def test_alias_resolution(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="sci-fi"))
+        assert "science_fiction" in result.normalized_genres
+
+    def test_multi_word_genre(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="enemies to lovers"))
+        assert "romance" in result.normalized_genres
+        assert "enemies_to_lovers" in result.subgenres
+
+
+# ---------------------------------------------------------------------------
+# Genre Deduplication
+# ---------------------------------------------------------------------------
+
+class TestGenreDeduplication:
+    def test_duplicate_genres_deduplicated(self, agent: GenreNormalizerAgent) -> None:
+        """'dark fantasy' and 'fantasy' both produce genre 'fantasy'."""
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="dark fantasy fantasy"))
+        # Should not have 'fantasy' twice
+        assert result.normalized_genres.count("fantasy") == 1
+
+
+# ---------------------------------------------------------------------------
+# Tone Integration
+# ---------------------------------------------------------------------------
+
+class TestToneIntegration:
+    def test_genre_default_tones(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        assert result.default_tones == ["wondrous", "adventurous", "epic"]
+        assert result.explicit_tones == []
+        assert result.effective_tone == "wondrous"
+        assert result.tone_conflicts is None
+
+    def test_explicit_tone_override(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="optimistic post-apocalyptic",
+        ))
+        assert "optimistic" in result.explicit_tones
+        assert result.effective_tone in result.explicit_tones
+        assert result.tone_profile[0] == result.effective_tone
+
+    def test_tone_conflict_detected(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="optimistic post-apocalyptic",
+        ))
+        assert result.tone_conflicts is not None
+        assert len(result.tone_conflicts) > 0
+
+    def test_tone_profile_ordering(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="gritty optimistic post-apocalyptic",
+        ))
+        # Explicit tones should come before defaults in profile
+        gritty_pos = result.tone_profile.index("gritty")
+        bleak_pos = result.tone_profile.index("bleak")
+        assert gritty_pos < bleak_pos
+
+
+# ---------------------------------------------------------------------------
+# Unresolved Tokens
+# ---------------------------------------------------------------------------
+
+class TestUnresolvedTokens:
+    def test_unresolved_tokens_captured(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="fantasy xyzzyfrob",
+        ))
+        assert "xyzzyfrob" in result.unresolved_tokens
+
+    def test_narrative_context_preserved(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="mystery set in 2075 chicago",
+        ))
+        assert "mystery" in result.normalized_genres
+        # Narrative tokens should be in unresolved
+        assert "2075" in result.unresolved_tokens
+        assert "chicago" in result.unresolved_tokens
+
+    def test_no_unresolved_when_all_matched(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        assert result.unresolved_tokens == []
+
+
+# ---------------------------------------------------------------------------
+# LLM Fallback Control
+# ---------------------------------------------------------------------------
+
+class TestLlmFallbackControl:
+    def test_llm_fallback_disabled(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="fantasy xyzzy",
+            allow_llm_fallback=False,
+        ))
+        assert "xyzzy" in result.unresolved_tokens
+
+    def test_llm_fallback_enabled_stub(self, agent: GenreNormalizerAgent) -> None:
+        """With LLM stubbed, results should be identical to disabled."""
+        enabled = agent.run(GenreNormalizerAgentInput(
+            raw_genre="fantasy xyzzy",
+            allow_llm_fallback=True,
+        ))
+        disabled = agent.run(GenreNormalizerAgentInput(
+            raw_genre="fantasy xyzzy",
+            allow_llm_fallback=False,
+        ))
+        assert enabled.unresolved_tokens == disabled.unresolved_tokens
+
+
+# ---------------------------------------------------------------------------
+# Full End-to-End Scenarios
+# ---------------------------------------------------------------------------
+
+class TestEndToEnd:
+    def test_optimistic_post_apocalyptic_enemies_to_lovers_mystery(
+        self, agent: GenreNormalizerAgent,
+    ) -> None:
+        """The canonical test scenario from our design discussions."""
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="optimistic post-apocalyptic enemies to lovers mystery",
+        ))
+
+        # Genres
+        assert "science_fiction" in result.normalized_genres
+        assert "romance" in result.normalized_genres
+        assert "mystery" in result.normalized_genres
+
+        # Subgenres
+        assert "post_apocalyptic" in result.subgenres
+        assert "enemies_to_lovers" in result.subgenres
+
+        # Tones
+        assert "optimistic" in result.explicit_tones
+        assert result.effective_tone in result.explicit_tones
+        assert result.tone_conflicts is not None
+
+        # Resolutions
+        assert len(result.genre_resolutions) == 3
+        assert len(result.tone_resolutions) == 1
+        assert result.unresolved_tokens == []
+
+        # Audit trail
+        genre_tokens = [r.input_token for r in result.genre_resolutions]
+        assert "post apocalyptic" in genre_tokens
+        assert "enemies to lovers" in genre_tokens
+        assert "mystery" in genre_tokens
+
+    def test_simple_single_genre(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="romance"))
+        assert result.normalized_genres == ["romance"]
+        assert result.subgenres == []
+        assert result.effective_tone == "passionate"
+        assert result.tone_conflicts is None
+        assert result.unresolved_tokens == []
+
+    def test_genre_with_narrative_context(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="gritty science fiction about a rebellion in 2085",
+        ))
+        assert "science_fiction" in result.normalized_genres
+        assert "gritty" in result.explicit_tones
+        assert "2085" in result.unresolved_tokens
+        assert "rebellion" in result.unresolved_tokens

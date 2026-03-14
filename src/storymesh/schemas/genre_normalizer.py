@@ -107,6 +107,11 @@ class GenreResolution(BaseModel):
         description="A confidence score between 0 and 1 for how well the input token maps to the canonical genres." # noqa E501
     )
 
+    subgenres: list[str] = Field(
+        default_factory = list,
+        description="The set of subgenres identified from this token."
+    )
+
 class ToneResolution(BaseModel):
     """
     Record for one tone modifier that is resolved during Pass 2 or Pass 3 of the

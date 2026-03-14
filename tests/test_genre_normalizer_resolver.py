@@ -168,6 +168,7 @@ class TestResolveGenres:
         assert resolutions[0].input_token == "enemies to lovers"
         assert "romance" in resolutions[0].canonical_genres
         assert leftovers == []
+        assert "enemies_to_lovers" in resolutions[0].subgenres
 
     def test_unmatched_genre_words_become_leftovers(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
