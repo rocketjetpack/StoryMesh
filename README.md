@@ -285,14 +285,8 @@ source venv/bin/activate
 pip install -e ".[anthropic]"  # or openai, or gemini
 ```
 
-Create a `.env` file:
-```
-EXTERNAL_LLM_PLATFORM=OPENAI|ANTHROPIC|GEMINI
-EXTERNAL_LLM_API_KEY=      # or OPENAI_API_KEY / GOOGLE_API_KEY
-NYT_API_KEY=
-STORYMESH_CACHE_DIR=.cache/storymesh
-STORYMESH_LOG_LEVEL=INFO
-```
+
+Create a `.env` file using `.env.example` as a base and add appropriate API keys.
 
 Run tests:
 ```bash
@@ -355,6 +349,12 @@ print(result.final_synopsis)
 - Hybrid classification design
 - Taxonomy planning
 - Schema planning
+
+## v0.3 - Implementation of LLM (In Progress)
+- Creation of YAML configuration file
+- Parsing of .env and configuration file for LLM settings
+- Add a generic LLM interface that has common function definitions for providers
+- Add Anthropic as the first provider
 
 ---
 
