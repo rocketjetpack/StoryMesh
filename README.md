@@ -23,7 +23,7 @@ StoryMesh takes a genre (or combination of genres) as input and outputs a polish
 Pipeline stages:
 
 1. Genre normalization
-2. Bestseller seeding
+2. Genre seed discovery
 3. Seed ranking
 4. Book profile synthesis
 5. Theme aggregation
@@ -78,14 +78,17 @@ Transforms raw genre input into a structured constraint object that governs all 
 
 ---
 
-### 1. NYTBestsellerFetcherAgent
+### 1. GenreSeedFetcherAgent
 
-**Tool:** NYT Books API
-**Purpose:** Retrieve historical bestseller data aligned with the normalized genre constraints.
+**Tool:** Open Library Search API
+**Purpose:** Discover genre-relevant, culturally significant books using Open Library's subject and search APIs. Results are used as seed data for downstream theme extraction and market awareness.
 
-**Notes:**
-- Aggressive caching is required due to API rate limits.
-- Only title, author, and list metadata are stored — no copyrighted content.
+**Design:**
+- Queries Open Library subjects endpoint (e.g., `/subjects/mystery.json`) filtered by the normalized genres from the GenreNormalizerAgent.
+- Uses edition count, number of ratings, and rating average as popularity proxies in place of bestseller rankings.
+- Respects Open Library rate limits (1 req/sec default, 3 req/sec with User-Agent identification).
+- Caching via `diskcache` is permitted; bulk downloads are not.
+- No copyrighted content is stored — only catalog metadata (title, author, subjects, edition count, first publish year).
 
 **Output:**
 ```json
@@ -101,7 +104,7 @@ Transforms raw genre input into a structured constraint object that governs all 
 **Tool:** Deterministic scoring function
 **Purpose:** Rank and filter the raw seed list to a manageable working set (20–30 books).
 
-Scoring factors include genre alignment, recency, and list frequency. This is a fully deterministic node — no LLM call is made.
+Scoring factors include genre alignment, recency, edition count (as a cultural reach proxy), and rating signals. This is a fully deterministic node — no LLM call is made.
 
 **Output:**
 ```json
@@ -241,7 +244,7 @@ StoryMesh intentionally avoids:
 
 Instead it uses:
 
-- NYT bestseller signals (titles, authors, list metadata)
+- Open Library catalog metadata (titles, authors, subjects, edition counts) under CC0-compatible terms
 - Derived structured summaries (plot skeletons, market signals)
 - Aggregated thematic extraction
 
@@ -325,7 +328,7 @@ print(result.final_synopsis)
 
 - [x] Project scaffolding, CI, versioning infrastructure
 - [ ] Finalize GenreNormalizerAgent taxonomy and schema
-- [ ] Implement NYTBestsellerFetcherAgent with caching
+- [ ] Implement GenreSeedFetcherAgent with Open Library integration and caching
 - [ ] Implement SeedRankerAgent (deterministic scoring)
 - [ ] Implement BookProfileSynthesizerAgent
 - [ ] Implement ThemeAggregatorAgent
@@ -355,6 +358,10 @@ print(result.final_synopsis)
 - Parsing of .env and configuration file for LLM settings
 - Add a generic LLM interface that has common function definitions for providers
 - Add Anthropic as the first provider
+- Replaced NYT Books API with Open Library API for legal compliance
+- Renamed NYTBestsellerFetcherAgent to GenreSeedFetcherAgent
+- Updated scoring model to use edition count and ratings as popularity proxies
+- Removed Hardcover API references (insufficient documentation)
 
 ---
 

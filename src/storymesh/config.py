@@ -24,8 +24,6 @@ _PROVIDER_KEY_MAP = {
     "google": "GOOGLE_API_KEY",
 }
 
-_ALWAYS_REQUIRED_KEYS = ("NYT_API_KEY",)
-
 
 def _configure_logging(level_name: str) -> None:
     """Configure the storymesh logger hierarchy."""
@@ -86,9 +84,7 @@ def _get_required_env_keys(config: dict[str, Any]) -> set[str]:
             f"Valid providers: {', '.join(sorted(_PROVIDER_KEY_MAP.keys()))}"
         )
 
-    keys = {_PROVIDER_KEY_MAP[p] for p in providers}
-    keys.update(_ALWAYS_REQUIRED_KEYS)
-    return keys
+    return {_PROVIDER_KEY_MAP[p] for p in providers}
 
 
 def _load_env(required_keys: set[str]) -> Path | None:

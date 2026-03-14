@@ -46,8 +46,6 @@ htmlcov/
 Thumbs.db
 
 # Claude skills
-.claude/skills/hardcover/SKILL.md
-.claude/skills/hardcover/schema-reference.md
 settings.local.json
 
 # Testing caches
@@ -57,3 +55,7 @@ settings.local.json
 
 # Distribution artifacts
 dist/
+
+# Instructions
+instructions/
+instructions/*
