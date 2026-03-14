@@ -6,6 +6,7 @@ Reads storymesh.config.yaml and .env, provides resolved settings to agents.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +18,17 @@ _config_cache: dict[str, Any] | None = None
 
 logger = logging.getLogger(__name__)
 
+_PROVIDER_KEY_MAP = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY",
+}
+
+_ALWAYS_REQUIRED_KEYS = ("NYT_API_KEY",)
+
 
 def _configure_logging(level_name: str) -> None:
+    """Configure the storymesh logger hierarchy."""
     storymesh_logger = logging.getLogger("storymesh")
     level = getattr(logging, level_name.upper(), logging.INFO)
     storymesh_logger.setLevel(level)
@@ -55,18 +65,79 @@ def find_config_file() -> Path:
     )
 
 
+def _get_required_env_keys(config: dict[str, Any]) -> set[str]:
+    """Determine which API keys are required based on the config."""
+    providers: set[str] = set()
+
+    llm_section = config.get("llm", {})
+    default_provider = llm_section.get("default_provider")
+    if default_provider:
+        providers.add(default_provider)
+
+    for agent_config in config.get("agents", {}).values():
+        provider = agent_config.get("provider")
+        if provider:
+            providers.add(provider)
+
+    unknown = providers - _PROVIDER_KEY_MAP.keys()
+    if unknown:
+        raise ValueError(
+            f"Unknown LLM provider(s) in config: {', '.join(sorted(unknown))}. "
+            f"Valid providers: {', '.join(sorted(_PROVIDER_KEY_MAP.keys()))}"
+        )
+
+    keys = {_PROVIDER_KEY_MAP[p] for p in providers}
+    keys.update(_ALWAYS_REQUIRED_KEYS)
+    return keys
+
+
+def _load_env(required_keys: set[str]) -> Path | None:
+    """Load .env if any required key is missing from the environment.
+
+    Search order:
+      1. If all required keys are already set, skip .env loading.
+      2. .env in the current working directory.
+      3. ~/.storymesh/.env
+    """
+    if all(os.environ.get(k) for k in required_keys):
+        return None
+
+    candidates = [
+        Path.cwd() / ".env",
+        Path.home() / ".storymesh" / ".env",
+    ]
+
+    for path in candidates:
+        if path.is_file():
+            load_dotenv(path)
+            return path
+
+    return None
+
+
+def _validate_env(required_keys: set[str]) -> None:
+    """Raise if any required API key is missing from the environment."""
+    missing = {k for k in required_keys if not os.environ.get(k)}
+    if missing:
+        raise EnvironmentError(
+            f"Missing required API key(s): {', '.join(sorted(missing))}. "
+            f"Set them in your environment, .env in the current directory, "
+            f"or ~/.storymesh/.env"
+        )
+
+
 def get_config() -> dict[str, Any]:
     """Load and cache the StoryMesh configuration.
 
-    On first call: loads .env, reads the YAML config, configures logging,
-    and caches the result. Subsequent calls return the cached dict.
+    On first call: reads the YAML config, determines required API keys,
+    loads .env if needed, validates all keys are present, configures
+    logging, and caches the result. Subsequent calls return the cached dict.
     """
-    global _config_cache  # noqa: PLW0603 this is a valid global use
+    global _config_cache  # noqa: PLW0603
     if _config_cache is not None:
         return _config_cache
 
-    load_dotenv()
-
+    # 1. Load YAML
     config_path = find_config_file()
     try:
         with open(config_path) as f:
@@ -79,12 +150,25 @@ def get_config() -> dict[str, Any]:
             f"Expected a YAML mapping in {config_path}, got {type(loaded).__name__}"
         )
 
-    _config_cache = loaded
+    # 2. Determine required keys from config
+    required_keys = _get_required_env_keys(loaded)
 
+    # 3. Load .env if needed
+    env_path = _load_env(required_keys)
+
+    # 4. Validate all required keys are present
+    _validate_env(required_keys)
+
+    # 5. Configure logging
     log_level = loaded.get("logging", {}).get("level", "INFO")
     _configure_logging(log_level)
 
+    # 6. Cache and return
+    _config_cache = loaded
+
     logger.debug("Configuration loaded from %s", config_path)
+    if env_path is not None:
+        logger.debug(".env loaded from %s", env_path)
 
     return _config_cache
 
