@@ -5,7 +5,7 @@ from storymesh.llm.anthropic import AnthropicClient
 
 @pytest.mark.real_api
 def test_anthropic_real_api() -> None:
-    """Requires ANTHROPIC_API_KEY in environment. Run with: pytest -m integration"""
+    """Requires ANTHROPIC_API_KEY in environment. Run with: pytest -m real-apis"""
     client = AnthropicClient()
     result = client.complete(
         prompt="Reply with exactly: hello",
