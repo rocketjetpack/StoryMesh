@@ -115,7 +115,7 @@ def _validate_env(required_keys: set[str]) -> None:
     """Raise if any required API key is missing from the environment."""
     missing = {k for k in required_keys if not os.environ.get(k)}
     if missing:
-        raise EnvironmentError(
+        raise OSError(
             f"Missing required API key(s): {', '.join(sorted(missing))}. "
             f"Set them in your environment, .env in the current directory, "
             f"or ~/.storymesh/.env"

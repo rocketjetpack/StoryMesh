@@ -42,6 +42,9 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov --cov-report term-missing"
+markers = [
+    "real_api: mark as tests that hit real API endpoints"
+]
 
 [tool.mypy]
 python_version = "3.12"
