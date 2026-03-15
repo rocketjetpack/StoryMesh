@@ -22,7 +22,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: pip install -e ".[dev,all-providers]
+        run: pip install -e ".[dev,all-providers]"
         
       - name: Install pytest YAML types
         run: pip install types-PyYAML
