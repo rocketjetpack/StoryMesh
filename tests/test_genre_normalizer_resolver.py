@@ -286,24 +286,36 @@ class TestResolveTones:
 # LLM resolution
 
 class TestResolveLlm:
-    def test_stub_returns_all_unresolved(self) -> None:
-        genres, tones, unresolved = resolve_llm(["xyzzy", "frob"])
-        assert genres == []
-        assert tones == []
-        assert unresolved == ["xyzzy", "frob"]
+    def test_no_client_returns_all_resolved(self) -> None:
+        prompted_text = "xxyzzy frobb glorp glunk"
+        genres, tones, narrative_context, unresolved = resolve_llm(
+            raw_input = prompted_text,
+            resolved_genres = [],
+            resolved_tones = [],
+            remaining_text = prompted_text,
+            llm_client = None
+        )
+        assert unresolved == prompted_text.split()
 
-    def test_stub_empty_input(self) -> None:
-        genres, tones, unresolved = resolve_llm([])
+    def test_no_client_empty_input(self) -> None:
+        genres, tones, narrative_context, unresolved = resolve_llm(
+            raw_input = "fantasy",
+            resolved_genres = ["fantasy"],
+            resolved_tones = [],
+            remaining_text = "",
+            llm_client = None
+        )
         assert genres == []
         assert tones == []
+        assert narrative_context == []
         assert unresolved == []
-
+        
 # Full Pipeline — resolve_all
 
 class TestResolveAll:
     def test_simple_genre_only(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
-        result = resolve_all("fantasy", store)
+        result = resolve_all(raw_input="fantasy", store=store)
         assert len(result.genre_resolutions) == 1
         assert result.genre_resolutions[0].canonical_genres == ["fantasy"]
         assert result.tone_resolutions == []
@@ -311,7 +323,7 @@ class TestResolveAll:
 
     def test_genre_with_tone_modifier(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
-        result = resolve_all("optimistic fantasy", store)
+        result = resolve_all(raw_input="optimistic fantasy", store=store)
         assert len(result.genre_resolutions) == 1
         assert result.genre_resolutions[0].canonical_genres == ["fantasy"]
         assert len(result.tone_resolutions) == 1
@@ -320,7 +332,8 @@ class TestResolveAll:
     def test_complex_multi_genre_with_tone(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
         result = resolve_all(
-            "optimistic post-apocalyptic enemies to lovers mystery", store
+            raw_input="optimistic post-apocalyptic enemies to lovers mystery", 
+            store=store
         )
         genre_tokens = [r.input_token for r in result.genre_resolutions]
         assert "post apocalyptic" in genre_tokens
@@ -336,32 +349,32 @@ class TestResolveAll:
 
     def test_unresolved_tokens_pass_through(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
-        result = resolve_all("fantasy xyzzyfrob", store)
+        result = resolve_all(raw_input="fantasy xyzzyfrob", store=store)
         assert len(result.genre_resolutions) == 1
         assert "xyzzyfrob" in result.unresolved_tokens
 
     def test_empty_input(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
-        result = resolve_all("", store)
+        result = resolve_all(raw_input="", store=store)
         assert result == ResolverResult()
 
     def test_whitespace_only_input(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
-        result = resolve_all("   ", store)
+        result = resolve_all(raw_input="   ", store=store)
         assert result == ResolverResult()
 
     def test_normalization_applied(self, tmp_path: Path) -> None:
         """Input with hyphens and mixed case should still resolve."""
         store = _make_store(tmp_path)
-        result = resolve_all("Dark Fantasy", store)
+        result = resolve_all(raw_input="Dark Fantasy", store=store)
         assert len(result.genre_resolutions) == 1
         assert result.genre_resolutions[0].input_token == "dark fantasy"
 
     def test_llm_fallback_disabled(self, tmp_path: Path) -> None:
         store = _make_store(tmp_path)
         result = resolve_all(
-            "fantasy xyzzy",
-            store,
+            raw_input="fantasy xyzzy",
+            store=store,
             allow_llm_fallback=False,
         )
         assert len(result.genre_resolutions) == 1
@@ -370,7 +383,7 @@ class TestResolveAll:
     def test_all_passes_contribute(self, tmp_path: Path) -> None:
         """Genre from Pass 1, tone from Pass 2, unresolved from Pass 3 stub."""
         store = _make_store(tmp_path)
-        result = resolve_all("gritty mystery xyzzy", store)
+        result = resolve_all(raw_input="gritty mystery xyzzy", store=store)
         assert len(result.genre_resolutions) == 1
         assert result.genre_resolutions[0].input_token == "mystery"
         assert len(result.tone_resolutions) == 1
@@ -380,6 +393,6 @@ class TestResolveAll:
     def test_alias_resolution(self, tmp_path: Path) -> None:
         """'sci-fi' should resolve via the alternate on 'science fiction'."""
         store = _make_store(tmp_path)
-        result = resolve_all("sci-fi", store)
+        result = resolve_all(raw_input="sci-fi", store=store)
         assert len(result.genre_resolutions) == 1
         assert "science_fiction" in result.genre_resolutions[0].canonical_genres

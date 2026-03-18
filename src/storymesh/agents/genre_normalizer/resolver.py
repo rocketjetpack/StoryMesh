@@ -16,6 +16,7 @@ from rapidfuzz import fuzz, process
 
 from storymesh.agents.genre_normalizer.loader import MappingStore
 from storymesh.agents.genre_normalizer.normalize import normalize_text
+from storymesh.llm.base import LLMClient
 from storymesh.schemas.genre_normalizer import (
     GenreMapEntry,
     GenreResolution,
@@ -34,6 +35,7 @@ class ResolverResult:
     """
     genre_resolutions: list[GenreResolution] = field(default_factory=list)
     tone_resolutions: list[ToneResolution] = field(default_factory=list)
+    narrative_context: list[str] = field(default_factory=list)
     unresolved_tokens: list[str] = field(default_factory=list)
 
 # Greedy, longest-match logic
@@ -196,26 +198,42 @@ def resolve_tones(
 
 # Pass 3: LLM fallback (not implemented)
 def resolve_llm(
-        words: list[str],
-    ) -> tuple[list[GenreResolution], list[ToneResolution], list[str]]:
-    """ Pass 3: LLM fallback for leftovers.
+        *,
+        raw_input: str,
+        resolved_genres: list[str],
+        resolved_tones: list[str],
+        remaining_text: str,
+        llm_client: LLMClient | None = None
+    ) -> tuple[list[GenreResolution], list[ToneResolution], list[str], list[str]]:
+    """Pass 3: LLM fallback for leftovers.
 
-    Not yet implemented!
+    Classifies unresolved tokens by asking an LLM to categorize each as
+    a genre, tone, narrative context, or unknown.
 
     Args:
-        words: Leftover words from pass 2.
+        raw_input: The original user-provided string (for context).
+        resolved_genres: Genre names already resolved in Passes 1 and 2.
+        resolved_tones: Tone names already resolved in Passes 1 and 2.
+        remaining_text: Leftover tokens rejoined as a string.
+        llm_client: An LLMClient instance. If None, stub behavior is used.
 
     Returns:
-        A tuple of (genre_resolutions, tone_resolutions, unresolved_words)
+        A tuple of (genre_resolutions, tone_resolutions, narrative_context, unresolved_tokens)
     """
-    return [], [], list(words) # STUB: Return all input words.
+
+    if llm_client is None:
+        return [], [], [], remaining_text.split()
+
+    return [], [], [], remaining_text.split()
 
 # Full resolution pipeline
 def resolve_all(
+        *,
         raw_input: str,
         store: MappingStore,
         fuzzy_threshold: float = 0.85,
-        allow_llm_fallback: bool = True
+        allow_llm_fallback: bool = True,
+        llm_client: LLMClient | None = None
     ) -> ResolverResult:
     """ Run the full pipeline with all three passes.
 
@@ -248,15 +266,35 @@ def resolve_all(
 
     # LLM fallback
     if allow_llm_fallback and leftover_after_tones:
-        llm_genres, llm_tones, unresolved = resolve_llm(leftover_after_tones)
+        resolved_genre_names = [
+            genre for g in genre_resolutions
+                  for genre in g.canonical_genres
+        ]
+        
+        resolved_tone_names = [
+            tone for t in tone_resolutions
+                for tone in t.normalized_tones
+        ]
+
+        remaining_text = " ".join(leftover_after_tones)
+
+        llm_genres, llm_tones, narrative_context, unresolved = resolve_llm(
+            raw_input = raw_input,
+            resolved_genres = resolved_genre_names,
+            resolved_tones = resolved_tone_names,
+            remaining_text = remaining_text,
+            llm_client = llm_client
+        )
 
         genre_resolutions = genre_resolutions + llm_genres
         tone_resolutions = tone_resolutions + llm_tones
     else:
+        narrative_context = []
         unresolved = leftover_after_tones
 
     return ResolverResult(
         genre_resolutions = genre_resolutions,
         tone_resolutions = tone_resolutions,
+        narrative_context = narrative_context,
         unresolved_tokens = unresolved
     )

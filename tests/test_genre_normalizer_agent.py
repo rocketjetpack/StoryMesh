@@ -122,6 +122,45 @@ class TestAgentConstruction:
         agent = GenreNormalizerAgent(store=store, fuzzy_threshold=0.90)
         assert agent is not None
 
+    def test_construct_with_llm_client(self, store: MappingStore) -> None:
+        from storymesh.llm.base import FakeLLMClient
+    
+        client = FakeLLMClient(responses=["{}"])
+        agent = GenreNormalizerAgent(store=store, llm_client=client)
+        assert agent is not None
+ 
+    def test_construct_without_llm_client(self, store: MappingStore) -> None:
+        agent = GenreNormalizerAgent(store=store)
+        assert agent is not None
+
+# ---------------------------------------------------------------------------
+# Narrative Context tests
+# ---------------------------------------------------------------------------
+
+class TestNarrativeContext:
+    def test_empty_when_all_tokens_resolved(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        assert result.narrative_context == []
+ 
+    def test_empty_when_llm_stub_active(self, agent: GenreNormalizerAgent) -> None:
+        """Without a real LLM client, narrative context tokens remain in
+        unresolved_tokens. Once the LLM is wired, tokens like '2085' and
+        'rebellion' would move to narrative_context."""
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="gritty science fiction about a rebellion in 2085",
+        ))
+        assert result.narrative_context == []
+        assert "2085" in result.unresolved_tokens
+        assert "rebellion" in result.unresolved_tokens
+ 
+    def test_empty_when_llm_fallback_disabled(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="mystery set in 2075 chicago",
+            allow_llm_fallback=False,
+        ))
+        assert result.narrative_context == []
+        assert "2075" in result.unresolved_tokens
+        assert "chicago" in result.unresolved_tokens
 
 # ---------------------------------------------------------------------------
 # Output Type and Contract
@@ -146,6 +185,12 @@ class TestOutputContract:
         json_str = result.model_dump_json()
         reconstructed = GenreNormalizerAgentOutput.model_validate_json(json_str)
         assert reconstructed == result
+
+    def test_narrative_context_in_roundtrip(self, agent: GenreNormalizerAgent) -> None:
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        json_str = result.model_dump_json()
+        reconstructed = GenreNormalizerAgentOutput.model_validate_json(json_str)
+        assert reconstructed.narrative_context == result.narrative_context
 
 
 # ---------------------------------------------------------------------------

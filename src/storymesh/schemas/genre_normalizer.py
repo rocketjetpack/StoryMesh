@@ -198,6 +198,11 @@ class GenreNormalizerAgentOutput(BaseModel):
         default_factory=list
     )
 
+    narrative_context: list[str] = Field(
+        default_factory=list,
+        description="Tokens identified as story related context instead of genre or tone information."
+    )
+
     unresolved_tokens: list[str] = Field(
         default_factory=list,
         description="Any tokens from the raw input that failed normalization."

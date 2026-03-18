@@ -13,6 +13,7 @@ from storymesh.agents.genre_normalizer.loader import MappingStore
 from storymesh.agents.genre_normalizer.resolver import resolve_all
 from storymesh.agents.genre_normalizer.tone_merge import merge_tones
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentInput, GenreNormalizerAgentOutput
+from storymesh.llm.base import LLMClient
 
 
 class GenreNormalizerAgent:
@@ -27,7 +28,8 @@ class GenreNormalizerAgent:
             store: MappingStore | None = None,
             genre_map_path: Path | None = None,
             tone_map_path: Path | None = None,
-            fuzzy_threshold: float = 0.85
+            fuzzy_threshold: float = 0.85,
+            llm_client: LLMClient | None = None
         ) -> None:
         """
         Initialize the agent.
@@ -50,6 +52,8 @@ class GenreNormalizerAgent:
 
         self._fuzzy_match_threshold = fuzzy_threshold
 
+        self._llm_client = llm_client
+
     def run(self, input_data: GenreNormalizerAgentInput) -> GenreNormalizerAgentOutput:
         """
         Run the genre normalization pipeline.
@@ -65,7 +69,8 @@ class GenreNormalizerAgent:
             raw_input = input_data.raw_genre,
             store = self._store,
             fuzzy_threshold = self._fuzzy_match_threshold,
-            allow_llm_fallback = input_data.allow_llm_fallback
+            allow_llm_fallback = input_data.allow_llm_fallback,
+            llm_client = self._llm_client,
         )
 
         tone_result = merge_tones(
@@ -95,6 +100,7 @@ class GenreNormalizerAgent:
             tone_conflicts = tone_result.tone_conflicts,
             genre_resolutions = resolver_result.genre_resolutions,
             tone_resolutions = resolver_result.tone_resolutions,
+            narrative_context = resolver_result.narrative_context,
             unresolved_tokens = resolver_result.unresolved_tokens
         )
 
