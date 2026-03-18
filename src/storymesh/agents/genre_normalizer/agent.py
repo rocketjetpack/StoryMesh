@@ -12,8 +12,8 @@ from pathlib import Path
 from storymesh.agents.genre_normalizer.loader import MappingStore
 from storymesh.agents.genre_normalizer.resolver import resolve_all
 from storymesh.agents.genre_normalizer.tone_merge import merge_tones
-from storymesh.schemas.genre_normalizer import GenreNormalizerAgentInput, GenreNormalizerAgentOutput
 from storymesh.llm.base import LLMClient
+from storymesh.schemas.genre_normalizer import GenreNormalizerAgentInput, GenreNormalizerAgentOutput
 
 
 class GenreNormalizerAgent:
