@@ -10,6 +10,7 @@ with tonal information associated with genres.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -154,8 +155,10 @@ class GenreNormalizerAgentInput(BaseModel):
 # -------- GenreNormalizerAgent Output Schema --------
 class GenreNormalizerAgentOutput(BaseModel):
     """Output contract for the GenreNormalizerAgent.
-    This output is frozen and versioned. It represents the complete result
-    of genre normalization including thorough audit trails.
+
+    This output is frozen and versioned. It represents the downstream contract
+    that subsequent agents (e.g. PlotGeneratorAgent) consume. Resolution details
+    and audit trails are available in the ``debug`` dict for observability.
     """
 
     model_config = { "frozen": True }
@@ -175,78 +178,37 @@ class GenreNormalizerAgentOutput(BaseModel):
         description="The list of normalized subgenres that the agent resolved from the raw input." # noqa E501
     )
 
-    default_tones: list[str] = Field(
+    user_tones: list[str] = Field(
         default_factory=list,
-        description="The list of default tones associated with the normalized genres."
+        description="The user's original tone words, normalized only for casing/spelling." # noqa E501
     )
 
-    explicit_tones: list[str] = Field(
-        default_factory=list,
-        description="The list of explicit tones that the agent resolved from the raw input." # noqa E501
+    tone_override: bool = Field(
+        default=False,
+        description="True when user-specified tones diverge from genre default tones." # noqa E501
     )
 
-    effective_tone: str = Field(
-        min_length=1,
-        description="The single effective tone that results from a combination of default and explicit tones." # noqa E501
+    override_note: str | None = Field(
+        default=None,
+        description="Short human-readable summary of which user tones override which genre defaults." # noqa E501
     )
 
-    tone_conflicts: list[str] | None = None # Document any tone conflicts.
-
-    genre_resolutions: list[GenreResolution] = Field(min_length=1)
-
-    tone_resolutions: list[ToneResolution] = Field(
-        default_factory=list
-    )
-
-    narrative_context: list[str] = Field(
-        default_factory=list,
-        description="Tokens identified as story related context instead of genre or tone information."
-    )
-
-    unresolved_tokens: list[str] = Field(
-        default_factory=list,
-        description="Any tokens from the raw input that failed normalization."
-    )
-
-    tone_profile: list[str] = Field (
-        min_length = 1,
-        description="Ordered list of all applicable tones, ranked by priority."
+    debug: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Resolution details, audit trails, and expanded tones for observability." # noqa E501
     )
 
     schema_version: str = GENRE_CONSTRAINT_SCHEMA_VERSION
 
     @model_validator(mode="after")
-    def check_effective_tone_has_source(self) -> GenreNormalizerAgentOutput:
+    def check_override_note_present_when_override(self) -> GenreNormalizerAgentOutput:
         """
-        Validate that the effective tone is derived from at least one default
-        or explicit tone.
+        Validate that override_note is provided when tone_override is True.
         """
-        
-        all_tones = set(self.default_tones) | set(self.explicit_tones)
-        
-        if self.effective_tone not in all_tones:
+
+        if self.tone_override and not self.override_note:
             raise ValueError(
-                "Effective tone must be derived from at least one default or explicit tone." # noqa E501
+                "override_note must be provided when tone_override is True."
             )
 
-        return self
-
-    @model_validator(mode="after")
-    def check_effective_tone_matches_profile(self) -> GenreNormalizerAgentOutput:
-        if self.tone_profile[0] != self.effective_tone:
-            raise ValueError(
-                "effective_tone must match the first element of tone_profile."
-            )
-        return self
-
-    @model_validator(mode="after")
-    def check_tone_conflicts_present_when_expected(self) -> GenreNormalizerAgentOutput:
-        if self.explicit_tones and self.default_tones:
-            explicit_set = set(self.explicit_tones)
-            default_set = set(self.default_tones)
-
-            if not explicit_set.issubset(default_set) and self.tone_conflicts is None: 
-                raise ValueError(
-                    "Tone conflicts must not be None when explicit tones differ from default tones." # noqa E501
-                )
         return self

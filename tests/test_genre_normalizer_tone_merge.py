@@ -1,3 +1,7 @@
+"""
+Unit tests for storymesh.agents.genre_normalizer.tone_merge.
+"""
+
 import pytest
 
 from storymesh.agents.genre_normalizer.tone_merge import (
@@ -9,10 +13,6 @@ from storymesh.schemas.genre_normalizer import (
     ResolutionMethod,
     ToneResolution,
 )
-
-"""
-Unit tests for storymesh.agents.genre_normalizer.tone_merge.
-"""
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -49,11 +49,16 @@ class TestDefaultsOnly:
             genre_resolutions=[_genre_resolution()],
             tone_resolutions=[],
         )
-        assert result.default_tones == ["adventurous", "epic"]
-        assert result.explicit_tones == []
-        assert result.tone_profile == ["adventurous", "epic"]
-        assert result.effective_tone == "adventurous"
-        assert result.tone_conflicts is None
+        # Contract fields
+        assert result.user_tones == []
+        assert result.tone_override is False
+        assert result.override_note is None
+        # Debug fields
+        assert result.debug["default_tones"] == ["adventurous", "epic"]
+        assert result.debug["explicit_tones"] == []
+        assert result.debug["tone_profile"] == ["adventurous", "epic"]
+        assert result.debug["effective_tone"] == "adventurous"
+        assert result.debug["tone_conflicts"] is None
 
     def test_multiple_genres_concatenated(self) -> None:
         result = merge_tones(
@@ -71,9 +76,11 @@ class TestDefaultsOnly:
             ],
             tone_resolutions=[],
         )
-        assert result.default_tones == ["bleak", "tense", "suspenseful", "cerebral"]
-        assert result.tone_profile == ["bleak", "tense", "suspenseful", "cerebral"]
-        assert result.effective_tone == "bleak"
+        assert result.user_tones == []
+        assert result.tone_override is False
+        assert result.debug["default_tones"] == ["bleak", "tense", "suspenseful", "cerebral"]
+        assert result.debug["tone_profile"] == ["bleak", "tense", "suspenseful", "cerebral"]
+        assert result.debug["effective_tone"] == "bleak"
 
     def test_duplicate_defaults_deduplicated(self) -> None:
         result = merge_tones(
@@ -89,8 +96,10 @@ class TestDefaultsOnly:
             ],
             tone_resolutions=[],
         )
-        assert result.default_tones == ["epic", "adventurous", "grand"]
-        assert result.tone_profile == ["epic", "adventurous", "grand"]
+        assert result.user_tones == []
+        assert result.tone_override is False
+        assert result.debug["default_tones"] == ["epic", "adventurous", "grand"]
+        assert result.debug["tone_profile"] == ["epic", "adventurous", "grand"]
 
 
 # ---------------------------------------------------------------------------
@@ -105,11 +114,14 @@ class TestExplicitsOnly:
             ],
             tone_resolutions=[_tone_resolution()],
         )
-        assert result.explicit_tones == ["optimistic", "hopeful"]
-        assert result.default_tones == []
-        assert result.tone_profile == ["optimistic", "hopeful"]
-        assert result.effective_tone == "optimistic"
-        assert result.tone_conflicts is None
+        assert result.user_tones == ["optimistic"]
+        assert result.tone_override is False
+        assert result.override_note is None
+        assert result.debug["explicit_tones"] == ["optimistic", "hopeful"]
+        assert result.debug["default_tones"] == []
+        assert result.debug["tone_profile"] == ["optimistic", "hopeful"]
+        assert result.debug["effective_tone"] == "optimistic"
+        assert result.debug["tone_conflicts"] is None
 
     def test_multiple_explicits(self) -> None:
         result = merge_tones(
@@ -127,8 +139,10 @@ class TestExplicitsOnly:
                 ),
             ],
         )
-        assert result.explicit_tones == ["gritty", "raw", "optimistic", "hopeful"]
-        assert result.effective_tone == "gritty"
+        assert result.user_tones == ["gritty", "optimistic"]
+        assert result.tone_override is False
+        assert result.debug["explicit_tones"] == ["gritty", "raw", "optimistic", "hopeful"]
+        assert result.debug["effective_tone"] == "gritty"
 
     def test_duplicate_explicits_deduplicated(self) -> None:
         result = merge_tones(
@@ -146,8 +160,8 @@ class TestExplicitsOnly:
                 ),
             ],
         )
-        # "dark" appears in both, should only appear once
-        assert result.explicit_tones == ["dark", "grim", "gritty"]
+        assert result.user_tones == ["dark", "gritty"]
+        assert result.debug["explicit_tones"] == ["dark", "grim", "gritty"]
 
 
 # ---------------------------------------------------------------------------
@@ -170,11 +184,14 @@ class TestCombinedPriority:
                 ),
             ],
         )
-        assert result.tone_profile == [
+        assert result.user_tones == ["optimistic"]
+        assert result.tone_override is True
+        assert result.override_note is not None
+        assert result.debug["tone_profile"] == [
             "optimistic", "hopeful",
             "bleak", "tense", "survivalist",
         ]
-        assert result.effective_tone == "optimistic"
+        assert result.debug["effective_tone"] == "optimistic"
 
     def test_shared_tone_appears_in_explicit_position(self) -> None:
         """If an explicit tone matches a default, it stays in explicit position only."""
@@ -191,9 +208,10 @@ class TestCombinedPriority:
                 ),
             ],
         )
-        # "dark" is in both, appears once in explicit position
-        assert result.tone_profile == ["dark", "grim", "brooding", "ominous"]
-        assert result.effective_tone == "dark"
+        assert result.user_tones == ["dark"]
+        assert result.tone_override is True
+        assert result.debug["tone_profile"] == ["dark", "grim", "brooding", "ominous"]
+        assert result.debug["effective_tone"] == "dark"
 
     def test_multiple_genres_and_explicits(self) -> None:
         result = merge_tones(
@@ -218,11 +236,13 @@ class TestCombinedPriority:
                 ),
             ],
         )
-        assert result.tone_profile == [
+        assert result.user_tones == ["gritty", "optimistic"]
+        assert result.tone_override is True
+        assert result.debug["tone_profile"] == [
             "gritty", "raw", "optimistic", "hopeful",
             "bleak", "tense", "suspenseful", "cerebral",
         ]
-        assert result.effective_tone == "gritty"
+        assert result.debug["effective_tone"] == "gritty"
 
 
 # ---------------------------------------------------------------------------
@@ -244,9 +264,11 @@ class TestConflictDetection:
                 ),
             ],
         )
-        assert result.tone_conflicts is not None
-        assert len(result.tone_conflicts) == 1
-        assert "optimistic" in result.tone_conflicts[0]
+        assert result.tone_override is True
+        assert result.override_note is not None
+        assert result.debug["tone_conflicts"] is not None
+        assert len(result.debug["tone_conflicts"]) == 1
+        assert "optimistic" in result.debug["tone_conflicts"][0]
 
     def test_no_conflict_when_explicit_subset_of_defaults(self) -> None:
         result = merge_tones(
@@ -262,7 +284,9 @@ class TestConflictDetection:
                 ),
             ],
         )
-        assert result.tone_conflicts is None
+        assert result.tone_override is False
+        assert result.override_note is None
+        assert result.debug["tone_conflicts"] is None
 
     def test_no_conflict_when_no_defaults(self) -> None:
         result = merge_tones(
@@ -276,7 +300,8 @@ class TestConflictDetection:
                 ),
             ],
         )
-        assert result.tone_conflicts is None
+        assert result.tone_override is False
+        assert result.debug["tone_conflicts"] is None
 
     def test_no_conflict_when_no_explicits(self) -> None:
         result = merge_tones(
@@ -285,7 +310,8 @@ class TestConflictDetection:
             ],
             tone_resolutions=[],
         )
-        assert result.tone_conflicts is None
+        assert result.tone_override is False
+        assert result.debug["tone_conflicts"] is None
 
     def test_multiple_conflicts(self) -> None:
         result = merge_tones(
@@ -305,8 +331,10 @@ class TestConflictDetection:
                 ),
             ],
         )
-        assert result.tone_conflicts is not None
-        assert len(result.tone_conflicts) == 2
+        assert result.tone_override is True
+        assert result.user_tones == ["optimistic", "lighthearted"]
+        assert result.debug["tone_conflicts"] is not None
+        assert len(result.debug["tone_conflicts"]) == 2
 
     def test_partial_conflict(self) -> None:
         """One explicit matches defaults, another doesn't."""
@@ -327,9 +355,11 @@ class TestConflictDetection:
                 ),
             ],
         )
-        assert result.tone_conflicts is not None
-        assert len(result.tone_conflicts) == 1
-        assert "optimistic" in result.tone_conflicts[0]
+        assert result.tone_override is True
+        assert result.user_tones == ["dark", "optimistic"]
+        assert result.debug["tone_conflicts"] is not None
+        assert len(result.debug["tone_conflicts"]) == 1
+        assert "optimistic" in result.debug["tone_conflicts"][0]
 
 
 # ---------------------------------------------------------------------------
@@ -344,9 +374,11 @@ class TestFallback:
             ],
             tone_resolutions=[],
         )
-        assert result.effective_tone == "neutral"
-        assert result.tone_profile == ["neutral"]
-        assert result.tone_conflicts is None
+        assert result.user_tones == []
+        assert result.tone_override is False
+        assert result.debug["effective_tone"] == "neutral"
+        assert result.debug["tone_profile"] == ["neutral"]
+        assert result.debug["tone_conflicts"] is None
 
     def test_empty_resolutions(self) -> None:
         """Edge case: no resolutions at all. Shouldn't happen in practice
@@ -355,8 +387,10 @@ class TestFallback:
             genre_resolutions=[],
             tone_resolutions=[],
         )
-        assert result.effective_tone == "neutral"
-        assert result.tone_profile == ["neutral"]
+        assert result.user_tones == []
+        assert result.tone_override is False
+        assert result.debug["effective_tone"] == "neutral"
+        assert result.debug["tone_profile"] == ["neutral"]
 
 
 # ---------------------------------------------------------------------------
@@ -367,12 +401,11 @@ class TestToneMergeResult:
     def test_frozen(self) -> None:
         result = ToneMergeResult()
         with pytest.raises(AttributeError):
-            result.effective_tone = "changed"  # type: ignore[misc]
+            result.user_tones = ["changed"]  # type: ignore[misc]
 
     def test_defaults(self) -> None:
         result = ToneMergeResult()
-        assert result.default_tones == []
-        assert result.explicit_tones == []
-        assert result.tone_profile == []
-        assert result.effective_tone == "neutral"
-        assert result.tone_conflicts is None
+        assert result.user_tones == []
+        assert result.tone_override is False
+        assert result.override_note is None
+        assert result.debug == {}

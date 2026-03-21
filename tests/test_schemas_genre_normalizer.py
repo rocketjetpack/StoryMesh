@@ -45,11 +45,6 @@ def _output(**overrides: object) -> GenreNormalizerAgentOutput:
     defaults = dict(
         raw_input="dark fantasy",
         normalized_genres=["Fantasy"],
-        default_tones=["adventurous"],
-        explicit_tones=[],
-        effective_tone="adventurous",
-        genre_resolutions=[_genre_resolution()],
-        tone_profile = ["adventurous"]
     )
     return GenreNormalizerAgentOutput(**(defaults | overrides))
 
@@ -224,34 +219,46 @@ class TestGenreNormalizerAgentInput:
 # ---------------------------------------------------------------------------
 
 class TestGenreNormalizerAgentOutput:
-    def test_valid_no_explicit_tones(self) -> None:
+    def test_valid_minimal(self) -> None:
         out = _output()
         assert out.raw_input == "dark fantasy"
         assert out.normalized_genres == ["Fantasy"]
-        assert out.tone_profile == ["adventurous"]
-        assert out.effective_tone == "adventurous"
+        assert out.user_tones == []
+        assert out.tone_override is False
+        assert out.override_note is None
+        assert out.debug == {}
         assert out.schema_version == GENRE_CONSTRAINT_SCHEMA_VERSION
 
-    def test_valid_explicit_tone_matches_default(self) -> None:
-        # explicit subset of default => no conflict needed
-        out = _output(
-            default_tones=["adventurous", "dark"],
-            explicit_tones=["dark"],
-            effective_tone="dark",
-            tone_conflicts=None,
-            tone_profile=["dark"]
-        )
-        assert out.effective_tone == "dark"
+    def test_valid_with_user_tones_no_override(self) -> None:
+        out = _output(user_tones=["dark"])
+        assert out.user_tones == ["dark"]
+        assert out.tone_override is False
+        assert out.override_note is None
 
-    def test_valid_with_tone_conflicts(self) -> None:
+    def test_valid_with_override(self) -> None:
         out = _output(
-            default_tones=["adventurous"],
-            explicit_tones=["dark"],
-            effective_tone="dark",
-            tone_conflicts=["dark vs adventurous"],
-            tone_profile=["dark"]
+            user_tones=["dreamy", "cozy"],
+            tone_override=True,
+            override_note="User tones (dreamy, cozy) override typical genre defaults (epic, grand)",
         )
-        assert out.tone_conflicts == ["dark vs adventurous"]
+        assert out.tone_override is True
+        assert out.override_note is not None
+
+    def test_override_without_note_raises(self) -> None:
+        with pytest.raises(ValidationError, match="override_note must be provided"):
+            _output(tone_override=True, override_note=None)
+
+    def test_override_with_empty_note_raises(self) -> None:
+        with pytest.raises(ValidationError, match="override_note must be provided"):
+            _output(tone_override=True, override_note="")
+
+    def test_no_override_with_note_is_valid(self) -> None:
+        """override_note present but tone_override False is allowed."""
+        out = _output(
+            tone_override=False,
+            override_note="Some note",
+        )
+        assert out.override_note == "Some note"
 
     def test_frozen(self) -> None:
         out = _output()
@@ -266,48 +273,6 @@ class TestGenreNormalizerAgentOutput:
         with pytest.raises(ValidationError):
             _output(normalized_genres=[])
 
-    def test_empty_genre_resolutions_raises(self) -> None:
-        with pytest.raises(ValidationError):
-            _output(genre_resolutions=[])
-
-    def test_effective_tone_not_in_any_tone_raises(self) -> None:
-        with pytest.raises(ValidationError, match="Effective tone must be derived"):
-            _output(
-                default_tones=["adventurous"],
-                explicit_tones=[],
-                effective_tone="unknown_tone",
-            )
-
-    def test_effective_tone_from_explicit_only(self) -> None:
-        # no default tones; effective_tone comes from explicit
-        out = _output(
-            default_tones=[],
-            explicit_tones=["dark"],
-            effective_tone="dark",
-            tone_profile=["dark"]
-        )
-        assert out.effective_tone == "dark"
-
-    def test_tone_conflict_required_when_explicit_not_subset_of_default(self) -> None:
-        with pytest.raises(ValidationError, match="Tone conflicts must not be None"):
-            _output(
-                default_tones=["adventurous"],
-                explicit_tones=["dark"],
-                effective_tone="dark",
-                tone_conflicts=None,  # should be required
-                tone_profile=["dark"]
-            )
-
-    def test_no_tone_conflict_when_explicit_subset_of_default(self) -> None:
-        # explicit == {"adventurous"} which is a subset of default => no conflict needed
-        out = _output(
-            default_tones=["adventurous", "dark"],
-            explicit_tones=["adventurous"],
-            effective_tone="adventurous",
-            tone_conflicts=None,
-        )
-        assert out.tone_conflicts is None
-
     def test_schema_version(self) -> None:
         out = _output()
         assert out.schema_version == GENRE_CONSTRAINT_SCHEMA_VERSION
@@ -315,11 +280,18 @@ class TestGenreNormalizerAgentOutput:
     def test_optional_fields_default(self) -> None:
         out = _output()
         assert out.subgenres == []
-        assert out.default_tones == ["adventurous"]
-        assert out.explicit_tones == []
-        assert out.tone_conflicts is None
-        assert out.unresolved_tokens == []
-        assert out.tone_resolutions == []
+        assert out.user_tones == []
+        assert out.tone_override is False
+        assert out.override_note is None
+        assert out.debug == {}
+
+    def test_debug_dict_preserved(self) -> None:
+        debug_data = {
+            "default_tones": ["epic"],
+            "genre_resolutions": [{"input_token": "fantasy"}],
+        }
+        out = _output(debug=debug_data)
+        assert out.debug == debug_data
 
 # ---------------------------------------------------------------------------
 # Round Trip JSON Validation
@@ -335,5 +307,19 @@ class TestRoundTrip:
         json_str = original.model_dump_json()
 
         reconstructed = GenreNormalizerAgentInput.model_validate_json(json_str)
+
+        assert reconstructed == original
+
+    def test_output_roundtrip(self) -> None:
+        original = _output(
+            user_tones=["dreamy", "cozy"],
+            tone_override=True,
+            override_note="User tones (dreamy, cozy) override typical genre defaults (epic)",
+            debug={"default_tones": ["epic"]},
+        )
+
+        json_str = original.model_dump_json()
+
+        reconstructed = GenreNormalizerAgentOutput.model_validate_json(json_str)
 
         assert reconstructed == original

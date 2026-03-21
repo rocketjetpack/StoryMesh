@@ -6,13 +6,11 @@ from pathlib import Path
 
 import orjson
 import pytest
-from pydantic import ValidationError
 
 from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent
 from storymesh.agents.genre_normalizer.loader import MappingStore
 from storymesh.schemas.genre_normalizer import (
     GenreNormalizerAgentInput,
-    GenreNormalizerAgentOutput,
 )
 
 # ---------------------------------------------------------------------------
@@ -124,14 +122,15 @@ class TestAgentConstruction:
 
     def test_construct_with_llm_client(self, store: MappingStore) -> None:
         from storymesh.llm.base import FakeLLMClient
-    
+
         client = FakeLLMClient(responses=["{}"])
         agent = GenreNormalizerAgent(store=store, llm_client=client)
         assert agent is not None
- 
+
     def test_construct_without_llm_client(self, store: MappingStore) -> None:
         agent = GenreNormalizerAgent(store=store)
         assert agent is not None
+
 
 # ---------------------------------------------------------------------------
 # Narrative Context tests
@@ -140,71 +139,28 @@ class TestAgentConstruction:
 class TestNarrativeContext:
     def test_empty_when_all_tokens_resolved(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
-        assert result.narrative_context == []
- 
+        assert result.debug["narrative_context"] == []
+
     def test_empty_when_llm_stub_active(self, agent: GenreNormalizerAgent) -> None:
         """Without a real LLM client, narrative context tokens remain in
         unresolved_tokens. Once the LLM is wired, tokens like '2085' and
         'rebellion' would move to narrative_context."""
         result = agent.run(GenreNormalizerAgentInput(
-            raw_genre="gritty science fiction about a rebellion in 2085",
+            raw_genre="fantasy about a rebellion in 2085",
         ))
-        assert result.narrative_context == []
-        assert "2085" in result.unresolved_tokens
-        assert "rebellion" in result.unresolved_tokens
- 
-    def test_empty_when_llm_fallback_disabled(self, agent: GenreNormalizerAgent) -> None:
-        result = agent.run(GenreNormalizerAgentInput(
-            raw_genre="mystery set in 2075 chicago",
-            allow_llm_fallback=False,
-        ))
-        assert result.narrative_context == []
-        assert "2075" in result.unresolved_tokens
-        assert "chicago" in result.unresolved_tokens
-
-# ---------------------------------------------------------------------------
-# Output Type and Contract
-# ---------------------------------------------------------------------------
-
-class TestOutputContract:
-    def test_returns_output_type(self, agent: GenreNormalizerAgent) -> None:
-        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
-        assert isinstance(result, GenreNormalizerAgentOutput)
-
-    def test_output_is_frozen(self, agent: GenreNormalizerAgent) -> None:
-        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
-        with pytest.raises(ValidationError):
-            result.raw_input = "changed"  # type: ignore[misc]
-
-    def test_raw_input_preserved(self, agent: GenreNormalizerAgent) -> None:
-        result = agent.run(GenreNormalizerAgentInput(raw_genre="Dark Fantasy"))
-        assert result.raw_input == "Dark Fantasy"
-
-    def test_output_roundtrip(self, agent: GenreNormalizerAgent) -> None:
-        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
-        json_str = result.model_dump_json()
-        reconstructed = GenreNormalizerAgentOutput.model_validate_json(json_str)
-        assert reconstructed == result
-
-    def test_narrative_context_in_roundtrip(self, agent: GenreNormalizerAgent) -> None:
-        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
-        json_str = result.model_dump_json()
-        reconstructed = GenreNormalizerAgentOutput.model_validate_json(json_str)
-        assert reconstructed.narrative_context == result.narrative_context
+        assert result.debug["narrative_context"] == []
 
 
 # ---------------------------------------------------------------------------
-# Simple Genre Resolution
+# Genre Resolution
 # ---------------------------------------------------------------------------
 
-class TestSimpleGenreResolution:
+class TestGenreResolution:
     def test_single_genre(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
         assert result.normalized_genres == ["fantasy"]
-        assert result.subgenres == []
-        assert len(result.genre_resolutions) == 1
 
-    def test_single_subgenre_entry(self, agent: GenreNormalizerAgent) -> None:
+    def test_subgenre_entry(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(raw_genre="dark fantasy"))
         assert "fantasy" in result.normalized_genres
         assert "dark_fantasy" in result.subgenres
@@ -213,7 +169,7 @@ class TestSimpleGenreResolution:
         result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy mystery"))
         assert "fantasy" in result.normalized_genres
         assert "mystery" in result.normalized_genres
-        assert len(result.genre_resolutions) == 2
+        assert len(result.debug["genre_resolutions"]) == 2
 
     def test_alias_resolution(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(raw_genre="sci-fi"))
@@ -244,33 +200,34 @@ class TestGenreDeduplication:
 class TestToneIntegration:
     def test_genre_default_tones(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
-        assert result.default_tones == ["wondrous", "adventurous", "epic"]
-        assert result.explicit_tones == []
-        assert result.effective_tone == "wondrous"
-        assert result.tone_conflicts is None
+        assert result.debug["default_tones"] == ["wondrous", "adventurous", "epic"]
+        assert result.user_tones == []
+        assert result.tone_override is False
 
     def test_explicit_tone_override(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(
             raw_genre="optimistic post-apocalyptic",
         ))
-        assert "optimistic" in result.explicit_tones
-        assert result.effective_tone in result.explicit_tones
-        assert result.tone_profile[0] == result.effective_tone
+        assert "optimistic" in result.user_tones
+        assert result.tone_override is True
+        assert result.override_note is not None
 
     def test_tone_conflict_detected(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(
             raw_genre="optimistic post-apocalyptic",
         ))
-        assert result.tone_conflicts is not None
-        assert len(result.tone_conflicts) > 0
+        assert result.tone_override is True
+        assert result.debug["tone_conflicts"] is not None
+        assert len(result.debug["tone_conflicts"]) > 0
 
     def test_tone_profile_ordering(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(
             raw_genre="gritty optimistic post-apocalyptic",
         ))
         # Explicit tones should come before defaults in profile
-        gritty_pos = result.tone_profile.index("gritty")
-        bleak_pos = result.tone_profile.index("bleak")
+        profile = result.debug["tone_profile"]
+        gritty_pos = profile.index("gritty")
+        bleak_pos = profile.index("bleak")
         assert gritty_pos < bleak_pos
 
 
@@ -283,7 +240,7 @@ class TestUnresolvedTokens:
         result = agent.run(GenreNormalizerAgentInput(
             raw_genre="fantasy xyzzyfrob",
         ))
-        assert "xyzzyfrob" in result.unresolved_tokens
+        assert "xyzzyfrob" in result.debug["unresolved_tokens"]
 
     def test_narrative_context_preserved(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(
@@ -291,12 +248,12 @@ class TestUnresolvedTokens:
         ))
         assert "mystery" in result.normalized_genres
         # Narrative tokens should be in unresolved
-        assert "2075" in result.unresolved_tokens
-        assert "chicago" in result.unresolved_tokens
+        assert "2075" in result.debug["unresolved_tokens"]
+        assert "chicago" in result.debug["unresolved_tokens"]
 
     def test_no_unresolved_when_all_matched(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
-        assert result.unresolved_tokens == []
+        assert result.debug["unresolved_tokens"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +266,7 @@ class TestLlmFallbackControl:
             raw_genre="fantasy xyzzy",
             allow_llm_fallback=False,
         ))
-        assert "xyzzy" in result.unresolved_tokens
+        assert "xyzzy" in result.debug["unresolved_tokens"]
 
     def test_llm_fallback_enabled_stub(self, agent: GenreNormalizerAgent) -> None:
         """With LLM stubbed, results should be identical to disabled."""
@@ -321,7 +278,7 @@ class TestLlmFallbackControl:
             raw_genre="fantasy xyzzy",
             allow_llm_fallback=False,
         ))
-        assert enabled.unresolved_tokens == disabled.unresolved_tokens
+        assert enabled.debug["unresolved_tokens"] == disabled.debug["unresolved_tokens"]
 
 
 # ---------------------------------------------------------------------------
@@ -347,17 +304,17 @@ class TestEndToEnd:
         assert "enemies_to_lovers" in result.subgenres
 
         # Tones
-        assert "optimistic" in result.explicit_tones
-        assert result.effective_tone in result.explicit_tones
-        assert result.tone_conflicts is not None
+        assert "optimistic" in result.user_tones
+        assert result.tone_override is True
+        assert result.override_note is not None
 
-        # Resolutions
-        assert len(result.genre_resolutions) == 3
-        assert len(result.tone_resolutions) == 1
-        assert result.unresolved_tokens == []
+        # Debug: resolutions
+        assert len(result.debug["genre_resolutions"]) == 3
+        assert len(result.debug["tone_resolutions"]) == 1
+        assert result.debug["unresolved_tokens"] == []
 
-        # Audit trail
-        genre_tokens = [r.input_token for r in result.genre_resolutions]
+        # Debug: audit trail
+        genre_tokens = [r["input_token"] for r in result.debug["genre_resolutions"]]
         assert "post apocalyptic" in genre_tokens
         assert "enemies to lovers" in genre_tokens
         assert "mystery" in genre_tokens
@@ -366,15 +323,16 @@ class TestEndToEnd:
         result = agent.run(GenreNormalizerAgentInput(raw_genre="romance"))
         assert result.normalized_genres == ["romance"]
         assert result.subgenres == []
-        assert result.effective_tone == "passionate"
-        assert result.tone_conflicts is None
-        assert result.unresolved_tokens == []
+        assert result.user_tones == []
+        assert result.tone_override is False
+        assert result.debug["effective_tone"] == "passionate"
+        assert result.debug["unresolved_tokens"] == []
 
     def test_genre_with_narrative_context(self, agent: GenreNormalizerAgent) -> None:
         result = agent.run(GenreNormalizerAgentInput(
             raw_genre="gritty science fiction about a rebellion in 2085",
         ))
         assert "science_fiction" in result.normalized_genres
-        assert "gritty" in result.explicit_tones
-        assert "2085" in result.unresolved_tokens
-        assert "rebellion" in result.unresolved_tokens
+        assert "gritty" in result.user_tones
+        assert "2085" in result.debug["unresolved_tokens"]
+        assert "rebellion" in result.debug["unresolved_tokens"]

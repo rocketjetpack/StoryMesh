@@ -11,6 +11,7 @@ Conflict example would be if the user requested 'optimistic dystopian romance' b
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from storymesh.schemas.genre_normalizer import GenreResolution, ToneResolution
 
@@ -22,13 +23,17 @@ class ToneMergeResult:
     The result of merging tones that are implicit from genres with tones that are requested by the user.
 
     This is an intra-agent data class and not a contract.
+    Contract fields (user_tones, tone_override, override_note) travel downstream.
+    The debug dict holds resolution details for observability.
     """
 
-    default_tones: list[str] = field(default_factory=list)
-    explicit_tones: list[str] = field(default_factory=list)
-    tone_profile: list[str] = field(default_factory=list)
-    effective_tone: str = _FALLBACK_TONE # Ensure the effective tone is valid even if no tones were resolved
-    tone_conflicts: list[str] | None = None
+    # --- Downstream contract fields ---
+    user_tones: list[str] = field(default_factory=list)
+    tone_override: bool = False
+    override_note: str | None = None
+
+    # --- Debug/audit fields ---
+    debug: dict[str, Any] = field(default_factory=dict)
 
 def _deduplicate_preserve_order(items: list[str]) -> list[str]:
     """Remove duplicates from a list without disrupting overall order."""
@@ -48,29 +53,37 @@ def merge_tones(
     ) -> ToneMergeResult:
     """
     Merge default tones resolved from genres with explicit tones provided by the user.
-    
-    Priority:
-    1. Explicit tones in order of appearance.
-    2. Genre default tones ordered by resolution position.
+
+    Produces a simplified result for the downstream contract and detailed
+    audit information in the debug dict.
 
     Args:
         genre_resolutions: Genre resolutions list that contains default_tones.
         tone_resolutions: Tone resolution list containing explicit normalized_tones.
 
     Returns:
-        A ToneMergeResult with the full tone profile, effective tone, and a list of tone conflicts.
+        A ToneMergeResult with user_tones, tone_override, override_note, and debug data.
     """
 
+    # --- Gather defaults from genres ---
     raw_defaults: list[str] = []
     for genre_resolution in genre_resolutions:
         raw_defaults.extend(genre_resolution.default_tones)
     default_tones = _deduplicate_preserve_order(raw_defaults)
 
+    # --- Gather expanded explicit tones (for debug) ---
     raw_explicits: list[str] = []
     for tone_resolution in tone_resolutions:
         raw_explicits.extend(tone_resolution.normalized_tones)
     explicit_tones = _deduplicate_preserve_order(raw_explicits)
 
+    # --- Extract user's original tone words (for contract) ---
+    user_tones = _deduplicate_preserve_order([
+        tone_resolution.input_token
+        for tone_resolution in tone_resolutions
+    ])
+
+    # --- Build the full tone profile (for debug) ---
     profile = list(explicit_tones)
     explicit_set = set(explicit_tones)
     for tone in default_tones:
@@ -82,8 +95,11 @@ def merge_tones(
 
     effective_tone = profile[0]
 
-    # Detect conflicts
+    # --- Detect conflicts / override ---
     tone_conflicts: list[str] | None = None
+    tone_override = False
+    override_note: str | None = None
+
     if explicit_tones and default_tones:
         default_set = set(default_tones)
         conflicts = [
@@ -94,11 +110,27 @@ def merge_tones(
         ]
         if conflicts:
             tone_conflicts = conflicts
+            tone_override = True
+            user_str = ", ".join(user_tones)
+            default_str = ", ".join(default_tones)
+            override_note = (
+                f"User tones ({user_str}) override typical "
+                f"genre defaults ({default_str})"
+            )
+
+    # --- Assemble debug dict ---
+    debug: dict[str, Any] = {
+        "default_tones": default_tones,
+        "explicit_tones": explicit_tones,
+        "expanded_tones": explicit_tones,
+        "tone_profile": profile,
+        "effective_tone": effective_tone,
+        "tone_conflicts": tone_conflicts,
+    }
 
     return ToneMergeResult(
-        default_tones = default_tones,
-        explicit_tones = explicit_tones,
-        tone_profile = profile,
-        effective_tone = effective_tone,
-        tone_conflicts = tone_conflicts
+        user_tones = user_tones,
+        tone_override = tone_override,
+        override_note = override_note,
+        debug = debug,
     )

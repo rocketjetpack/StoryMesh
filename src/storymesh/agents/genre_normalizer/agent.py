@@ -2,12 +2,14 @@
 GenreNormalizerAgent - The public interface for normalizing genres from user prompts.
 
 Takes the raw user input and produces a structured, validated output which contains
-normalized genres, subgenres, tone profile, and full audit trails.
+normalized genres, subgenres, user tones, and override information for downstream agents.
+Resolution details and audit trails are available in the debug dict.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from storymesh.agents.genre_normalizer.loader import MappingStore
 from storymesh.agents.genre_normalizer.resolver import resolve_all
@@ -94,20 +96,24 @@ class GenreNormalizerAgent:
                 for subgenre in resolution.subgenres
         ])
 
+        # Build the debug dict with full resolution and audit data.
+        debug: dict[str, Any] = {
+            **tone_result.debug,
+            "genre_resolutions": [r.model_dump() for r in resolver_result.genre_resolutions],
+            "tone_resolutions": [r.model_dump() for r in resolver_result.tone_resolutions],
+            "narrative_context": resolver_result.narrative_context,
+            "unresolved_tokens": resolver_result.unresolved_tokens,
+        }
+
         # Assemble the output contract.
         return GenreNormalizerAgentOutput(
             raw_input = input_data.raw_genre,
             normalized_genres = normalized_genres,
             subgenres = subgenres,
-            default_tones = tone_result.default_tones,
-            explicit_tones = tone_result.explicit_tones,
-            effective_tone = tone_result.effective_tone,
-            tone_profile = tone_result.tone_profile,
-            tone_conflicts = tone_result.tone_conflicts,
-            genre_resolutions = resolver_result.genre_resolutions,
-            tone_resolutions = resolver_result.tone_resolutions,
-            narrative_context = resolver_result.narrative_context,
-            unresolved_tokens = resolver_result.unresolved_tokens
+            user_tones = tone_result.user_tones,
+            tone_override = tone_result.tone_override,
+            override_note = tone_result.override_note,
+            debug = debug,
         )
 
 def _deduplicate_preserve_order(items: list[str]) -> list[str]:
