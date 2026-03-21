@@ -1,0 +1,58 @@
+# ------
+# StoryMesh Global Configuration File
+# ------
+# Non-secret settings that control the pipeline.
+# API keys live in .env (see .env.example). This file is committed to the
+# repository so that model choices, temperatures, and defaults are
+# controllable and trackable over time.
+#
+# This file provides safe defaults for development, CI, and testing.
+# The LLM provider API keys are read from the environment; if absent,
+# agents fall back to static-only mode (no LLM calls).
+# ------
+
+# ------
+# LLM defaults
+# ------
+# These settings apply when an agent does not specify overrides.
+llm:
+  default_provider: anthropic
+  default_model: claude-haiku-4-5-20251001
+  default_max_tokens: 1024
+  default_temperature: 1.0
+
+# ------
+# Per-Agent overrides
+# ------
+agents:
+  genre_normalizer:
+    provider: anthropic
+    model: claude-haiku-4-5-20251001
+    temperature: 0.0
+    max_tokens: 1024
+  proposal_generation:
+    provider: anthropic
+    model: claude-sonnet-4-6
+    temperature: 1.0
+    max_tokens: 4096
+
+# ------
+# Caching Configuration
+# ------
+cache:
+  dir: ~/.cache/storymesh
+
+# ------
+# Logging
+# ------
+logging:
+  level: INFO
+
+# ------
+# LangSmith Observability (optional)
+# ------
+# Enable tracing: pip install "storymesh[langsmith]"
+# Then set LANGCHAIN_TRACING_V2=true and LANGCHAIN_API_KEY in .env.
+# The project name groups all pipeline runs in the LangSmith dashboard.
+langsmith:
+  project: storymesh-dev

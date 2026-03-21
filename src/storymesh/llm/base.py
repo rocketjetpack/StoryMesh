@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Any
 
 import orjson
@@ -13,6 +14,28 @@ logger = logging.getLogger(__name__)
 
 # This is a defensive regular expression to strip markdown fences from LLM replies.
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
+
+
+def _traceable[F: Callable[..., object]](fn: F) -> F:
+    """Wrap a callable with LangSmith tracing if langsmith is installed.
+
+    When ``langsmith`` is not installed or ``LANGCHAIN_TRACING_V2`` is not
+    set, this is a transparent no-op with zero runtime cost. Apply it to
+    ``complete()`` implementations so that individual LLM calls appear as
+    spans in the LangSmith dashboard alongside the LangGraph node traces.
+
+    Args:
+        fn: The callable to wrap.
+
+    Returns:
+        The wrapped callable (or the original, if langsmith is absent).
+    """
+    try:
+        from langsmith import traceable
+
+        return traceable(fn)  # type: ignore[return-value]  # langsmith's return type is not F-compatible
+    except ImportError:
+        return fn
 
 def _strip_markdown_fences(text: str) -> str:
     match = _FENCE_RE.search(text)

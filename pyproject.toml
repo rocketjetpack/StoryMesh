@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "storymesh"
-version = "0.3.0"
+version = "0.4.0"
 description = "Production-grade agentic AI workflow for generating original fiction synopses."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -20,13 +20,15 @@ dependencies = [
     "typer",
     "python-dotenv",
     "pyyaml",
+    "langgraph>=0.2",
 ]
 
 [project.optional-dependencies]
 openai = ["openai>=2.24.0"]
 anthropic = ["anthropic>=0.84.0"]
 gemini = ["google-generativeai>=0.8.6"]
-dev = ["pytest", "pytest-cov", "ruff", "mypy"]
+langsmith = ["langsmith>=0.1"]
+dev = ["pytest", "pytest-cov", "ruff", "mypy", "langsmith>=0.1"]
 all-providers = ["anthropic>=0.84.0", "openai>=2.24.0", "google-generativeai>=0.8.6"]
 
 [project.scripts]

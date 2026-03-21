@@ -43,3 +43,14 @@ cache:
 # ------
 logging:
   level: INFO
+
+# ------
+# LangSmith Observability (optional)
+# ------
+# Enable tracing: pip install "storymesh[langsmith]"
+# Then set LANGCHAIN_TRACING_V2=true and LANGCHAIN_API_KEY in .env.
+# The project name groups all pipeline runs in the LangSmith dashboard.
+# LangGraph node spans are traced automatically; individual LLM calls are
+# traced via the @_traceable decorator in storymesh.llm.base.
+langsmith:
+  project: storymesh-dev

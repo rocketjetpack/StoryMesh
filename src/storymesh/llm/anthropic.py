@@ -7,7 +7,7 @@ from typing import Any
 
 import anthropic
 
-from storymesh.llm.base import LLMClient
+from storymesh.llm.base import LLMClient, _traceable
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
@@ -31,6 +31,7 @@ class AnthropicClient(LLMClient):
         super().__init__(api_key=resolved_key, model=resolved_model)
         self.client = anthropic.Anthropic(api_key=resolved_key)
 
+    @_traceable
     def complete(
             self,
             prompt: str,

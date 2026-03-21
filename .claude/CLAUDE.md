@@ -34,3 +34,4 @@ Model selection and temperature should be active decisions to balance accuracy a
 
 ALWAYS propose code and discuss the plan. The primary goal of this project is to become familiar with best practices and strong development patters for agentic workflows.  
 NEVER modify or create files without explicit consent.  
+Do NOT treat README.md as a bible. If a better implementation, tool, architecture, or other topics conflict with README.md ALWAYS highlight this as a topic for discussion.
