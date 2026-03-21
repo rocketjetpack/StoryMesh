@@ -30,6 +30,7 @@ gemini = ["google-generativeai>=0.8.6"]
 langsmith = ["langsmith>=0.1"]
 dev = ["pytest", "pytest-cov", "ruff", "mypy", "langsmith>=0.1"]
 all-providers = ["anthropic>=0.84.0", "openai>=2.24.0", "google-generativeai>=0.8.6"]
+langgraph-studio = ["langgraph-cli[inmem]"]
 
 [project.scripts]
 storymesh = "storymesh.cli:app"

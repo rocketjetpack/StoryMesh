@@ -137,7 +137,11 @@ def build_graph() -> Any:  # noqa: ANN401  # CompiledStateGraph generics not res
 
     from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent  # noqa: PLC0415
 
-    genre_agent = GenreNormalizerAgent(llm_client=genre_llm)
+    genre_agent = GenreNormalizerAgent(
+        llm_client = genre_llm,
+        temperature = genre_cfg.get("temperature", 0.0),
+        max_tokens = genre_cfg.get("max_tokens", 1024)
+        )
     genre_node = make_genre_normalizer_node(genre_agent)
 
     # ── Build the graph ────────────────────────────────────────────────────

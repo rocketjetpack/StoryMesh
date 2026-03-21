@@ -2,6 +2,7 @@
 Unit tests for storymesh.agents.genre_normalizer.resolver
 """
 
+import json
 from pathlib import Path
 
 import orjson
@@ -14,6 +15,7 @@ from storymesh.agents.genre_normalizer.resolver import (
     resolve_llm,
     resolve_tones,
 )
+from storymesh.llm.base import FakeLLMClient
 from storymesh.schemas.genre_normalizer import ResolutionMethod
 
 
@@ -396,3 +398,261 @@ class TestResolveAll:
         result = resolve_all(raw_input="sci-fi", store=store)
         assert len(result.genre_resolutions) == 1
         assert "science_fiction" in result.genre_resolutions[0].canonical_genres
+
+
+
+
+class TestResolveLlmWithClient:
+    """Tests for resolve_llm() when an LLM client is provided."""
+
+    def test_genre_classification(self) -> None:
+        """LLM classifies a token as a genre."""
+        response = json.dumps({"classifications": [
+            {
+                "token": "solarpunk",
+                "type": "genre",
+                "genres": ["science_fiction"],
+                "subgenres": ["solarpunk"],
+                "default_tones": ["optimistic", "hopeful"],
+            },
+        ]})
+        client = FakeLLMClient(responses=[response])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="gritty solarpunk",
+            resolved_genres=[],
+            resolved_tones=["gritty"],
+            remaining_text="solarpunk",
+            llm_client=client,
+        )
+
+        assert len(genres) == 1
+        assert genres[0].input_token == "solarpunk"
+        assert genres[0].canonical_genres == ["science_fiction"]
+        assert genres[0].subgenres == ["solarpunk"]
+        assert genres[0].default_tones == ["optimistic", "hopeful"]
+        assert genres[0].method == ResolutionMethod.LLM_LIVE
+        assert genres[0].confidence == 0.8
+        assert tones == []
+        assert narrative == []
+        assert unresolved == []
+
+    def test_tone_classification(self) -> None:
+        """LLM classifies a token as a tone."""
+        response = json.dumps({"classifications": [
+            {
+                "token": "moody",
+                "type": "tone",
+                "normalized_tones": ["moody", "brooding"],
+            },
+        ]})
+        client = FakeLLMClient(responses=[response])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="moody fantasy",
+            resolved_genres=["fantasy"],
+            resolved_tones=[],
+            remaining_text="moody",
+            llm_client=client,
+        )
+
+        assert genres == []
+        assert len(tones) == 1
+        assert tones[0].input_token == "moody"
+        assert tones[0].normalized_tones == ["moody", "brooding"]
+        assert tones[0].method == ResolutionMethod.LLM_LIVE
+        assert tones[0].confidence == 0.8
+        assert tones[0].is_override is True
+
+    def test_narrative_context_non_stopword(self) -> None:
+        """LLM classifies a token as narrative context (not a stopword)."""
+        response = json.dumps({"classifications": [
+            {"token": "chicago", "type": "narrative_context", "is_stopword": False},
+        ]})
+        client = FakeLLMClient(responses=[response])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="mystery chicago",
+            resolved_genres=["mystery"],
+            resolved_tones=[],
+            remaining_text="chicago",
+            llm_client=client,
+        )
+
+        assert narrative == ["chicago"]
+        assert unresolved == []
+
+    def test_narrative_context_stopword_dropped(self) -> None:
+        """Stopword narrative context tokens are silently dropped."""
+        response = json.dumps({"classifications": [
+            {"token": "in", "type": "narrative_context", "is_stopword": True},
+            {"token": "chicago", "type": "narrative_context", "is_stopword": False},
+        ]})
+        client = FakeLLMClient(responses=[response])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="mystery in chicago",
+            resolved_genres=["mystery"],
+            resolved_tones=[],
+            remaining_text="in chicago",
+            llm_client=client,
+        )
+
+        assert narrative == ["chicago"]
+        assert unresolved == []
+
+    def test_unknown_classification(self) -> None:
+        """LLM classifies a token as unknown."""
+        response = json.dumps({"classifications": [
+            {"token": "xyzzyfrob", "type": "unknown"},
+        ]})
+        client = FakeLLMClient(responses=[response])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="fantasy xyzzyfrob",
+            resolved_genres=["fantasy"],
+            resolved_tones=[],
+            remaining_text="xyzzyfrob",
+            llm_client=client,
+        )
+
+        assert unresolved == ["xyzzyfrob"]
+
+    def test_mixed_classification_types(self) -> None:
+        """LLM returns a mix of all four classification types."""
+        response = json.dumps({"classifications": [
+            {
+                "token": "solarpunk",
+                "type": "genre",
+                "genres": ["science_fiction"],
+                "subgenres": ["solarpunk"],
+                "default_tones": ["optimistic"],
+            },
+            {"token": "moody", "type": "tone", "normalized_tones": ["moody"]},
+            {"token": "in", "type": "narrative_context", "is_stopword": True},
+            {"token": "2085", "type": "narrative_context", "is_stopword": False},
+            {"token": "xyzzy", "type": "unknown"},
+        ]})
+        client = FakeLLMClient(responses=[response])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="solarpunk moody in 2085 xyzzy",
+            resolved_genres=[],
+            resolved_tones=[],
+            remaining_text="solarpunk moody in 2085 xyzzy",
+            llm_client=client,
+        )
+
+        assert len(genres) == 1
+        assert genres[0].input_token == "solarpunk"
+        assert len(tones) == 1
+        assert tones[0].input_token == "moody"
+        assert narrative == ["2085"]
+        assert unresolved == ["xyzzy"]
+
+    def test_llm_call_exception_falls_back(self) -> None:
+        """If the LLM call raises, all tokens become unresolved."""
+        client = FakeLLMClient(responses=["this is not valid json at all {{{{"])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="fantasy solarpunk xyzzy",
+            resolved_genres=["fantasy"],
+            resolved_tones=[],
+            remaining_text="solarpunk xyzzy",
+            llm_client=client,
+        )
+
+        assert genres == []
+        assert tones == []
+        assert narrative == []
+        assert unresolved == ["solarpunk", "xyzzy"]
+
+    def test_invalid_schema_falls_back(self) -> None:
+        """Valid JSON that fails _ClassificationResponse validation."""
+        response = json.dumps({"wrong_key": "no classifications here"})
+        client = FakeLLMClient(responses=[response])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="fantasy solarpunk",
+            resolved_genres=["fantasy"],
+            resolved_tones=[],
+            remaining_text="solarpunk",
+            llm_client=client,
+        )
+
+        assert genres == []
+        assert unresolved == ["solarpunk"]
+
+    def test_genre_missing_genres_list_skipped(self) -> None:
+        """A genre classification with empty genres list is skipped."""
+        response = json.dumps({"classifications": [
+            {"token": "solarpunk", "type": "genre", "genres": []},
+            {"token": "2085", "type": "narrative_context", "is_stopword": False},
+        ]})
+        client = FakeLLMClient(responses=[response])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="solarpunk 2085",
+            resolved_genres=[],
+            resolved_tones=[],
+            remaining_text="solarpunk 2085",
+            llm_client=client,
+        )
+
+        assert genres == []
+        assert narrative == ["2085"]
+        assert unresolved == ["solarpunk"]
+
+    def test_tone_missing_tones_list_skipped(self) -> None:
+        """A tone classification with empty normalized_tones is skipped."""
+        response = json.dumps({"classifications": [
+            {"token": "moody", "type": "tone", "normalized_tones": []},
+        ]})
+        client = FakeLLMClient(responses=[response])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="moody fantasy",
+            resolved_genres=["fantasy"],
+            resolved_tones=[],
+            remaining_text="moody",
+            llm_client=client,
+        )
+
+        assert tones == []
+        assert unresolved == ["moody"]
+
+    def test_empty_remaining_text_skips_llm_call(self) -> None:
+        """Empty remaining_text returns immediately without calling the LLM."""
+        client = FakeLLMClient(responses=[])  # No responses — would error if called
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="fantasy",
+            resolved_genres=["fantasy"],
+            resolved_tones=[],
+            remaining_text="",
+            llm_client=client,
+        )
+
+        assert genres == []
+        assert tones == []
+        assert narrative == []
+        assert unresolved == []
+        assert client.call_count == 0
+
+    def test_whitespace_remaining_text_skips_llm_call(self) -> None:
+        """Whitespace-only remaining_text returns immediately without calling the LLM."""
+        client = FakeLLMClient(responses=[])
+
+        genres, tones, narrative, unresolved = resolve_llm(
+            raw_input="fantasy",
+            resolved_genres=["fantasy"],
+            resolved_tones=[],
+            remaining_text="   ",
+            llm_client=client,
+        )
+
+        assert genres == []
+        assert tones == []
+        assert narrative == []
+        assert unresolved == []
+        assert client.call_count == 0

@@ -29,7 +29,9 @@ class GenreNormalizerAgent:
             genre_map_path: Path | None = None,
             tone_map_path: Path | None = None,
             fuzzy_threshold: float = 0.85,
-            llm_client: LLMClient | None = None
+            llm_client: LLMClient | None = None,
+            temperature: float = 0.0,
+            max_tokens: int = 1024
         ) -> None:
         """
         Initialize the agent.
@@ -53,6 +55,8 @@ class GenreNormalizerAgent:
         self._fuzzy_match_threshold = fuzzy_threshold
 
         self._llm_client = llm_client
+        self._temperature = temperature
+        self._max_tokens = max_tokens
 
     def run(self, input_data: GenreNormalizerAgentInput) -> GenreNormalizerAgentOutput:
         """
@@ -71,6 +75,8 @@ class GenreNormalizerAgent:
             fuzzy_threshold = self._fuzzy_match_threshold,
             allow_llm_fallback = input_data.allow_llm_fallback,
             llm_client = self._llm_client,
+            temperature = self._temperature,
+            max_tokens = self._max_tokens
         )
 
         tone_result = merge_tones(

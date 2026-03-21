@@ -1,0 +1,7 @@
+{
+    "dependencies": ["./"],
+    "graphs": {
+        "storymesh": "./src/storymesh/orchestration/graph.py:build_graph"
+    },
+    "env": "~/.storymesh/.env"
+}

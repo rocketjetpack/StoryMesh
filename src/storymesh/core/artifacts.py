@@ -28,7 +28,7 @@ class ArtifactStore:
         stage_dir.mkdir(parents=True, exist_ok=True)
         return stage_dir / f"{stage_hash}.json"
     
-    def save_stage(self, stage_name: str, stage_hash: str, data: dict[str, Any]) -> None: # noqa: E501
+    def save_stage(self, stage_name: str, stage_hash: str, data: dict[str, Any]) -> None:
         """
         Save stage artifacts to the appropriate path based on the stage name and hash.
         
@@ -42,6 +42,19 @@ class ArtifactStore:
         """
         path = self.stage_path(stage_name, stage_hash)
         path.write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2))
+
+    def save_run_file(self, run_hash: str, filename: str, data: dict[str, Any]) -> None:
+        """
+        Save a JSON file within a run directory.
+
+        Args:
+            run_hash: Unique identifier for a specific run.
+            filename: Name of the file to write
+            data: The data to write as JSON
+        """
+        run_dir = self.runs_dir / run_hash
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / filename).write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2))
 
     def load_stage(self, stage_name: str, stage_hash: str) -> dict[str, Any] | None:
         """
@@ -71,7 +84,5 @@ class ArtifactStore:
         :param data: Description
         :type data: Dict[str, Any]
         """
-        run_dir = self.runs_dir / run_hash
-        run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / "run_metadata.json").write_bytes(orjson.dumps(
-            data, option=orjson.OPT_INDENT_2))
+        
+        self.save_run_file(run_hash, "run_metadata.json", data)

@@ -9,9 +9,12 @@ Implements a three-pass resolution pipeline:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Literal
 
+from pydantic import BaseModel, Field
 from rapidfuzz import fuzz, process
 
 from storymesh.agents.genre_normalizer.loader import MappingStore
@@ -25,6 +28,7 @@ from storymesh.schemas.genre_normalizer import (
     ToneResolution,
 )
 
+logger= logging.getLogger(__name__)
 
 # Resolver result class
 @dataclass(frozen=True)
@@ -37,6 +41,35 @@ class ResolverResult:
     tone_resolutions: list[ToneResolution] = field(default_factory=list)
     narrative_context: list[str] = field(default_factory=list)
     unresolved_tokens: list[str] = field(default_factory=list)
+
+# Private model for parsing LLM classification responses
+class _Classification(BaseModel):
+    """
+    A single classification entry returned by the LLM during resolution.
+
+    All type-specific fields default to empty/false so the model parses regardless of which
+    fields the LLM response actually includes. Validation that the correct fields are populated
+    for a given type happens during the conversion to GenreResolution or ToneResolution.
+    """
+    model_config = { "frozen": True }
+    token: str = Field(min_length=1, description="The original token or merged phrase from the input.")
+    type: Literal["genre", "tone", "narrative_context", "unknown"]
+    genres: list[str] = Field(default_factory=list)
+    subgenres: list[str] = Field(default_factory=list)
+    default_tones: list[str] = Field(default_factory=list)
+    normalized_tones: list[str] = Field(default_factory=list)
+    is_stopword: bool = False
+
+class _ClassificationResponse(BaseModel):
+    """
+    Top level wrapper for the LLM classiciation response.
+
+    Validates that the response contains a 'classifications' list. Individual entries that fail
+    validation against the _Classification model are rejected automatically.
+    """
+    model_config = { "frozen": True }
+    classifications: list[_Classification] = Field(default_factory=list)
+
 
 # Greedy, longest-match logic
 def _greedy_longest_match(
@@ -197,13 +230,17 @@ def resolve_tones(
     return resolutions, leftovers
 
 # Pass 3: LLM fallback (not implemented)
+_LLM_LIVE_CONFIDENCE = 0.8
+
 def resolve_llm(
         *,
         raw_input: str,
         resolved_genres: list[str],
         resolved_tones: list[str],
         remaining_text: str,
-        llm_client: LLMClient | None = None
+        llm_client: LLMClient | None = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1024
     ) -> tuple[list[GenreResolution], list[ToneResolution], list[str], list[str]]:
     """Pass 3: LLM fallback for leftovers.
 
@@ -221,10 +258,95 @@ def resolve_llm(
         A tuple of (genre_resolutions, tone_resolutions, narrative_context, unresolved_tokens)
     """
 
+    fallback_unresolved = remaining_text.split() if remaining_text else []
+
     if llm_client is None:
         return [], [], [], remaining_text.split()
 
-    return [], [], [], remaining_text.split()
+    if not remaining_text.strip():
+        return [], [], [], remaining_text.split()
+
+    # Load and format the prompt
+    from storymesh.prompts.loader import load_prompt  # noqa: PLC0415
+
+    prompt_template = load_prompt("genre_normalizer")
+    user_prompt = prompt_template.format_user(
+        raw_input = raw_input,
+        resolved_genres = resolved_genres,
+        resolved_tones = resolve_tones,
+        remaining_text = remaining_text
+    )
+
+    # Call the actual LLM
+    try:
+        raw_response = llm_client.complete_json(
+            user_prompt,
+            system_prompt = prompt_template.system,
+            temperature = temperature,
+            max_tokens = max_tokens
+        )
+    except Exception:
+        logger.warning(
+            "LLM classification call failed: treating all tokens as unresolved.",
+            exc_info = True
+        )
+        return [], [], [], fallback_unresolved
+    
+    # Validate the response
+    try:
+        parsed = _ClassificationResponse.model_validate(raw_response)
+    except Exception:
+        logger.warning(
+            "LLM response failed schema validation: treating all tokens as unresolved.",
+            exc_info = True
+        )
+        return [], [], [], fallback_unresolved
+    
+    # Convert validated classifications
+    genre_resolutions: list[GenreResolution] = []
+    tone_resolutions: list[ToneResolution] = []
+    narrative_context: list[str] = []
+    unresolved: list[str] = []
+
+    for item in parsed.classifications:
+        if item.type == "genre":
+            if not item.genres:
+                logger.warning("Genre classification for '%s' has no genres.", item.token)
+                unresolved.append(item.token)
+                continue
+            genre_resolutions.append(GenreResolution(
+                input_token = item.token,
+                canonical_genres = item.genres,
+                subgenres = item.subgenres,
+                default_tones = item.default_tones,
+                method = ResolutionMethod.LLM_LIVE,
+                confidence = _LLM_LIVE_CONFIDENCE
+            ))
+        elif item.type == "tone":
+            if not item.normalized_tones:
+                logger.warning("Tone classification for '%s' has no tones.", item.token)
+                unresolved.append(item.token)
+                continue
+            tone_resolutions.append(ToneResolution(
+                input_token = item.token,
+                normalized_tones = item.normalized_tones,
+                method=ResolutionMethod.LLM_LIVE,
+                confidence = _LLM_LIVE_CONFIDENCE,
+                is_override = True
+            ))
+        elif item.type == "narrative_context":
+            if not item.is_stopword:
+                narrative_context.append(item.token)
+        elif item.type == "unknown":
+            unresolved.append(item.token)
+
+    # Detect situations where the LLM returns no usable classifications and treat all
+    # tokens as unresolved.
+
+    if not genre_resolutions and not tone_resolutions and not narrative_context and not unresolved:
+        return [], [], [], fallback_unresolved
+
+    return genre_resolutions, tone_resolutions, narrative_context, unresolved
 
 # Full resolution pipeline
 def resolve_all(
@@ -233,7 +355,9 @@ def resolve_all(
         store: MappingStore,
         fuzzy_threshold: float = 0.85,
         allow_llm_fallback: bool = True,
-        llm_client: LLMClient | None = None
+        llm_client: LLMClient | None = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1024
     ) -> ResolverResult:
     """ Run the full pipeline with all three passes.
 
@@ -243,7 +367,7 @@ def resolve_all(
         fuzzy_threshold:  Minimum rapidfuzz score to qualify as a match
         allow_llm_fallback: Controls if LLM fallback (pass 3) is enabled or skipped
     """
-
+    
     normalized = normalize_text(raw_input)
     words = normalized.split()
 
@@ -283,7 +407,9 @@ def resolve_all(
             resolved_genres = resolved_genre_names,
             resolved_tones = resolved_tone_names,
             remaining_text = remaining_text,
-            llm_client = llm_client
+            llm_client = llm_client,
+            temperature = temperature,
+            max_tokens = max_tokens
         )
 
         genre_resolutions = genre_resolutions + llm_genres
