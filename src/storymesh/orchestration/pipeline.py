@@ -49,13 +49,12 @@ class StoryMeshPipeline:
             "input_genre": genre,
             "pipeline_version": storymesh_version,
             "genre_normalizer_output": None,
-            "genre_seed_fetcher_output": None,
-            "seed_ranker_output": None,
-            "book_profile_synthesizer_output": None,
-            "theme_aggregator_output": None,
-            "proposal_output": None,
+            "book_fetcher_output": None,
+            "book_ranker_output": None,
+            "theme_extractor_output": None,
+            "proposal_draft_output": None,
             "rubric_judge_output": None,
-            "synthesis_writer_output": None,
+            "synopsis_writer_output": None,
             "errors": [],
         }
 
@@ -74,13 +73,12 @@ class StoryMeshPipeline:
 
         stage_outputs: dict[str, object | None] = {
             "genre_normalizer": final_state.get("genre_normalizer_output"),
-            "seed_fetcher": final_state.get("genre_seed_fetcher_output"),
-            "seed_ranker": final_state.get("seed_ranker_output"),
-            "book_profile_synthesizer": final_state.get("book_profile_synthesizer_output"),
-            "theme_aggregator": final_state.get("theme_aggregator_output"),
-            "proposal": final_state.get("proposal_output"),
+            "book_fetcher": final_state.get("book_fetcher_output"),
+            "book_ranker": final_state.get("book_ranker_output"),
+            "theme_extractor": final_state.get("theme_extractor_output"),
+            "proposal_draft": final_state.get("proposal_draft_output"),
             "rubric_judge": final_state.get("rubric_judge_output"),
-            "synthesis_writer": final_state.get("synthesis_writer_output"),
+            "synopsis_writer": final_state.get("synopsis_writer_output"),
         }
 
         for stage_name, output in stage_outputs.items():

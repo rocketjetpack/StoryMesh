@@ -5,7 +5,7 @@ node in the graph. Each node receives the full state and returns a partial
 dict containing only the keys it updates — LangGraph merges these back in
 automatically.
 
-Fields for stages 1–7 are typed as ``object | None`` until those agents are
+Fields for stages 2–6 are typed as ``object | None`` until those agents are
 implemented and their schemas are added to storymesh.schemas. Tighten each
 field's type annotation as the corresponding schema is introduced.
 """
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+from storymesh.schemas.book_fetcher import BookFetcherAgentOutput
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
 
 
@@ -36,36 +37,28 @@ class StoryMeshState(TypedDict, total=False):
     # ── Stage 0: GenreNormalizerAgent ──────────────────────────────────────
     genre_normalizer_output: GenreNormalizerAgentOutput | None
 
-    # ── Stage 1: GenreSeedFetcherAgent ─────────────────────────────────────
-    # TODO: Replace ``object`` with GenreSeedFetcherAgentOutput once implemented.
-    genre_seed_fetcher_output: object | None
+    # ── Stage 1: BookFetcherAgent ──────────────────────────────────────────
+    book_fetcher_output: BookFetcherAgentOutput | None
 
-    # ── Stage 2: SeedRankerAgent ───────────────────────────────────────────
-    # TODO: Replace ``object`` with SeedRankerAgentOutput once implemented.
-    seed_ranker_output: object | None
+    # ── Stage 2: BookRankerAgent ───────────────────────────────────────────
+    # TODO: Replace object with BookRankerAgentOutput once implemented.
+    book_ranker_output: object | None
 
-    # ── Stage 3: BookProfileSynthesizerAgent (fan-out / parallel) ──────────
-    # TODO: Replace ``object`` with list[BookProfileOutput] once implemented.
-    #       The fan-out pattern will require an Annotated[list, operator.add]
-    #       reducer on this field.
-    book_profile_synthesizer_output: object | None
+    # ── Stage 3: ThemeExtractorAgent (LLM) ────────────────────────────────
+    # TODO: Replace object with ThemePack once implemented.
+    theme_extractor_output: object | None
 
-    # ── Stage 4: ThemeAggregatorAgent ─────────────────────────────────────
-    # TODO: Replace ``object`` with ThemePack once implemented.
-    theme_aggregator_output: object | None
+    # ── Stage 4: ProposalDraftAgent (LLM) ─────────────────────────────────
+    # TODO: Replace object with ProposalDraftOutput once implemented.
+    proposal_draft_output: object | None
 
-    # ── Stage 5: ProposalAgent ────────────────────────────────────────────
-    # TODO: Replace ``object`` with ProposalOutput once implemented.
-    proposal_output: object | None
-
-    # ── Stage 6: RubricJudgeAgent (conditional retry edge) ────────────────
-    # TODO: Replace ``object`` with RubricResult once implemented.
-    #       The retry loop will require a conditional edge in graph.py.
+    # ── Stage 5: RubricJudgeAgent (LLM, conditional retry edge) ───────────
+    # TODO: Replace object with RubricResult once implemented.
     rubric_judge_output: object | None
 
-    # ── Stage 7: SynthesisWriterAgent ─────────────────────────────────────
-    # TODO: Replace ``object`` with SynthesisWriterOutput once implemented.
-    synthesis_writer_output: object | None
+    # ── Stage 6: SynopsisWriterAgent (LLM) ────────────────────────────────
+    # TODO: Replace object with SynopsisWriterOutput once implemented.
+    synopsis_writer_output: object | None
 
     # ── Error tracking ─────────────────────────────────────────────────────
     errors: list[str]

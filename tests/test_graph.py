@@ -159,15 +159,14 @@ class TestStoryMeshState:
         """The full initial state dict used by StoryMeshPipeline must be constructable."""
         state: StoryMeshState = {
             "input_genre": "cozy mystery",
-            "pipeline_version": "0.3.0",
+            "pipeline_version": "0.4.0",
             "genre_normalizer_output": None,
-            "genre_seed_fetcher_output": None,
-            "seed_ranker_output": None,
-            "book_profile_synthesizer_output": None,
-            "theme_aggregator_output": None,
-            "proposal_output": None,
+            "book_fetcher_output": None,
+            "book_ranker_output": None,
+            "theme_extractor_output": None,
+            "proposal_draft_output": None,
             "rubric_judge_output": None,
-            "synthesis_writer_output": None,
+            "synopsis_writer_output": None,
             "errors": [],
         }
         assert state["input_genre"] == "cozy mystery"

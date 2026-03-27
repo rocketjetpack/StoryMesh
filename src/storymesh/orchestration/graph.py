@@ -33,13 +33,11 @@ from storymesh.orchestration.state import StoryMeshState
 logger = logging.getLogger(__name__)
 
 # Future node imports (uncomment as agents are implemented):
-# from storymesh.orchestration.nodes.seed_fetcher import make_seed_fetcher_node
-# from storymesh.orchestration.nodes.seed_ranker import make_seed_ranker_node
-# from storymesh.orchestration.nodes.book_profile_synthesizer import make_book_profile_synthesizer_node
-# from storymesh.orchestration.nodes.theme_aggregator import make_theme_aggregator_node
-# from storymesh.orchestration.nodes.proposal import make_proposal_node
+# from storymesh.orchestration.nodes.book_ranker import make_book_ranker_node
+# from storymesh.orchestration.nodes.theme_extractor import make_theme_extractor_node
+# from storymesh.orchestration.nodes.proposal_draft import make_proposal_draft_node
 # from storymesh.orchestration.nodes.rubric_judge import make_rubric_judge_node
-# from storymesh.orchestration.nodes.synthesis_writer import make_synthesis_writer_node
+# from storymesh.orchestration.nodes.synopsis_writer import make_synopsis_writer_node
 
 
 def _build_llm_client(agent_cfg: dict[str, Any]) -> LLMClient | None:
@@ -111,19 +109,17 @@ def _noop_node(state: StoryMeshState) -> dict[str, Any]:
 def build_graph() -> Any:  # noqa: ANN401  # CompiledStateGraph generics not resolvable under mypy strict.
     """Construct and compile the StoryMesh pipeline StateGraph.
 
-    Stage topology (linear for now; Stage 6 will become a conditional edge
+    Stage topology (linear for now; Stage 5 will become a conditional edge
     once RubricJudgeAgent is implemented):
 
-        START → genre_normalizer → seed_fetcher → seed_ranker
-              → book_profile_synthesizer → theme_aggregator
-              → proposal → rubric_judge → synthesis_writer → END
+        START → genre_normalizer → book_fetcher → book_ranker
+              → theme_extractor → proposal_draft → rubric_judge
+              → synopsis_writer → END
 
     Future topology notes:
-    - Stage 3 (BookProfileSynthesizer): replace ``_noop_node`` with a
-      Send-based fan-out for parallel per-book LLM calls.
-    - Stage 6 (RubricJudge): replace the direct edge to ``synthesis_writer``
+    - Stage 5 (RubricJudge): replace the direct edge to ``synopsis_writer``
       with ``add_conditional_edges`` routing failed proposals back to
-      ``proposal`` for one retry.
+      ``proposal_draft`` for revision.
     - Checkpointer: pass ``checkpointer=MemorySaver()`` to ``compile()``
       when HITL or run-persistence is needed.
 
@@ -138,33 +134,40 @@ def build_graph() -> Any:  # noqa: ANN401  # CompiledStateGraph generics not res
     from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent  # noqa: PLC0415
 
     genre_agent = GenreNormalizerAgent(
-        llm_client = genre_llm,
-        temperature = genre_cfg.get("temperature", 0.0),
-        max_tokens = genre_cfg.get("max_tokens", 1024)
-        )
+        llm_client=genre_llm,
+        temperature=genre_cfg.get("temperature", 0.0),
+        max_tokens=genre_cfg.get("max_tokens", 1024),
+    )
     genre_node = make_genre_normalizer_node(genre_agent)
+
+    # ── Stage 1: BookFetcherAgent ──────────────────────────────────────────
+    from storymesh.agents.book_fetcher.agent import BookFetcherAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.book_fetcher import (  # noqa: PLC0415
+        make_book_fetcher_node,
+    )
+
+    book_fetcher_agent = BookFetcherAgent()
+    book_fetcher_node = make_book_fetcher_node(book_fetcher_agent)
 
     # ── Build the graph ────────────────────────────────────────────────────
     graph: Any = StateGraph(StoryMeshState)
 
     graph.add_node("genre_normalizer", genre_node)
-    graph.add_node("seed_fetcher", _noop_node)              # Stage 1 — placeholder
-    graph.add_node("seed_ranker", _noop_node)               # Stage 2 — placeholder
-    graph.add_node("book_profile_synthesizer", _noop_node)  # Stage 3 — placeholder (fan-out)
-    graph.add_node("theme_aggregator", _noop_node)          # Stage 4 — placeholder
-    graph.add_node("proposal", _noop_node)                  # Stage 5 — placeholder
-    graph.add_node("rubric_judge", _noop_node)              # Stage 6 — placeholder (conditional)
-    graph.add_node("synthesis_writer", _noop_node)          # Stage 7 — placeholder
+    graph.add_node("book_fetcher", book_fetcher_node)
+    graph.add_node("book_ranker", _noop_node)       # Stage 2 — placeholder
+    graph.add_node("theme_extractor", _noop_node)   # Stage 3 — placeholder (LLM)
+    graph.add_node("proposal_draft", _noop_node)    # Stage 4 — placeholder (LLM)
+    graph.add_node("rubric_judge", _noop_node)      # Stage 5 — placeholder (LLM, conditional)
+    graph.add_node("synopsis_writer", _noop_node)   # Stage 6 — placeholder (LLM)
 
     # ── Wire edges (linear) ────────────────────────────────────────────────
     graph.add_edge(START, "genre_normalizer")
-    graph.add_edge("genre_normalizer", "seed_fetcher")
-    graph.add_edge("seed_fetcher", "seed_ranker")
-    graph.add_edge("seed_ranker", "book_profile_synthesizer")
-    graph.add_edge("book_profile_synthesizer", "theme_aggregator")
-    graph.add_edge("theme_aggregator", "proposal")
-    graph.add_edge("proposal", "rubric_judge")
-    graph.add_edge("rubric_judge", "synthesis_writer")
-    graph.add_edge("synthesis_writer", END)
+    graph.add_edge("genre_normalizer", "book_fetcher")
+    graph.add_edge("book_fetcher", "book_ranker")
+    graph.add_edge("book_ranker", "theme_extractor")
+    graph.add_edge("theme_extractor", "proposal_draft")
+    graph.add_edge("proposal_draft", "rubric_judge")
+    graph.add_edge("rubric_judge", "synopsis_writer")
+    graph.add_edge("synopsis_writer", END)
 
     return graph.compile()

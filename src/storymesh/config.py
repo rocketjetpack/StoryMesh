@@ -169,6 +169,46 @@ def get_config() -> dict[str, Any]:
     return _config_cache
 
 
+def get_api_client_config(client_name: str) -> dict[str, Any]:
+    """Return configuration for a named external API client.
+
+    Reads from the ``api_clients`` section of storymesh.config.yaml.
+    Returns an empty dict (with a warning) if no entry exists for the client.
+
+    Args:
+        client_name: Key under ``api_clients`` in the config file.
+
+    Returns:
+        Dict of client settings. Keys depend on the specific client.
+    """
+    config = get_config()
+    clients_section = config.get("api_clients", {})
+    if client_name not in clients_section:
+        logger.warning(
+            "No config entry for api_client '%s', using defaults", client_name
+        )
+        return {}
+    return dict(clients_section[client_name])
+
+
+def get_cache_dir(name: str) -> Path:
+    """Return the diskcache directory for the given agent or client name.
+
+    Resolves ``cache.dir`` from storymesh.config.yaml (expanding ``~``),
+    then appends ``name`` as a subdirectory. The directory is not created
+    here; callers (agent constructors) create it via diskcache.
+
+    Args:
+        name: Subdirectory name, typically the agent or API client name.
+
+    Returns:
+        Absolute Path for the cache directory.
+    """
+    config = get_config()
+    cache_dir_str: str = config.get("cache", {}).get("dir", "~/.cache/storymesh")
+    return Path(cache_dir_str).expanduser() / name
+
+
 def get_agent_config(agent_name: str) -> dict[str, Any]:
     """Return the resolved LLM configuration for a specific agent.
 

@@ -37,6 +37,17 @@ agents:
     max_tokens: 4096
 
 # ------
+# External API Clients
+# ------
+# Configuration for external API integrations.
+# user_agent: Identifies this application to Open Library for a higher rate limit
+#   (3 req/sec vs 1 req/sec anonymous). Format required by Open Library:
+#   "AppName (contact@email.com)". Remove or leave blank to use the anonymous rate limit.
+api_clients:
+  open_library:
+    user_agent: 
+
+# ------
 # Caching Configuration
 # ------
 cache:
