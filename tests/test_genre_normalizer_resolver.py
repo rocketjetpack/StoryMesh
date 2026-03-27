@@ -656,3 +656,42 @@ class TestResolveLlmWithClient:
         assert narrative == []
         assert unresolved == []
         assert client.call_count == 0
+
+    def test_resolved_tones_value_appears_in_prompt(self) -> None:
+        """Regression: resolved_tones must inject the list value into the prompt,
+        not the resolve_tones function object (which would appear as '<function ...>')."""
+        captured_prompts: list[str] = []
+
+        class CapturingClient(FakeLLMClient):
+            def complete(
+                self,
+                prompt: str,
+                *,
+                system_prompt: str | None = None,
+                temperature: float,
+                max_tokens: int,
+            ) -> str:
+                captured_prompts.append(prompt)
+                return super().complete(
+                    prompt,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+
+        response = json.dumps({"classifications": [
+            {"token": "chicago", "type": "narrative_context", "is_stopword": False},
+        ]})
+        client = CapturingClient(responses=[response])
+
+        resolve_llm(
+            raw_input="mystery chicago",
+            resolved_genres=["mystery"],
+            resolved_tones=["suspenseful"],
+            remaining_text="chicago",
+            llm_client=client,
+        )
+
+        assert len(captured_prompts) == 1
+        assert "suspenseful" in captured_prompts[0]
+        assert "<function" not in captured_prompts[0]

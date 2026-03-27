@@ -14,6 +14,7 @@ from typing import Any
 from storymesh.agents.genre_normalizer.loader import MappingStore
 from storymesh.agents.genre_normalizer.resolver import resolve_all
 from storymesh.agents.genre_normalizer.tone_merge import merge_tones
+from storymesh.exceptions import GenreResolutionError
 from storymesh.llm.base import LLMClient
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentInput, GenreNormalizerAgentOutput
 
@@ -104,6 +105,35 @@ class GenreNormalizerAgent:
             "narrative_context": resolver_result.narrative_context,
             "unresolved_tokens": resolver_result.unresolved_tokens,
         }
+
+        if not normalized_genres:
+            llm_configured = self._llm_client is not None
+            llm_allowed = input_data.allow_llm_fallback
+
+            if llm_configured and llm_allowed:
+                detail = (
+                    "LLM fallback was attempted but returned no recognizable genres. "
+                    "Try rephrasing with explicit genre keywords."
+                )
+            elif llm_configured and not llm_allowed:
+                detail = (
+                    "LLM fallback is disabled. "
+                    "Enable it or rephrase with explicit genre keywords."
+                )
+            elif not llm_configured and llm_allowed:
+                detail = (
+                    "No LLM client is configured. "
+                    "Rephrase with explicit genre keywords (e.g. 'fantasy', 'thriller')."
+                )
+            else:
+                detail = (
+                    "No genres could be resolved. "
+                    "Try including a genre keyword (e.g. 'fantasy', 'thriller')."
+                )
+
+            raise GenreResolutionError(
+                f"No genres could be resolved from input: {input_data.raw_genre!r}. {detail}"
+            )
 
         # Assemble the output contract.
         return GenreNormalizerAgentOutput(

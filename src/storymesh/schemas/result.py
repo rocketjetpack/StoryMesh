@@ -13,6 +13,10 @@ class GenerationResult(BaseModel):
     similarity_risk: dict[str, Any] = Field(
         default_factory=dict, description="A dictionary of similarity risk values."
         )
+    errors: list[str] = Field(
+        default_factory=list,
+        description="Pipeline errors encountered during generation, if any.",
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {

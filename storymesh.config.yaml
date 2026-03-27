@@ -2,14 +2,10 @@
 # StoryMesh Global Configuration File
 # ------
 # Non-secret settings that control the pipeline.
-# API keys live in .env (see .env.example). This file is committed to the
-# repository so that model choices, temperatures, and defaults are
-# controllable and trackable over time.
-#
-# This file provides safe defaults for development, CI, and testing.
-# The LLM provider API keys are read from the environment; if absent,
-# agents fall back to static-only mode (no LLM calls).
-# ------
+# API keys live in .env (see .env.example). This file is part of
+# the code repo so that model choices, temperatures, and defaults
+# are controllable and trackable over time.
+#------
 
 # ------
 # LLM defaults
@@ -39,14 +35,10 @@ agents:
 # ------
 # External API Clients
 # ------
-# Configuration for external API integrations.
-# user_agent: Identifies this application to Open Library for a higher rate limit
-#   (3 req/sec vs 1 req/sec anonymous). Format required by Open Library:
-#   "AppName (contact@email.com)". Remove or leave blank to use the anonymous rate limit.
 api_clients:
   open_library:
-    user_agent:
-    max_books: 50    # Total cap after deduplication across all genre queries
+    user_agent:    # Optional; "AppName (contact@email.com)" for higher rate limit
+    max_books: 50  # Total cap after deduplication across all genre queries
 
 # ------
 # Caching Configuration
@@ -66,5 +58,7 @@ logging:
 # Enable tracing: pip install "storymesh[langsmith]"
 # Then set LANGCHAIN_TRACING_V2=true and LANGCHAIN_API_KEY in .env.
 # The project name groups all pipeline runs in the LangSmith dashboard.
+# LangGraph node spans are traced automatically; individual LLM calls are
+# traced via the @_traceable decorator in storymesh.llm.base.
 langsmith:
   project: storymesh-dev

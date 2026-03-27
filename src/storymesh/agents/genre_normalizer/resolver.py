@@ -273,7 +273,7 @@ def resolve_llm(
     user_prompt = prompt_template.format_user(
         raw_input = raw_input,
         resolved_genres = resolved_genres,
-        resolved_tones = resolve_tones,
+        resolved_tones = resolved_tones,
         remaining_text = remaining_text
     )
 

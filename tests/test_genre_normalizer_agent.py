@@ -9,6 +9,7 @@ import pytest
 
 from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent
 from storymesh.agents.genre_normalizer.loader import MappingStore
+from storymesh.exceptions import GenreResolutionError
 from storymesh.schemas.genre_normalizer import (
     GenreNormalizerAgentInput,
 )
@@ -336,3 +337,85 @@ class TestEndToEnd:
         assert "gritty" in result.user_tones
         assert "2085" in result.debug["unresolved_tokens"]
         assert "rebellion" in result.debug["unresolved_tokens"]
+
+
+# ---------------------------------------------------------------------------
+# Error Handling
+# ---------------------------------------------------------------------------
+
+class TestErrorHandling:
+    def test_unresolvable_input_raises_genre_resolution_error(
+        self, agent: GenreNormalizerAgent,
+    ) -> None:
+        """Prompts with no recognizable genre keywords must raise GenreResolutionError,
+        not a Pydantic ValidationError."""
+        with pytest.raises(GenreResolutionError):
+            agent.run(GenreNormalizerAgentInput(
+                raw_genre="a world of warcraft paladin who marries his hammer",
+            ))
+
+    def test_genre_resolution_error_is_storymesh_error(
+        self, agent: GenreNormalizerAgent,
+    ) -> None:
+        """GenreResolutionError must be catchable as a StoryMeshError."""
+        from storymesh.exceptions import StoryMeshError
+
+        with pytest.raises(StoryMeshError):
+            agent.run(GenreNormalizerAgentInput(
+                raw_genre="a world of warcraft paladin who marries his hammer",
+            ))
+
+    def test_error_no_llm_fallback_disabled(
+        self, agent: GenreNormalizerAgent,
+    ) -> None:
+        """No LLM client + fallback disabled: message guides user to add genre keywords."""
+        with pytest.raises(GenreResolutionError, match="genre keyword"):
+            agent.run(GenreNormalizerAgentInput(
+                raw_genre="a world of warcraft paladin who marries his hammer",
+                allow_llm_fallback=False,
+            ))
+
+    def test_error_no_llm_fallback_enabled(
+        self, agent: GenreNormalizerAgent,
+    ) -> None:
+        """No LLM client + fallback enabled: message says no LLM client is configured."""
+        with pytest.raises(GenreResolutionError, match="No LLM client is configured"):
+            agent.run(GenreNormalizerAgentInput(
+                raw_genre="a world of warcraft paladin who marries his hammer",
+                allow_llm_fallback=True,
+            ))
+
+    def test_error_llm_configured_fallback_disabled(
+        self, store: MappingStore,
+    ) -> None:
+        """LLM configured + fallback disabled: message says to enable fallback."""
+        import json
+        from storymesh.llm.base import FakeLLMClient
+
+        agent_with_llm = GenreNormalizerAgent(
+            store=store, llm_client=FakeLLMClient(responses=[])
+        )
+        with pytest.raises(GenreResolutionError, match="LLM fallback is disabled"):
+            agent_with_llm.run(GenreNormalizerAgentInput(
+                raw_genre="a world of warcraft paladin who marries his hammer",
+                allow_llm_fallback=False,
+            ))
+
+    def test_error_llm_configured_fallback_attempted(
+        self, store: MappingStore,
+    ) -> None:
+        """LLM configured + fallback enabled but no genres returned: message says LLM was attempted."""
+        import json
+        from storymesh.llm.base import FakeLLMClient
+
+        response = json.dumps({"classifications": [
+            {"token": "world of warcraft paladin", "type": "narrative_context", "is_stopword": False},
+        ]})
+        agent_with_llm = GenreNormalizerAgent(
+            store=store, llm_client=FakeLLMClient(responses=[response])
+        )
+        with pytest.raises(GenreResolutionError, match="LLM fallback was attempted"):
+            agent_with_llm.run(GenreNormalizerAgentInput(
+                raw_genre="a world of warcraft paladin who marries his hammer",
+                allow_llm_fallback=True,
+            ))

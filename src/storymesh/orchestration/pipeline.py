@@ -94,6 +94,26 @@ class StoryMeshPipeline:
         # completes (see persist_node_output in core/artifacts.py), so no
         # post-invocation artifact loop is needed here.
 
+        base_metadata: dict[str, Any] = {
+            "user_prompt": final_state.get("user_prompt", user_prompt),
+            "pipeline_version": storymesh_version,
+            "run_id": run_id,
+            "stage_timings": stage_timings,
+            "run_dir": str(self._artifact_store.runs_dir / run_id),
+        }
+
+        # If genre normalization failed, the graph short-circuits to END and
+        # genre_normalizer_output remains None. Surface the error as a readable
+        # result rather than propagating a crash.
+        if not final_state.get("genre_normalizer_output"):
+            errors: list[str] = final_state.get("errors") or []
+            user_message = errors[0] if errors else "Genre normalization failed."
+            return GenerationResult(
+                final_synopsis=f"Could not generate a synopsis: {user_message}",
+                errors=errors,
+                metadata=base_metadata,
+            )
+
         # TODO: When SynopsisWriterAgent is implemented, replace this block with:
         #   synopsis_out = final_state.get("synopsis_writer_output")
         #   final_synopsis = synopsis_out.final_synopsis
@@ -106,11 +126,5 @@ class StoryMeshPipeline:
             final_synopsis=final_synopsis,
             scores={},
             similarity_risk={},
-            metadata={
-                "user_prompt": final_state.get("user_prompt", user_prompt),
-                "pipeline_version": storymesh_version,
-                "run_id": run_id,
-                "stage_timings": stage_timings,
-                "run_dir": str(self._artifact_store.runs_dir / run_id),
-            },
+            metadata=base_metadata,
         )

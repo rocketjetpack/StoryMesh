@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent
+from storymesh.exceptions import GenreResolutionError
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentInput
 
@@ -53,7 +54,11 @@ def make_genre_normalizer_node(
             raw_genre=state["user_prompt"],
             allow_llm_fallback=True,
         )
-        output = agent.run(input_data)
+
+        try:
+            output = agent.run(input_data)
+        except GenreResolutionError as exc:
+            return {"genre_normalizer_output": None, "errors": [str(exc)]}
 
         if artifact_store is not None:
             from storymesh.core.artifacts import persist_node_output  # noqa: PLC0415

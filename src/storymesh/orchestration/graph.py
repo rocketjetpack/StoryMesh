@@ -120,6 +120,22 @@ MAX_RUBRIC_RETRIES: int = 2
 """Maximum number of times rubric_judge may route back to proposal_draft."""
 
 
+def _genre_normalizer_route(state: StoryMeshState) -> str:
+    """Route to book_fetcher if genre normalization succeeded, otherwise END.
+
+    Genre normalization sets ``genre_normalizer_output`` to ``None`` and writes
+    to ``errors`` when it cannot resolve any genres. Short-circuiting here
+    prevents downstream nodes from running against an empty genre output.
+
+    Args:
+        state: Current pipeline state.
+
+    Returns:
+        ``'book_fetcher'`` on success, ``END`` on failure.
+    """
+    return "book_fetcher" if state.get("genre_normalizer_output") is not None else END
+
+
 def _noop_node(state: StoryMeshState) -> dict[str, Any]:
     """Placeholder node for pipeline stages not yet implemented.
 
@@ -233,7 +249,11 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
 
     # ── Wire edges (linear) ────────────────────────────────────────────────
     graph.add_edge(START, "genre_normalizer")
-    graph.add_edge("genre_normalizer", "book_fetcher")
+    graph.add_conditional_edges(
+        "genre_normalizer",
+        _genre_normalizer_route,
+        {"book_fetcher": "book_fetcher", END: END},
+    )
     graph.add_edge("book_fetcher", "book_ranker")
     graph.add_edge("book_ranker", "theme_extractor")
     graph.add_edge("theme_extractor", "proposal_draft")

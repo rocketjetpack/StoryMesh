@@ -244,3 +244,66 @@ class TestRubricRetryTopology:
 
         graph = build_graph(artifact_store=None)
         assert graph is not None
+
+
+# ── TestGenreNormalizerRoute ───────────────────────────────────────────────────
+
+
+class TestGenreNormalizerRoute:
+    """Tests for _genre_normalizer_route and the node's error handling."""
+
+    def test_routes_to_book_fetcher_when_output_is_present(self) -> None:
+        """A populated genre_normalizer_output routes to book_fetcher."""
+        from storymesh.orchestration.graph import _genre_normalizer_route
+
+        state: StoryMeshState = {
+            "genre_normalizer_output": object(),  # type: ignore[typeddict-item]
+        }
+        assert _genre_normalizer_route(state) == "book_fetcher"
+
+    def test_routes_to_end_when_output_is_none(self) -> None:
+        """genre_normalizer_output=None must route to END."""
+        from langgraph.graph import END
+
+        from storymesh.orchestration.graph import _genre_normalizer_route
+
+        state: StoryMeshState = {"genre_normalizer_output": None}
+        assert _genre_normalizer_route(state) == END
+
+    def test_routes_to_end_when_output_key_absent(self) -> None:
+        """Missing genre_normalizer_output key must also route to END."""
+        from langgraph.graph import END
+
+        from storymesh.orchestration.graph import _genre_normalizer_route
+
+        state: StoryMeshState = {}
+        assert _genre_normalizer_route(state) == END
+
+    def test_node_catches_genre_resolution_error(
+        self, minimal_store: MappingStore
+    ) -> None:
+        """Node must catch GenreResolutionError and write to the errors state key."""
+        agent = GenreNormalizerAgent(store=minimal_store)
+        node = make_genre_normalizer_node(agent)
+        state: StoryMeshState = {
+            "user_prompt": "xyzzy frobb glorp",
+            "pipeline_version": "test",
+        }
+
+        result = node(state)
+
+        assert result["genre_normalizer_output"] is None
+        assert len(result["errors"]) == 1
+        assert "No genres could be resolved" in result["errors"][0]
+
+    def test_node_error_returns_two_keys(
+        self, minimal_store: MappingStore
+    ) -> None:
+        """On error the node returns exactly genre_normalizer_output and errors."""
+        agent = GenreNormalizerAgent(store=minimal_store)
+        node = make_genre_normalizer_node(agent)
+        state: StoryMeshState = {"user_prompt": "xyzzy frobb", "pipeline_version": "test"}
+
+        result = node(state)
+
+        assert set(result.keys()) == {"genre_normalizer_output", "errors"}
