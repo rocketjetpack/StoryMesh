@@ -1,4 +1,4 @@
-"""Abstract class defining the requiements for LLM provider classes."""
+"""Abstract class defining the requirements for LLM provider classes."""
 
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ class LLMClient(ABC):
             max_retries: int = 1,
         ) -> dict[str, Any]:
         """
-        Call the complete() implementation and parse the resposne as a JSON object.
+        Call the complete() implementation and parse the response as a JSON object.
 
         Strip markdown fences if present in the response. Retry one time on parse failure
         or if the response is valid JSON but not a dict.
@@ -122,6 +122,56 @@ class LLMClient(ABC):
             return parsed
         
         raise RuntimeError("Reached code that should be unreachable in complete_json()!")
+
+# ---------------------------------------------------------------------------
+# Provider registry
+# ---------------------------------------------------------------------------
+
+_PROVIDER_REGISTRY: dict[str, type[LLMClient]] = {}
+
+
+def register_provider(name: str, cls: type[LLMClient]) -> None:
+    """Register an LLMClient subclass for a given provider name.
+
+    Idempotent: registering the same class under the same name twice is
+    allowed (e.g., when a module is re-imported). Raises if a *different*
+    class is registered under an already-taken name.
+
+    Args:
+        name: Provider name as it appears in storymesh.config.yaml (e.g. ``'anthropic'``).
+        cls: The concrete LLMClient subclass to instantiate for this provider.
+
+    Raises:
+        ValueError: If ``name`` is already registered to a different class.
+    """
+    if name in _PROVIDER_REGISTRY and _PROVIDER_REGISTRY[name] is not cls:
+        raise ValueError(
+            f"Provider '{name}' is already registered to "
+            f"{_PROVIDER_REGISTRY[name].__name__}, "
+            f"cannot re-register to {cls.__name__}."
+        )
+    _PROVIDER_REGISTRY[name] = cls
+
+
+def get_provider_class(name: str) -> type[LLMClient]:
+    """Return the LLMClient subclass registered for the given provider name.
+
+    Args:
+        name: Provider name string.
+
+    Returns:
+        The registered LLMClient subclass.
+
+    Raises:
+        ValueError: If no provider is registered under ``name``.
+    """
+    if name not in _PROVIDER_REGISTRY:
+        registered = ", ".join(sorted(_PROVIDER_REGISTRY.keys())) or "(none)"
+        raise ValueError(
+            f"Unknown LLM provider: '{name}'. Registered providers: {registered}"
+        )
+    return _PROVIDER_REGISTRY[name]
+
 
 class FakeLLMClient(LLMClient):
     """This implementation exists solely for pytest testing of the base class without any implementation."""

@@ -1,6 +1,6 @@
 # StoryMesh
 
-StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, artifact persistence, and a CLI/API surface for running the current pipeline.
+StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
 
 The later creative stages are scaffolded but not implemented yet. Today, a full `generate` run executes the implemented stages, persists artifacts, and returns a placeholder synopsis while stages 2 to 6 remain stubs.
 
@@ -9,11 +9,13 @@ The later creative stages are scaffolded but not implemented yet. Today, a full 
 Implemented:
 
 - Package, CLI, config loader, and version reporting
-- LangGraph orchestration and typed shared state
+- LangGraph orchestration with typed shared state and per-node artifact persistence
 - `GenreNormalizerAgent` with deterministic mapping, fuzzy matching, and optional LLM fallback
-- `BookFetcherAgent` backed by the Open Library Search API with disk cache and deduplication
-- Artifact persistence for pipeline runs under `~/.storymesh/runs`
-- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, and genre normalization
+- `BookFetcherAgent` backed by the Open Library Search API with disk cache, deduplication, and configurable `max_books` cap
+- LLM provider registry for extensible provider support
+- Rubric retry loop topology (conditional edge wired; noop placeholder always passes)
+- Rich-formatted CLI output with per-stage timing and artifact paths
+- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, genre normalization, LLM registry, and artifacts
 
 Not implemented yet:
 
@@ -25,7 +27,7 @@ Not implemented yet:
 
 Current runtime behavior:
 
-1. Normalize the user’s genre input.
+1. Normalize the user's prompt into genres and tones.
 2. Fetch matching books from Open Library.
 3. Pass through placeholder nodes for stages 2 to 6.
 4. Return a `GenerationResult` with a placeholder `final_synopsis`.
@@ -36,23 +38,24 @@ The pipeline is built as a LangGraph `StateGraph` with this topology:
 
 ```text
 START
-  -> genre_normalizer
-  -> book_fetcher
-  -> book_ranker
-  -> theme_extractor
-  -> proposal_draft
-  -> rubric_judge
-  -> synopsis_writer
-  -> END
+  → genre_normalizer
+  → book_fetcher
+  → book_ranker
+  → theme_extractor
+  → proposal_draft
+  → rubric_judge
+  → [conditional]
+      ├── PASS → synopsis_writer → END
+      └── FAIL → proposal_draft (max 2 retries)
 ```
 
-Only `genre_normalizer` and `book_fetcher` currently perform real work. The remaining nodes are registered as no-op placeholders so the graph shape is in place before the later stages are implemented.
+Only `genre_normalizer` and `book_fetcher` currently perform real work. The remaining nodes are registered as no-op placeholders. The rubric retry loop is wired via a conditional edge; the noop rubric judge always passes so the pipeline runs linearly until the real agent is implemented.
 
 ### Stage 0: GenreNormalizerAgent
 
 Status: implemented
 
-- Reads taxonomy data from [src/storymesh/data/genre_map.json](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/src/storymesh/data/genre_map.json) and [src/storymesh/data/tone_map.json](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/src/storymesh/data/tone_map.json)
+- Reads taxonomy data from `src/storymesh/data/genre_map.json` and `src/storymesh/data/tone_map.json`
 - Resolves genre and tone tokens deterministically where possible
 - Uses fuzzy matching for near-matches
 - Can fall back to an LLM client when unresolved tokens remain and API keys are configured
@@ -62,11 +65,12 @@ Status: implemented
 
 Status: implemented
 
-- Queries Open Library’s search API by subject
+- Queries Open Library's search API by subject
 - Uses disk cache via `diskcache`
 - Deduplicates books by Open Library work key
 - Preserves all matched source genres per book
-- Emits debug metadata for cache hits, misses, and per-genre counts
+- Caps results at `max_books` (default 50) after deduplication, prioritising cross-genre books
+- Emits debug metadata for cache hits, misses, truncation, and per-genre counts
 
 ### Stages 2 to 6
 
@@ -101,12 +105,9 @@ source .venv/bin/activate
 pip install -e ".[anthropic]"
 ```
 
-If you only want the currently implemented deterministic and Open Library stages, the package still expects a configured LLM provider in `storymesh.config.yaml` during config validation. In practice, that means you should either:
+API keys are loaded from `.env` (CWD or `~/.storymesh/.env`) at pipeline run time. Absent keys produce a warning; agents fall back to static-only mode. CLI commands like `show-config` and `show-version` never require API keys.
 
-- install a matching provider extra and set the corresponding API key, or
-- change the committed config locally to point at a provider you have configured
-
-Create a `.env` from [.env.example](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/.env.example):
+Create a `.env` from `.env.example`:
 
 ```bash
 cp .env.example .env
@@ -125,25 +126,25 @@ LANGCHAIN_PROJECT=storymesh-dev
 
 ## Configuration
 
-The main config file is [storymesh.config.yaml](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/storymesh.config.yaml).
+The main config file is `storymesh.config.yaml`.
 
 Important behavior:
 
-- `get_config()` validates that API keys exist for every provider referenced in the config
+- `get_config()` loads the YAML and `.env` files without requiring any API keys. Key presence is validated (as a warning) only when the pipeline is about to run.
 - `.env` is loaded from the current working directory first, then `~/.storymesh/.env`
-- cache directories are derived from `cache.dir`
-- logging is configured from `logging.level`
+- Cache directories are derived from `cache.dir`
+- Logging is configured from `logging.level`
+- All config section names under `agents:` match graph node names (e.g. `genre_normalizer`, `book_fetcher`, `proposal_draft`)
 
 Current committed config includes:
 
 - LLM defaults
-- `genre_normalizer` overrides
-- a `proposal_generation` section that is not currently consumed by the graph
-- Open Library client settings
-- cache and logging settings
-- optional LangSmith project settings
+- `genre_normalizer` and `proposal_draft` agent overrides
+- Open Library client settings including `max_books`
+- Cache and logging settings
+- Optional LangSmith project settings
 
-An example config is also provided at [storymesh.config.yaml.example](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/storymesh.config.yaml.example).
+An example config is also provided at `storymesh.config.yaml.example`.
 
 ## Usage
 
@@ -155,12 +156,32 @@ Generate with the current pipeline:
 storymesh generate "dark post-apocalyptic detective mystery"
 ```
 
-Current output shape in the CLI:
+Example output:
 
-```text
-Generated Synopsis:
-Placeholder synopsis for genre 'dark post-apocalyptic detective mystery'. SynthesisWriterAgent is not yet implemented.
-Metadata: {'input_genre': 'dark post-apocalyptic detective mystery', 'pipeline_version': '0.4.0', 'run_id': '...'}
+```
+╭──────────────────────────────────────────────────────────────╮
+│ StoryMesh v0.5.0  Run abc123def456                           │
+│ Input: "dark post-apocalyptic detective mystery"             │
+╰──────────────────────────────────────────────────────────────╯
+
+ Stage                   Status    Time     Artifact
+ ────────────────────────────────────────────────────────────────────────
+ genre_normalizer        ✓ done    0.03s    ~/.storymesh/runs/abc.../genre_normalizer_output.json
+ book_fetcher            ✓ done    1.24s    ~/.storymesh/runs/abc.../book_fetcher_output.json
+ book_ranker             ○ noop    0.00s    —
+ theme_extractor         ○ noop    0.00s    —
+ proposal_draft          ○ noop    0.00s    —
+ rubric_judge            ○ noop    0.00s    —
+ synopsis_writer         ○ noop    0.00s    —
+ ────────────────────────────────────────────────────────────────────────
+                         Total: 1.27s
+
+╭─ Synopsis ───────────────────────────────────────────────────╮
+│ Placeholder synopsis for 'dark post-apocalyptic detective    │
+│ mystery'. SynopsisWriterAgent is not yet implemented.        │
+╰──────────────────────────────────────────────────────────────╯
+
+Artifacts saved to: ~/.storymesh/runs/abc123def456/
 ```
 
 Inspect version information:
@@ -174,6 +195,7 @@ Inspect resolved config:
 ```bash
 storymesh show-config
 storymesh show-agent-config genre_normalizer
+storymesh show-agent-config proposal_draft
 ```
 
 ### Python API
@@ -181,24 +203,32 @@ storymesh show-agent-config genre_normalizer
 ```python
 from storymesh import generate_synopsis
 
-result = generate_synopsis("dark fantasy")
+result = generate_synopsis("dark post-apocalyptic detective mystery")
 print(result.final_synopsis)
 print(result.metadata)
 ```
 
-The public return type is `GenerationResult`, defined in [src/storymesh/schemas/result.py](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/src/storymesh/schemas/result.py).
+The public return type is `GenerationResult`, defined in `src/storymesh/schemas/result.py`. The `metadata` dict includes `user_prompt`, `pipeline_version`, `run_id`, `stage_timings`, and `run_dir`.
 
 ## Artifacts and Caching
 
-StoryMesh persists run artifacts under `~/.storymesh`:
+StoryMesh persists run artifacts under `~/.storymesh`. Artifacts are written as each node completes (not after the full graph finishes), so a crash mid-pipeline leaves partial artifacts on disk for inspection.
 
-- `~/.storymesh/runs/<run_id>/run_metadata.json`
-- `~/.storymesh/runs/<run_id>/<stage>_output.json`
-- `~/.storymesh/stages/` for stage-level persisted artifacts when used
+```
+~/.storymesh/
+├── runs/
+│   └── <run_id>/
+│       ├── run_metadata.json         ← written before graph invocation
+│       ├── genre_normalizer_output.json
+│       └── book_fetcher_output.json
+└── stages/                           ← stage-level cache (content-addressed)
+```
 
 Open Library responses are cached under the configured cache root, typically:
 
-- `~/.cache/storymesh/open_library`
+```
+~/.cache/storymesh/open_library
+```
 
 ## Development
 
@@ -214,27 +244,28 @@ Run tests:
 pytest
 ```
 
-Real API coverage exists behind the `real_api` marker.
+Real API coverage exists behind the `real_api` marker:
+
+```bash
+pytest -m real_api
+```
 
 Useful files:
 
-- [src/storymesh/orchestration/graph.py](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/src/storymesh/orchestration/graph.py)
-- [src/storymesh/orchestration/pipeline.py](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/src/storymesh/orchestration/pipeline.py)
-- [src/storymesh/cli.py](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/src/storymesh/cli.py)
-- [src/storymesh/config.py](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/src/storymesh/config.py)
+- `src/storymesh/orchestration/graph.py`
+- `src/storymesh/orchestration/pipeline.py`
+- `src/storymesh/cli.py`
+- `src/storymesh/config.py`
 
 ## Known Gaps
 
-- The README previously described the full planned pipeline as if it were implemented; that was inaccurate.
-- A successful `generate()` call still requires config/API-key validation even though only one stage currently needs optional LLM access.
-- The graph includes placeholder nodes for stages 2 to 6, so the final synopsis is intentionally not a real generated synopsis yet.
-- The current config file includes a `proposal_generation` section, while the graph looks up agent configs by names such as `genre_normalizer`; later stage config names will need alignment when those stages are implemented.
+- The graph includes placeholder nodes for stages 2 to 6; the final synopsis is a placeholder until `SynopsisWriterAgent` is implemented.
+- The rubric retry loop topology is wired but the routing function always passes (noop placeholder).
 
 ## Roadmap
 
 - Implement deterministic book ranking
 - Add theme extraction and proposal-generation stages
-- Add rubric-based retry logic with conditional graph edges
+- Activate rubric-based retry logic with real pass/fail signal
 - Implement final synopsis synthesis
 - Expand provider support beyond the current Anthropic implementation
-- Tighten config semantics so unimplemented providers and stages do not block local development

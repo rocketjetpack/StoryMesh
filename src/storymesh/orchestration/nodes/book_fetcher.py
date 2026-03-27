@@ -9,25 +9,32 @@ straightforward to test with a pre-configured agent and mock client.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from storymesh.agents.book_fetcher.agent import BookFetcherAgent
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.book_fetcher import BookFetcherAgentInput
 
+if TYPE_CHECKING:
+    from storymesh.core.artifacts import ArtifactStore
+
 
 def make_book_fetcher_node(
     agent: BookFetcherAgent,
+    artifact_store: ArtifactStore | None = None,
 ) -> Callable[[StoryMeshState], dict[str, Any]]:
     """Return a LangGraph-compatible node function for BookFetcherAgent (Stage 1).
 
     Reads ``genre_normalizer_output`` from the pipeline state, constructs the
-    BookFetcherAgentInput, runs the agent, and returns a partial state dict
-    containing only ``book_fetcher_output``. LangGraph merges this into the
-    full state automatically.
+    BookFetcherAgentInput, runs the agent, persists the output artifact (if an
+    ``ArtifactStore`` is provided), and returns a partial state dict containing
+    only ``book_fetcher_output``. LangGraph merges this into the full state
+    automatically.
 
     Args:
         agent: A fully constructed ``BookFetcherAgent`` instance.
+        artifact_store: Optional store for per-node artifact persistence.
+            Pass ``None`` (default) to skip persistence (e.g. in unit tests).
 
     Returns:
         A node callable with signature ``StoryMeshState -> dict[str, Any]``.
@@ -37,7 +44,8 @@ def make_book_fetcher_node(
         """Execute Stage 1 and write the output into the pipeline state.
 
         Args:
-            state: Current pipeline state. Must contain ``genre_normalizer_output``.
+            state: Current pipeline state. Must contain ``genre_normalizer_output``
+                and ``run_id``.
 
         Returns:
             Partial state update dict with ``book_fetcher_output`` set.
@@ -50,6 +58,12 @@ def make_book_fetcher_node(
             normalized_genres=genre_output.normalized_genres,
         )
         output = agent.run(input_data)
+
+        if artifact_store is not None:
+            from storymesh.core.artifacts import persist_node_output  # noqa: PLC0415
+
+            persist_node_output(artifact_store, state["run_id"], "book_fetcher", output)
+
         return {"book_fetcher_output": output}
 
     return book_fetcher_node

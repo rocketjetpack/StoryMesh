@@ -617,6 +617,111 @@ class TestAPIErrorGracefulDegradation:
 
 
 # ---------------------------------------------------------------------------
+# max_books truncation
+# ---------------------------------------------------------------------------
+
+
+def _make_doc(work_key: str, title: str, edition_count: int = 1) -> dict[str, Any]:
+    """Build a minimal Open Library doc dict for testing."""
+    return {"key": work_key, "title": title, "edition_count": edition_count}
+
+
+class TestMaxBooks:
+    def test_truncates_to_max_books(self, tmp_path: Path) -> None:
+        """Output is capped at max_books when more books are fetched."""
+        docs = [_make_doc(f"/works/OL{i}W", f"Book {i}", edition_count=i) for i in range(1, 21)]
+        stub = _StubClient(responses={"fantasy": docs})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(client=stub, max_books=5)  # type: ignore[arg-type]
+
+        output = a.run(BookFetcherAgentInput(normalized_genres=["fantasy"]))
+
+        assert len(output.books) == 5
+
+    def test_no_truncation_when_under_limit(self, tmp_path: Path) -> None:
+        """All books are returned when the total is within the max_books limit."""
+        docs = [_make_doc(f"/works/OL{i}W", f"Book {i}") for i in range(1, 4)]
+        stub = _StubClient(responses={"fantasy": docs})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(client=stub, max_books=10)  # type: ignore[arg-type]
+
+        output = a.run(BookFetcherAgentInput(normalized_genres=["fantasy"]))
+
+        assert len(output.books) == 3
+
+    def test_truncation_prioritises_cross_genre_books(self, tmp_path: Path) -> None:
+        """Books found under more genre queries are retained over single-genre books."""
+        mystery_and_fantasy = _make_doc("/works/OLXW", "Cross-genre Book", edition_count=1)
+        fantasy_only = [
+            _make_doc(f"/works/OL{i}W", f"Fantasy Only {i}", edition_count=100)
+            for i in range(1, 10)
+        ]
+        stub = _StubClient(
+            responses={
+                "mystery": [mystery_and_fantasy],
+                "fantasy": [mystery_and_fantasy, *fantasy_only],
+            }
+        )
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(client=stub, max_books=3)  # type: ignore[arg-type]
+
+        output = a.run(BookFetcherAgentInput(normalized_genres=["mystery", "fantasy"]))
+
+        retained_keys = {b.work_key for b in output.books}
+        assert "/works/OLXW" in retained_keys
+
+    def test_debug_records_truncation_flag(self, tmp_path: Path) -> None:
+        """debug dict reports max_books_applied=True when truncation occurred."""
+        docs = [_make_doc(f"/works/OL{i}W", f"Book {i}") for i in range(1, 11)]
+        stub = _StubClient(responses={"fantasy": docs})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(client=stub, max_books=3)  # type: ignore[arg-type]
+
+        output = a.run(BookFetcherAgentInput(normalized_genres=["fantasy"]))
+
+        assert output.debug["max_books_applied"] is True
+        assert output.debug["max_books_limit"] == 3
+
+    def test_debug_records_no_truncation_flag(self, tmp_path: Path) -> None:
+        """debug dict reports max_books_applied=False when no truncation occurred."""
+        docs = [_make_doc(f"/works/OL{i}W", f"Book {i}") for i in range(1, 4)]
+        stub = _StubClient(responses={"fantasy": docs})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(client=stub, max_books=50)  # type: ignore[arg-type]
+
+        output = a.run(BookFetcherAgentInput(normalized_genres=["fantasy"]))
+
+        assert output.debug["max_books_applied"] is False
+        assert output.debug["max_books_limit"] == 50
+
+    def test_default_max_books(self, tmp_path: Path) -> None:
+        """Default max_books is 50 when client is provided directly."""
+        stub = _StubClient()
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(client=stub)  # type: ignore[arg-type]
+
+        assert a._max_books == 50
+
+
+# ---------------------------------------------------------------------------
 # Node wrapper
 # ---------------------------------------------------------------------------
 

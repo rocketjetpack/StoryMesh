@@ -30,7 +30,7 @@ agents:
     model: claude-haiku-4-5-20251001
     temperature: 0.0
     max_tokens: 1024
-  proposal_generation:
+  proposal_draft:
     provider: anthropic
     model: claude-sonnet-4-6
     temperature: 1.0
@@ -45,7 +45,8 @@ agents:
 #   "AppName (contact@email.com)". Remove or leave blank to use the anonymous rate limit.
 api_clients:
   open_library:
-    user_agent: 
+    user_agent:
+    max_books: 50    # Total cap after deduplication across all genre queries
 
 # ------
 # Caching Configuration

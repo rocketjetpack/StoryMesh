@@ -23,16 +23,19 @@ class StoryMeshState(TypedDict, total=False):
 
     All fields are optional (``total=False``) so that nodes can return
     partial dicts without needing to repeat unchanged keys. The pipeline
-    populates ``input_genre`` and ``pipeline_version`` before invocation;
+    populates ``user_prompt`` and ``pipeline_version`` before invocation;
     all other fields start as ``None`` and are filled in as stages run.
     """
 
     # ── Pipeline bookkeeping ───────────────────────────────────────────────
-    input_genre: str
-    """Raw genre string supplied by the caller."""
+    user_prompt: str
+    """Raw user input string describing the desired fiction synopsis."""
 
     pipeline_version: str
     """Package version string, set by StoryMeshPipeline before invocation."""
+
+    run_id: str
+    """Unique run identifier (UUID hex), generated before graph invocation."""
 
     # ── Stage 0: GenreNormalizerAgent ──────────────────────────────────────
     genre_normalizer_output: GenreNormalizerAgentOutput | None
@@ -59,6 +62,10 @@ class StoryMeshState(TypedDict, total=False):
     # ── Stage 6: SynopsisWriterAgent (LLM) ────────────────────────────────
     # TODO: Replace object with SynopsisWriterOutput once implemented.
     synopsis_writer_output: object | None
+
+    # ── Rubric retry tracking ──────────────────────────────────────────────
+    rubric_retry_count: int
+    """Number of times rubric_judge has routed back to proposal_draft. Starts at 0."""
 
     # ── Error tracking ─────────────────────────────────────────────────────
     errors: list[str]

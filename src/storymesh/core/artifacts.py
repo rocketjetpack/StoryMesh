@@ -4,6 +4,38 @@ from typing import Any, cast
 import orjson
 
 
+def persist_node_output(
+    artifact_store: "ArtifactStore",
+    run_id: str,
+    stage_name: str,
+    output: object,
+) -> None:
+    """Write a node's output as a JSON artifact within its run directory.
+
+    Called by node wrapper functions immediately after agent execution so
+    that artifacts are written incrementally rather than only after the full
+    graph completes. This means a crash mid-pipeline still leaves partial
+    artifacts on disk for post-mortem inspection.
+
+    No-ops silently when ``output`` is ``None`` or not serialisable as a dict.
+
+    Args:
+        artifact_store: The ``ArtifactStore`` instance for this run.
+        run_id: Unique run identifier from ``StoryMeshState``.
+        stage_name: Pipeline stage name (e.g. ``'genre_normalizer'``).
+        output: Stage output — a Pydantic model, a plain dict, or ``None``.
+    """
+    if output is None:
+        return
+    if hasattr(output, "model_dump"):
+        data: dict[str, Any] = output.model_dump()
+    elif isinstance(output, dict):
+        data = output
+    else:
+        return
+    artifact_store.save_run_file(run_id, f"{stage_name}_output.json", data)
+
+
 class ArtifactStore:
     def __init__(self, root: Path | None = None) -> None:
         self.root = root or Path(f"{Path.home()}/.storymesh")

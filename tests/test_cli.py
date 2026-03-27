@@ -21,7 +21,13 @@ def test_show_version() -> None:  # noqa: ANN201
 def test_generate_outputs_synopsis() -> None:  # noqa: ANN201
     mock_result = MagicMock()
     mock_result.final_synopsis = "A hero rises."
-    mock_result.metadata = {"input_genre": "fantasy"}
+    mock_result.metadata = {
+        "user_prompt": "fantasy",
+        "run_id": "testrun123",
+        "pipeline_version": "0.5.0",
+        "stage_timings": {"genre_normalizer": 0.03, "book_fetcher": 1.24},
+        "run_dir": "",
+    }
 
     with patch("storymesh.cli.generate_synopsis", return_value=mock_result):
         result = runner.invoke(app, ["generate", "fantasy"])
@@ -29,3 +35,6 @@ def test_generate_outputs_synopsis() -> None:  # noqa: ANN201
     assert result.exit_code == 0
     assert "A hero rises." in result.output
     assert "fantasy" in result.output
+    assert "testrun123" in result.output
+    assert "genre_normalizer" in result.output
+    assert "book_fetcher" in result.output

@@ -7,7 +7,7 @@ from typing import Any
 
 import anthropic
 
-from storymesh.llm.base import LLMClient, _traceable
+from storymesh.llm.base import LLMClient, _traceable, register_provider
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
@@ -66,3 +66,6 @@ class AnthropicClient(LLMClient):
             )
 
         return str(block.text)
+
+
+register_provider("anthropic", AnthropicClient)

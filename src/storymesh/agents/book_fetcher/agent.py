@@ -41,6 +41,7 @@ class BookFetcherAgent:
         self,
         client: OpenLibraryClient | None = None,
         cache_ttl: int = 86400,
+        max_books: int = 50,
     ) -> None:
         """Construct the agent.
 
@@ -51,15 +52,21 @@ class BookFetcherAgent:
             cache_ttl: Cache time-to-live in seconds. Default 86400 (24 hours).
                 Book metadata changes infrequently; aggressive caching is
                 appropriate and respectful to Open Library's infrastructure.
+            max_books: Maximum number of books to return after deduplication.
+                When ``client`` is None (normal runtime), the value from
+                ``api_clients.open_library.max_books`` in config takes
+                precedence over this parameter. Default 50.
         """
         self._cache_ttl = cache_ttl
 
         if client is None:
             ol_cfg = get_api_client_config("open_library")
             user_agent: str | None = ol_cfg.get("user_agent") or None
+            self._max_books: int = ol_cfg.get("max_books", max_books)
             self._client = OpenLibraryClient(user_agent=user_agent)
             self._owns_client = True
         else:
+            self._max_books = max_books
             self._client = client
             self._owns_client = False
 
@@ -158,11 +165,22 @@ class BookFetcherAgent:
         total_dedup = len(all_books)
         duplicates_merged = total_raw - total_dedup
 
+        # Apply max_books cap: prioritise books found across more genres, then
+        # by edition count as a popularity proxy.
+        truncated = len(all_books) > self._max_books
+        if truncated:
+            all_books.sort(
+                key=lambda b: (len(b.source_genres), b.edition_count),
+                reverse=True,
+            )
+            all_books = all_books[: self._max_books]
+
         logger.info(
-            "BookFetcherAgent complete | %d books (%d after dedup, %d merged)",
+            "BookFetcherAgent complete | %d books (%d after dedup, %d merged, %d returned)",
             total_raw,
             total_dedup,
             duplicates_merged,
+            len(all_books),
         )
 
         debug: dict[str, Any] = {
@@ -170,6 +188,8 @@ class BookFetcherAgent:
             "total_raw": total_raw,
             "total_after_dedup": total_dedup,
             "duplicates_merged": duplicates_merged,
+            "max_books_limit": self._max_books,
+            "max_books_applied": truncated,
         }
 
         return BookFetcherAgentOutput(

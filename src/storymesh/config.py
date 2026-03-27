@@ -64,7 +64,17 @@ def find_config_file() -> Path:
 
 
 def _get_required_env_keys(config: dict[str, Any]) -> set[str]:
-    """Determine which API keys are required based on the config."""
+    """Determine which API key environment variable names are needed by the config.
+
+    Args:
+        config: Loaded config dict.
+
+    Returns:
+        Set of environment variable names (e.g. ``{"ANTHROPIC_API_KEY"}``).
+
+    Raises:
+        ValueError: If the config references an unknown provider name.
+    """
     providers: set[str] = set()
 
     llm_section = config.get("llm", {})
@@ -87,47 +97,60 @@ def _get_required_env_keys(config: dict[str, Any]) -> set[str]:
     return {_PROVIDER_KEY_MAP[p] for p in providers}
 
 
-def _load_env(required_keys: set[str]) -> Path | None:
-    """Load .env if any required key is missing from the environment.
+def _load_env_best_effort() -> None:
+    """Load the first .env file found, without checking for specific keys.
 
     Search order:
-      1. If all required keys are already set, skip .env loading.
-      2. .env in the current working directory.
-      3. ~/.storymesh/.env
-    """
-    if all(os.environ.get(k) for k in required_keys):
-        return None
+      1. .env in the current working directory.
+      2. ~/.storymesh/.env
 
+    Silently no-ops if neither file exists.
+    """
     candidates = [
         Path.cwd() / ".env",
         Path.home() / ".storymesh" / ".env",
     ]
-
     for path in candidates:
         if path.is_file():
             load_dotenv(path)
-            return path
+            logger.debug(".env loaded from %s", path)
+            return
 
-    return None
 
+def warn_missing_provider_keys(config: dict[str, Any]) -> None:
+    """Log a warning for each provider API key referenced in config but absent from the environment.
 
-def _validate_env(required_keys: set[str]) -> None:
-    """Raise if any required API key is missing from the environment."""
-    missing = {k for k in required_keys if not os.environ.get(k)}
-    if missing:
-        raise OSError(
-            f"Missing required API key(s): {', '.join(sorted(missing))}. "
-            f"Set them in your environment, .env in the current directory, "
-            f"or ~/.storymesh/.env"
-        )
+    This is a non-fatal check intended to be called just before the pipeline
+    runs. Agents handle missing keys gracefully (static-only mode), so raising
+    here would be overly strict.
+
+    Args:
+        config: Loaded config dict, as returned by ``get_config()``.
+    """
+    try:
+        required_keys = _get_required_env_keys(config)
+    except ValueError as exc:
+        logger.warning("Config provider validation warning: %s", exc)
+        return
+
+    for key in sorted(required_keys):
+        if not os.environ.get(key):
+            logger.warning(
+                "%s is not set — agents using this provider will run in static-only mode.",
+                key,
+            )
 
 
 def get_config() -> dict[str, Any]:
     """Load and cache the StoryMesh configuration.
 
-    On first call: reads the YAML config, determines required API keys,
-    loads .env if needed, validates all keys are present, configures
+    On first call: reads the YAML config, loads .env (best-effort), configures
     logging, and caches the result. Subsequent calls return the cached dict.
+
+    API key presence is intentionally *not* validated here so that CLI
+    commands like ``show-config`` and ``show-version`` work without any keys
+    configured. Call ``warn_missing_provider_keys(get_config())`` explicitly
+    when the pipeline is about to run.
     """
     global _config_cache  # noqa: PLW0603
     if _config_cache is not None:
@@ -146,25 +169,17 @@ def get_config() -> dict[str, Any]:
             f"Expected a YAML mapping in {config_path}, got {type(loaded).__name__}"
         )
 
-    # 2. Determine required keys from config
-    required_keys = _get_required_env_keys(loaded)
+    # 2. Load .env unconditionally (best-effort, no error if absent)
+    _load_env_best_effort()
 
-    # 3. Load .env if needed
-    env_path = _load_env(required_keys)
-
-    # 4. Validate all required keys are present
-    _validate_env(required_keys)
-
-    # 5. Configure logging
+    # 3. Configure logging
     log_level = loaded.get("logging", {}).get("level", "INFO")
     _configure_logging(log_level)
 
-    # 6. Cache and return
+    # 4. Cache and return
     _config_cache = loaded
 
     logger.debug("Configuration loaded from %s", config_path)
-    if env_path is not None:
-        logger.debug(".env loaded from %s", env_path)
 
     return _config_cache
 
