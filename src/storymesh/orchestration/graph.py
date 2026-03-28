@@ -34,7 +34,6 @@ from storymesh.orchestration.state import StoryMeshState
 logger = logging.getLogger(__name__)
 
 # Future node imports (uncomment as agents are implemented):
-# from storymesh.orchestration.nodes.book_ranker import make_book_ranker_node
 # from storymesh.orchestration.nodes.theme_extractor import make_theme_extractor_node
 # from storymesh.orchestration.nodes.proposal_draft import make_proposal_draft_node
 # from storymesh.orchestration.nodes.rubric_judge import make_rubric_judge_node
@@ -172,7 +171,7 @@ def _rubric_route(state: StoryMeshState) -> str:
     Returns:
         Name of the next node to execute.
     """
-    retry_count: int = state.get("rubric_retry_count", 0)  # type: ignore[assignment]
+    retry_count: int = state.get("rubric_retry_count", 0)
     rubric_output = state.get("rubric_judge_output")
 
     # None means the noop placeholder ran — treat as passed.
@@ -200,7 +199,7 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
               └── FAIL → proposal_draft (max 2 retries)
 
     Notes:
-    - Stages 2–6 are noop placeholders until their agents are implemented.
+    - Stages 3–6 are noop placeholders until their agents are implemented.
     - The rubric retry loop is wired via ``_rubric_route``; the noop always
       passes so the pipeline progresses linearly until real agents are added.
     - Checkpointer: pass ``checkpointer=MemorySaver()`` to ``compile()``
@@ -236,12 +235,32 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     book_fetcher_agent = BookFetcherAgent()
     book_fetcher_node = make_book_fetcher_node(book_fetcher_agent, artifact_store=artifact_store)
 
+    # ── Stage 2: BookRankerAgent ──────────────────────────────────────────
+    from storymesh.agents.book_ranker.agent import BookRankerAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.book_ranker import (  # noqa: PLC0415
+        make_book_ranker_node,
+    )
+
+    book_ranker_cfg = get_agent_config("book_ranker")
+    book_ranker_llm = _build_llm_client(book_ranker_cfg) if book_ranker_cfg.get("llm_rerank") else None
+
+    book_ranker_agent = BookRankerAgent(
+        top_n=book_ranker_cfg.get("top_n", 10),
+        weights=book_ranker_cfg.get("weights"),
+        rating_confidence_threshold=book_ranker_cfg.get("rating_confidence_threshold", 50),
+        llm_rerank=book_ranker_cfg.get("llm_rerank", False),
+        llm_client=book_ranker_llm,
+        temperature=book_ranker_cfg.get("temperature", 0.0),
+        max_tokens=book_ranker_cfg.get("max_tokens", 1024),
+    )
+    book_ranker_node = make_book_ranker_node(book_ranker_agent, artifact_store=artifact_store)
+
     # ── Build the graph ────────────────────────────────────────────────────
     graph: Any = StateGraph(StoryMeshState)
 
     graph.add_node("genre_normalizer", genre_node)
     graph.add_node("book_fetcher", book_fetcher_node)
-    graph.add_node("book_ranker", _noop_node)       # Stage 2 — placeholder
+    graph.add_node("book_ranker", book_ranker_node)
     graph.add_node("theme_extractor", _noop_node)   # Stage 3 — placeholder (LLM)
     graph.add_node("proposal_draft", _noop_node)    # Stage 4 — placeholder (LLM)
     graph.add_node("rubric_judge", _noop_node)      # Stage 5 — placeholder (LLM, conditional)

@@ -77,6 +77,11 @@ _MYSTERY_DOC: dict[str, Any] = {
     "edition_count": 50,
     "ratings_average": 4.5,
     "ratings_count": 1000,
+    "readinglog_count": 500,
+    "want_to_read_count": 200,
+    "already_read_count": 250,
+    "currently_reading_count": 50,
+    "number_of_pages_median": 307,
     "subject": ["Mystery", "Victorian"],
     "cover_i": 123,
     "first_publish_year": 1892,
@@ -211,6 +216,11 @@ class TestSingleGenre:
         assert record.first_publish_year == 1892
         assert "Mystery" in record.subjects
         assert record.cover_id == 123
+        assert record.readinglog_count == 500
+        assert record.want_to_read_count == 200
+        assert record.already_read_count == 250
+        assert record.currently_reading_count == 50
+        assert record.number_of_pages_median == 307
 
     def test_source_genres_set_correctly(self, agent: BookFetcherAgent) -> None:
         output = agent.run(BookFetcherAgentInput(normalized_genres=["mystery"]))
@@ -461,6 +471,11 @@ class TestDocParsing:
         assert record.edition_count == 0
         assert record.ratings_average is None
         assert record.ratings_count == 0
+        assert record.readinglog_count == 0
+        assert record.want_to_read_count == 0
+        assert record.already_read_count == 0
+        assert record.currently_reading_count == 0
+        assert record.number_of_pages_median is None
         assert record.subjects == []
         assert record.cover_id is None
 

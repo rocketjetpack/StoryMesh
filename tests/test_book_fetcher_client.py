@@ -157,6 +157,11 @@ class TestFetchBooksBySubject:
         assert "author_name" in fields
         assert "edition_count" in fields
         assert "ratings_average" in fields
+        assert "readinglog_count" in fields
+        assert "want_to_read_count" in fields
+        assert "already_read_count" in fields
+        assert "currently_reading_count" in fields
+        assert "number_of_pages_median" in fields
 
 
 # ---------------------------------------------------------------------------

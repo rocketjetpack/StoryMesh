@@ -60,6 +60,33 @@ class BookRecord(BaseModel):
             "Not used downstream but retained for future UI use."
         ),
     )
+    readinglog_count: int = Field(
+        default=0,
+        description=(
+            "Total number of Open Library users who have this book on any "
+            "reading shelf (want to read + currently reading + already read). "
+            "Direct popularity signal for ranking."
+        ),
+    )
+    want_to_read_count: int = Field(
+        default=0,
+        description="Number of users with this book on their 'want to read' shelf.",
+    )
+    already_read_count: int = Field(
+        default=0,
+        description="Number of users who have marked this book as 'already read'.",
+    )
+    currently_reading_count: int = Field(
+        default=0,
+        description="Number of users currently reading this book.",
+    )
+    number_of_pages_median: int | None = Field(
+        default=None,
+        description=(
+            "Median page count across all editions. None if unavailable. "
+            "Not used for ranking but useful for downstream synopsis calibration."
+        ),
+    )
     source_genres: list[str] = Field(
         description=(
             "Genre subject strings whose queries returned this book "

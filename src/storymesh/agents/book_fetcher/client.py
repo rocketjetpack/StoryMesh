@@ -30,7 +30,10 @@ class OpenLibraryClient:
     _BASE_URL = "https://openlibrary.org/search.json"
     _FIELDS = (
         "key,title,author_name,first_publish_year,"
-        "edition_count,ratings_average,ratings_count,subject,cover_i"
+        "edition_count,ratings_average,ratings_count,"
+        "readinglog_count,want_to_read_count,already_read_count,"
+        "currently_reading_count,number_of_pages_median,"
+        "subject,cover_i"
     )
 
     def __init__(

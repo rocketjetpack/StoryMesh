@@ -47,6 +47,11 @@ class TestBookRecord:
             edition_count=120,
             ratings_average=4.2,
             ratings_count=850,
+            readinglog_count=1200,
+            want_to_read_count=500,
+            already_read_count=600,
+            currently_reading_count=100,
+            number_of_pages_median=455,
             subjects=["Fantasy fiction", "Middle Earth"],
             cover_id=258027,
             source_genres=["fantasy"],
@@ -58,6 +63,11 @@ class TestBookRecord:
         assert record.edition_count == 120
         assert record.ratings_average == 4.2
         assert record.ratings_count == 850
+        assert record.readinglog_count == 1200
+        assert record.want_to_read_count == 500
+        assert record.already_read_count == 600
+        assert record.currently_reading_count == 100
+        assert record.number_of_pages_median == 455
         assert record.subjects == ["Fantasy fiction", "Middle Earth"]
         assert record.cover_id == 258027
         assert record.source_genres == ["fantasy"]
@@ -69,6 +79,11 @@ class TestBookRecord:
         assert record.edition_count == 0
         assert record.ratings_average is None
         assert record.ratings_count == 0
+        assert record.readinglog_count == 0
+        assert record.want_to_read_count == 0
+        assert record.already_read_count == 0
+        assert record.currently_reading_count == 0
+        assert record.number_of_pages_median is None
         assert record.subjects == []
         assert record.cover_id is None
 
@@ -172,7 +187,7 @@ class TestBookFetcherAgentOutput:
         assert out.schema_version == BOOK_FETCHER_SCHEMA_VERSION
 
     def test_schema_version_value(self) -> None:
-        assert BOOK_FETCHER_SCHEMA_VERSION == "1.1"
+        assert BOOK_FETCHER_SCHEMA_VERSION == "1.2"
 
 
 # ---------------------------------------------------------------------------

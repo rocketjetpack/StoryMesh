@@ -1,8 +1,8 @@
 # StoryMesh
 
-StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
+StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, a deterministic book ranking stage with optional LLM re-ranking, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
 
-The later creative stages are scaffolded but not implemented yet. Today, a full `generate` run executes the implemented stages, persists artifacts, and returns a placeholder synopsis while stages 2 to 6 remain stubs.
+The later creative stages are scaffolded but not implemented yet. Today, a full `generate` run executes the implemented stages, persists artifacts, and returns a placeholder synopsis while stages 3 to 6 remain stubs.
 
 ## Current Status
 
@@ -12,14 +12,14 @@ Implemented:
 - LangGraph orchestration with typed shared state and per-node artifact persistence
 - `GenreNormalizerAgent` with deterministic mapping, fuzzy matching, and optional LLM fallback
 - `BookFetcherAgent` backed by the Open Library Search API with disk cache, deduplication, and configurable `max_books` cap
+- `BookRankerAgent` with deterministic weighted composite scoring (genre overlap, reader engagement, rating quality, rating volume) and optional LLM re-ranking by narrative potential
 - LLM provider registry for extensible provider support
 - Rubric retry loop topology (conditional edge wired; noop placeholder always passes)
 - Rich-formatted CLI output with per-stage timing and artifact paths
-- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, genre normalization, LLM registry, and artifacts
+- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, book ranking, genre normalization, LLM registry, and artifacts
 
 Not implemented yet:
 
-- `BookRankerAgent`
 - `ThemeExtractorAgent`
 - `ProposalDraftAgent`
 - `RubricJudgeAgent`
@@ -29,8 +29,9 @@ Current runtime behavior:
 
 1. Normalize the user's prompt into genres and tones.
 2. Fetch matching books from Open Library.
-3. Pass through placeholder nodes for stages 2 to 6.
-4. Return a `GenerationResult` with a placeholder `final_synopsis`.
+3. Rank books by composite score (deterministic; optionally refined by LLM).
+4. Pass through placeholder nodes for stages 3 to 6.
+5. Return a `GenerationResult` with a placeholder `final_synopsis`.
 
 ## Architecture
 
@@ -49,7 +50,7 @@ START
       └── FAIL → proposal_draft (max 2 retries)
 ```
 
-Only `genre_normalizer` and `book_fetcher` currently perform real work. The remaining nodes are registered as no-op placeholders. The rubric retry loop is wired via a conditional edge; the noop rubric judge always passes so the pipeline runs linearly until the real agent is implemented.
+Stages 0, 1, and 2 currently perform real work. Stages 3 to 6 are registered as no-op placeholders. The rubric retry loop is wired via a conditional edge; the noop rubric judge always passes so the pipeline runs linearly until the real agent is implemented.
 
 ### Stage 0: GenreNormalizerAgent
 
@@ -72,11 +73,25 @@ Status: implemented
 - Caps results at `max_books` (default 50) after deduplication, prioritising cross-genre books
 - Emits debug metadata for cache hits, misses, truncation, and per-genre counts
 
-### Stages 2 to 6
+### Stage 2: BookRankerAgent
+
+Status: implemented
+
+- Scores books using a weighted composite of four signals:
+  - **Genre overlap** (weight 0.40): fraction of queried genres that returned this book
+  - **Reader engagement** (weight 0.25): min-max normalized `readinglog_count` from Open Library
+  - **Rating quality** (weight 0.20): confidence-adjusted average rating (discounts low sample sizes)
+  - **Rating volume** (weight 0.15): min-max normalized `ratings_count`
+- Truncates to a configurable `top_n` (default 10)
+- Emits dual-representation output: full `RankedBook` records in artifacts, slim `RankedBookSummary` objects for downstream LLM token efficiency
+- Optional LLM re-rank pass: when `llm_rerank: true`, passes the shortlist to an LLM which re-orders by narrative potential for the user's creative brief; falls back gracefully on LLM failure
+- All scoring weights and `top_n` are configurable in `storymesh.config.yaml`
+
+### Stages 3 to 6
 
 Status: scaffolded only
 
-The state fields, graph nodes, and versioning hooks exist, but the runtime logic for ranking, thematic extraction, proposal drafting, rubric evaluation, and synopsis synthesis has not been implemented yet.
+The state fields, graph nodes, and versioning hooks exist, but the runtime logic for thematic extraction, proposal drafting, rubric evaluation, and synopsis synthesis has not been implemented yet.
 
 ## Requirements
 
@@ -139,7 +154,7 @@ Important behavior:
 Current committed config includes:
 
 - LLM defaults
-- `genre_normalizer` and `proposal_draft` agent overrides
+- `genre_normalizer`, `book_ranker`, and `proposal_draft` agent overrides
 - Open Library client settings including `max_books`
 - Cache and logging settings
 - Optional LangSmith project settings
@@ -160,7 +175,7 @@ Example output:
 
 ```
 ╭──────────────────────────────────────────────────────────────╮
-│ StoryMesh v0.5.0  Run abc123def456                           │
+│ StoryMesh v0.6.0  Run abc123def456                           │
 │ Input: "dark post-apocalyptic detective mystery"             │
 ╰──────────────────────────────────────────────────────────────╯
 
@@ -168,13 +183,13 @@ Example output:
  ────────────────────────────────────────────────────────────────────────
  genre_normalizer        ✓ done    0.03s    ~/.storymesh/runs/abc.../genre_normalizer_output.json
  book_fetcher            ✓ done    1.24s    ~/.storymesh/runs/abc.../book_fetcher_output.json
- book_ranker             ○ noop    0.00s    —
+ book_ranker             ✓ done    0.01s    ~/.storymesh/runs/abc.../book_ranker_output.json
  theme_extractor         ○ noop    0.00s    —
  proposal_draft          ○ noop    0.00s    —
  rubric_judge            ○ noop    0.00s    —
  synopsis_writer         ○ noop    0.00s    —
  ────────────────────────────────────────────────────────────────────────
-                         Total: 1.27s
+                         Total: 1.28s
 
 ╭─ Synopsis ───────────────────────────────────────────────────╮
 │ Placeholder synopsis for 'dark post-apocalyptic detective    │
@@ -220,7 +235,8 @@ StoryMesh persists run artifacts under `~/.storymesh`. Artifacts are written as 
 │   └── <run_id>/
 │       ├── run_metadata.json         ← written before graph invocation
 │       ├── genre_normalizer_output.json
-│       └── book_fetcher_output.json
+│       ├── book_fetcher_output.json
+│       └── book_ranker_output.json
 └── stages/                           ← stage-level cache (content-addressed)
 ```
 
@@ -259,12 +275,11 @@ Useful files:
 
 ## Known Gaps
 
-- The graph includes placeholder nodes for stages 2 to 6; the final synopsis is a placeholder until `SynopsisWriterAgent` is implemented.
+- The graph includes placeholder nodes for stages 3 to 6; the final synopsis is a placeholder until `SynopsisWriterAgent` is implemented.
 - The rubric retry loop topology is wired but the routing function always passes (noop placeholder).
 
 ## Roadmap
 
-- Implement deterministic book ranking
 - Add theme extraction and proposal-generation stages
 - Activate rubric-based retry logic with real pass/fail signal
 - Implement final synopsis synthesis

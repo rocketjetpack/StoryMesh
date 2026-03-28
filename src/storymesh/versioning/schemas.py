@@ -1,11 +1,13 @@
 GENRE_CONSTRAINT_SCHEMA_VERSION = "2.0"
-BOOK_FETCHER_SCHEMA_VERSION = "1.1"
+BOOK_FETCHER_SCHEMA_VERSION = "1.2"
+BOOK_RANKER_SCHEMA_VERSION = "1.0"
 PROPOSAL_SCHEMA_VERSION = "1.0"
 THEMEPACK_SCHEMA_VERSION = "1.0"
 
 SCHEMA_VERSIONS: dict[str, str] = {
     "Genre Constraint": GENRE_CONSTRAINT_SCHEMA_VERSION,
     "Book Fetcher": BOOK_FETCHER_SCHEMA_VERSION,
+    "Book Ranker": BOOK_RANKER_SCHEMA_VERSION,
     "Proposal": PROPOSAL_SCHEMA_VERSION,
     "Themepack": THEMEPACK_SCHEMA_VERSION,
 }
@@ -20,3 +22,9 @@ SCHEMA_VERSIONS: dict[str, str] = {
 # 2026-03-26: Increment Book Fetcher schema to 1.1. Renamed BookRecord.source_query
 #             (str) to source_genres (list[str]) to support deduplication within the
 #             agent. Added BookFetcherAgentOutput.debug dict for per-run audit data.
+# 2026-03-27: Increment Book Fetcher schema to 1.2. Added readinglog_count,
+#             want_to_read_count, already_read_count, currently_reading_count,
+#             and number_of_pages_median fields to BookRecord for richer
+#             downstream ranking signals.
+# 2026-03-27: Add Book Ranker schema 1.0. Introduces ScoreBreakdown, RankedBook,
+#             RankedBookSummary, BookRankerAgentInput, and BookRankerAgentOutput.

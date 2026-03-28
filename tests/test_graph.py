@@ -11,14 +11,20 @@ committed storymesh.config.yaml.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
+from unittest.mock import patch
 
 import orjson
 import pytest
 
+from storymesh.agents.book_ranker.agent import BookRankerAgent
 from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent
 from storymesh.agents.genre_normalizer.loader import MappingStore
+from storymesh.orchestration.nodes.book_ranker import make_book_ranker_node
 from storymesh.orchestration.nodes.genre_normalizer import make_genre_normalizer_node
 from storymesh.orchestration.state import StoryMeshState
+from storymesh.schemas.book_fetcher import BookFetcherAgentOutput, BookRecord
+from storymesh.schemas.book_ranker import BookRankerAgentOutput
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -133,6 +139,107 @@ class TestGenreNormalizerNode:
         assert isinstance(output, GenreNormalizerAgentOutput)
         with pytest.raises(Exception):  # noqa: B017
             output.normalized_genres = []  # type: ignore[misc]
+
+
+# ── TestBookRankerNode ─────────────────────────────────────────────────────────
+
+
+def _make_book_fetcher_output(books: list[BookRecord]) -> BookFetcherAgentOutput:
+    return BookFetcherAgentOutput(
+        books=books,
+        queries_executed=["mystery"],
+    )
+
+
+def _make_book_record(work_key: str) -> BookRecord:
+    return BookRecord(
+        work_key=work_key,
+        title=f"Book {work_key}",
+        source_genres=["mystery"],
+    )
+
+
+class TestBookRankerNode:
+    """Tests for the make_book_ranker_node factory and resulting node function."""
+
+    def test_returns_book_ranker_output_type(self, tmp_path: Path) -> None:
+        """The node must return a BookRankerAgentOutput under the correct key."""
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            agent = BookRankerAgent()
+
+        node = make_book_ranker_node(agent)
+        book_fetcher_output = _make_book_fetcher_output([_make_book_record("/works/OL1W")])
+        state: StoryMeshState = {
+            "user_prompt": "dark mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "book_fetcher_output": book_fetcher_output,
+        }
+
+        result = node(state)
+
+        assert "book_ranker_output" in result
+        assert isinstance(result["book_ranker_output"], BookRankerAgentOutput)
+
+    def test_only_returns_own_key(self, tmp_path: Path) -> None:
+        """The node must return a partial state dict with exactly one key."""
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            agent = BookRankerAgent()
+
+        node = make_book_ranker_node(agent)
+        book_fetcher_output = _make_book_fetcher_output([_make_book_record("/works/OL1W")])
+        state: StoryMeshState = {
+            "user_prompt": "dark mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "book_fetcher_output": book_fetcher_output,
+        }
+
+        result = node(state)
+
+        assert set(result.keys()) == {"book_ranker_output"}
+
+    def test_none_book_fetcher_output_raises_runtime_error(self) -> None:
+        """Node raises RuntimeError when book_fetcher_output is None."""
+        agent = BookRankerAgent()
+        node = make_book_ranker_node(agent)
+        state: StoryMeshState = {
+            "user_prompt": "dark mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "book_fetcher_output": None,
+        }
+
+        with pytest.raises(RuntimeError, match="book_fetcher_output.*None"):
+            node(state)  # type: ignore[arg-type]
+
+    def test_ranked_books_count_matches_input(self, tmp_path: Path) -> None:
+        """Output ranked_books length must not exceed top_n (default 10)."""
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            agent = BookRankerAgent(top_n=2)
+
+        node = make_book_ranker_node(agent)
+        books = [_make_book_record(f"/works/OL{i}W") for i in range(5)]
+        book_fetcher_output = _make_book_fetcher_output(books)
+        state: StoryMeshState = {
+            "user_prompt": "mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "book_fetcher_output": book_fetcher_output,
+        }
+
+        result = node(state)
+        output: Any = result["book_ranker_output"]
+        assert len(output.ranked_books) == 2
 
 
 # ── TestStoryMeshState ─────────────────────────────────────────────────────────

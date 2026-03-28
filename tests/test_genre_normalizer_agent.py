@@ -389,7 +389,6 @@ class TestErrorHandling:
         self, store: MappingStore,
     ) -> None:
         """LLM configured + fallback disabled: message says to enable fallback."""
-        import json
         from storymesh.llm.base import FakeLLMClient
 
         agent_with_llm = GenreNormalizerAgent(
@@ -406,6 +405,7 @@ class TestErrorHandling:
     ) -> None:
         """LLM configured + fallback enabled but no genres returned: message says LLM was attempted."""
         import json
+
         from storymesh.llm.base import FakeLLMClient
 
         response = json.dumps({"classifications": [

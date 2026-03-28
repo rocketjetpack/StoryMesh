@@ -79,7 +79,7 @@ class StoryMeshPipeline:
         # Stream the graph to collect per-node timing without touching node code.
         # stream_mode="updates" yields one {node_name: state_delta} dict per node.
         stage_timings: dict[str, float] = {}
-        final_state: dict[str, Any] = dict(initial_state)  # type: ignore[arg-type]
+        final_state: dict[str, Any] = dict(initial_state)
 
         prev_time = time.perf_counter()
         for chunk in self._graph.stream(initial_state, stream_mode="updates"):
