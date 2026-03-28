@@ -34,7 +34,6 @@ from storymesh.orchestration.state import StoryMeshState
 logger = logging.getLogger(__name__)
 
 # Future node imports (uncomment as agents are implemented):
-# from storymesh.orchestration.nodes.theme_extractor import make_theme_extractor_node
 # from storymesh.orchestration.nodes.proposal_draft import make_proposal_draft_node
 # from storymesh.orchestration.nodes.rubric_judge import make_rubric_judge_node
 # from storymesh.orchestration.nodes.synopsis_writer import make_synopsis_writer_node
@@ -252,8 +251,34 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
         llm_client=book_ranker_llm,
         temperature=book_ranker_cfg.get("temperature", 0.0),
         max_tokens=book_ranker_cfg.get("max_tokens", 1024),
+        diversity_weight=book_ranker_cfg.get("diversity_weight", 0.0),
     )
     book_ranker_node = make_book_ranker_node(book_ranker_agent, artifact_store=artifact_store)
+
+    # ── Stage 3: ThemeExtractorAgent ──────────────────────────────────────
+    from storymesh.agents.theme_extractor.agent import ThemeExtractorAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.theme_extractor import (  # noqa: PLC0415
+        make_theme_extractor_node,
+    )
+
+    theme_cfg = get_agent_config("theme_extractor")
+    theme_llm = _build_llm_client(theme_cfg)
+
+    if theme_llm is None:
+        logger.warning(
+            "ThemeExtractorAgent: no LLM client available — stage 3 will run as noop."
+        )
+        theme_extractor_node: Any = _noop_node
+    else:
+        theme_agent = ThemeExtractorAgent(
+            llm_client=theme_llm,
+            temperature=theme_cfg.get("temperature", 0.6),
+            max_tokens=theme_cfg.get("max_tokens", 4096),
+            max_seeds=theme_cfg.get("max_seeds", 5),
+        )
+        theme_extractor_node = make_theme_extractor_node(
+            theme_agent, artifact_store=artifact_store
+        )
 
     # ── Build the graph ────────────────────────────────────────────────────
     graph: Any = StateGraph(StoryMeshState)
@@ -261,7 +286,7 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     graph.add_node("genre_normalizer", genre_node)
     graph.add_node("book_fetcher", book_fetcher_node)
     graph.add_node("book_ranker", book_ranker_node)
-    graph.add_node("theme_extractor", _noop_node)   # Stage 3 — placeholder (LLM)
+    graph.add_node("theme_extractor", theme_extractor_node)
     graph.add_node("proposal_draft", _noop_node)    # Stage 4 — placeholder (LLM)
     graph.add_node("rubric_judge", _noop_node)      # Stage 5 — placeholder (LLM, conditional)
     graph.add_node("synopsis_writer", _noop_node)   # Stage 6 — placeholder (LLM)

@@ -309,3 +309,55 @@ class TestLogging:
         with caplog.at_level(logging.INFO, logger="storymesh.agents.book_ranker.agent"):
             _agent().run(_input(books))
         assert any("BookRankerAgent complete" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Diversity
+# ---------------------------------------------------------------------------
+
+
+class TestBookRankerAgentDiversity:
+    def test_diversity_weight_from_constructor(self) -> None:
+        """Agent stores the diversity_weight passed to the constructor."""
+        agent = BookRankerAgent(diversity_weight=0.4)
+        assert agent._diversity_weight == pytest.approx(0.4)
+
+    def test_default_zero_weight_backward_compatible(self) -> None:
+        """Default diversity_weight is 0.0 — existing behavior is unchanged."""
+        agent = BookRankerAgent()
+        assert agent._diversity_weight == pytest.approx(0.0)
+
+    def test_debug_records_diversity_metadata(self) -> None:
+        books = [_book(f"/works/OL{i}W") for i in range(3)]
+        output = _agent(diversity_weight=0.3).run(_input(books))
+        assert "diversity_weight" in output.debug
+        assert "diversity_applied" in output.debug
+        assert output.debug["diversity_weight"] == pytest.approx(0.3)
+        assert output.debug["diversity_applied"] is True
+
+    def test_debug_diversity_applied_false_when_zero(self) -> None:
+        books = [_book(f"/works/OL{i}W") for i in range(3)]
+        output = _agent(diversity_weight=0.0).run(_input(books))
+        assert output.debug["diversity_applied"] is False
+
+    def test_debug_selection_order_present(self) -> None:
+        books = [_book(f"/works/OL{i}W") for i in range(3)]
+        output = _agent(diversity_weight=0.3).run(_input(books))
+        assert "selection_order" in output.debug
+        assert len(output.debug["selection_order"]) == len(output.ranked_books)
+
+    def test_diversity_produces_diverse_shortlist(self) -> None:
+        """With a high diversity_weight and genre-diverse input, a book from an
+        underrepresented genre should appear in the shortlist over a redundant one."""
+        mystery_books = [
+            _book(f"/works/OLM{i}W", source_genres=["mystery"]) for i in range(5)
+        ]
+        fantasy_book = _book("/works/OLFANTASY", source_genres=["fantasy"])
+        # fantasy_book has a lower composite score than most mystery books
+        # but with diversity_weight=0.9 it should still be selected.
+        all_books = mystery_books + [fantasy_book]
+        output = _agent(top_n=3, diversity_weight=0.9).run(_input(all_books))
+        selected_genres = {
+            g for rb in output.ranked_books for g in rb.book.source_genres
+        }
+        assert "fantasy" in selected_genres

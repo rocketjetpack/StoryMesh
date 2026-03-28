@@ -17,6 +17,7 @@ from typing import TypedDict
 from storymesh.schemas.book_fetcher import BookFetcherAgentOutput
 from storymesh.schemas.book_ranker import BookRankerAgentOutput
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
+from storymesh.schemas.theme_extractor import ThemeExtractorAgentOutput
 
 
 class StoryMeshState(TypedDict, total=False):
@@ -48,8 +49,7 @@ class StoryMeshState(TypedDict, total=False):
     book_ranker_output: BookRankerAgentOutput | None
 
     # ── Stage 3: ThemeExtractorAgent (LLM) ────────────────────────────────
-    # TODO: Replace object with ThemePack once implemented.
-    theme_extractor_output: object | None
+    theme_extractor_output: ThemeExtractorAgentOutput | None
 
     # ── Stage 4: ProposalDraftAgent (LLM) ─────────────────────────────────
     # TODO: Replace object with ProposalDraftOutput once implemented.

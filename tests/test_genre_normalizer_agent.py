@@ -153,6 +153,35 @@ class TestNarrativeContext:
 
 
 # ---------------------------------------------------------------------------
+# Narrative Context Promotion (WI-1)
+# ---------------------------------------------------------------------------
+
+class TestNarrativeContextPromotion:
+    def test_narrative_context_defaults_to_empty_list(
+        self, agent: GenreNormalizerAgent
+    ) -> None:
+        """narrative_context top-level field defaults to [] for a simple genre input."""
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        assert result.narrative_context == []
+
+    def test_narrative_context_matches_debug(
+        self, agent: GenreNormalizerAgent
+    ) -> None:
+        """Top-level narrative_context must equal debug['narrative_context']."""
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        assert result.narrative_context == result.debug["narrative_context"]
+
+    def test_narrative_context_matches_debug_with_unresolved(
+        self, agent: GenreNormalizerAgent
+    ) -> None:
+        """Top-level field mirrors debug dict even when tokens are present."""
+        result = agent.run(GenreNormalizerAgentInput(
+            raw_genre="mystery set in 2075 chicago",
+        ))
+        assert result.narrative_context == result.debug["narrative_context"]
+
+
+# ---------------------------------------------------------------------------
 # Genre Resolution
 # ---------------------------------------------------------------------------
 

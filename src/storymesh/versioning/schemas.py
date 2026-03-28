@@ -1,8 +1,8 @@
-GENRE_CONSTRAINT_SCHEMA_VERSION = "2.0"
+GENRE_CONSTRAINT_SCHEMA_VERSION = "3.0"
 BOOK_FETCHER_SCHEMA_VERSION = "1.2"
 BOOK_RANKER_SCHEMA_VERSION = "1.0"
 PROPOSAL_SCHEMA_VERSION = "1.0"
-THEMEPACK_SCHEMA_VERSION = "1.0"
+THEMEPACK_SCHEMA_VERSION = "1.1"
 
 SCHEMA_VERSIONS: dict[str, str] = {
     "Genre Constraint": GENRE_CONSTRAINT_SCHEMA_VERSION,
@@ -28,3 +28,11 @@ SCHEMA_VERSIONS: dict[str, str] = {
 #             downstream ranking signals.
 # 2026-03-27: Add Book Ranker schema 1.0. Introduces ScoreBreakdown, RankedBook,
 #             RankedBookSummary, BookRankerAgentInput, and BookRankerAgentOutput.
+# 2026-03-28: Increment Genre Constraint schema to 3.0. Promoted
+#             narrative_context from debug dict to a top-level field
+#             so downstream agents (ThemeExtractorAgent) can consume it
+#             as part of the typed contract.
+# 2026-03-28: Increment ThemePack schema to 1.1. Added cliched_resolutions
+#             (required, min_length=1) to ThematicTension. Downstream agents
+#             ProposalDraft and RubricJudge use this list as exclusions and
+#             evaluation criteria respectively.

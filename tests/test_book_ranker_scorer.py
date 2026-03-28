@@ -11,11 +11,13 @@ import pytest
 from storymesh.agents.book_ranker.scorer import (
     DEFAULT_RATING_CONFIDENCE_THRESHOLD,
     DEFAULT_WEIGHTS,
+    _jaccard_similarity,
     compute_scores,
     score_genre_overlap,
     score_rating_quality,
     score_rating_volume,
     score_reader_engagement,
+    select_with_diversity,
 )
 from storymesh.schemas.book_fetcher import BookRecord
 
@@ -251,3 +253,117 @@ class TestComputeScores:
         assert len(results) == 3
         scores = [r[1] for r in results]
         assert all(s == pytest.approx(scores[0]) for s in scores)
+
+
+# ---------------------------------------------------------------------------
+# _jaccard_similarity
+# ---------------------------------------------------------------------------
+
+
+class TestJaccardSimilarity:
+    def test_identical_genres(self) -> None:
+        assert _jaccard_similarity(["fantasy", "mystery"], ["fantasy", "mystery"]) == pytest.approx(1.0)
+
+    def test_disjoint_genres(self) -> None:
+        assert _jaccard_similarity(["fantasy"], ["mystery"]) == pytest.approx(0.0)
+
+    def test_partial_overlap(self) -> None:
+        # intersection={"mystery"}, union={"fantasy","mystery","thriller"} → 1/3
+        result = _jaccard_similarity(["fantasy", "mystery"], ["mystery", "thriller"])
+        assert result == pytest.approx(1 / 3)
+
+    def test_empty_both(self) -> None:
+        assert _jaccard_similarity([], []) == pytest.approx(1.0)
+
+    def test_empty_one(self) -> None:
+        assert _jaccard_similarity(["fantasy"], []) == pytest.approx(0.0)
+
+    def test_empty_other(self) -> None:
+        assert _jaccard_similarity([], ["mystery"]) == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# select_with_diversity
+# ---------------------------------------------------------------------------
+
+
+def _scored(
+    work_key: str,
+    score: float,
+    source_genres: list[str] | None = None,
+) -> tuple:
+    book = _book(work_key=work_key, source_genres=source_genres or ["mystery"])
+    from storymesh.schemas.book_ranker import ScoreBreakdown
+
+    breakdown = ScoreBreakdown(
+        genre_overlap=score,
+        reader_engagement=score,
+        rating_quality=score,
+        rating_volume=score,
+    )
+    return (book, score, breakdown)
+
+
+class TestSelectWithDiversity:
+    def test_zero_weight_matches_pure_relevance(self) -> None:
+        """diversity_weight=0.0 must produce the same order as sorted-by-score."""
+        books = [
+            _scored("/works/OL1W", 0.9, ["mystery"]),
+            _scored("/works/OL2W", 0.8, ["mystery"]),
+            _scored("/works/OL3W", 0.7, ["fantasy"]),
+        ]
+        result = select_with_diversity(books, top_n=2, diversity_weight=0.0)
+        assert [b[0].work_key for b in result] == ["/works/OL1W", "/works/OL2W"]
+
+    def test_diversity_changes_selection(self) -> None:
+        """With high diversity_weight, a lower-scoring but genre-diverse book
+        should be preferred over a higher-scoring genre-redundant book."""
+        # OL1W and OL2W are both mystery (redundant). OL3W is fantasy (diverse).
+        books = [
+            _scored("/works/OL1W", 0.9, ["mystery"]),
+            _scored("/works/OL2W", 0.85, ["mystery"]),
+            _scored("/works/OL3W", 0.7, ["fantasy"]),
+        ]
+        result = select_with_diversity(books, top_n=2, diversity_weight=0.8)
+        selected_keys = {b[0].work_key for b in result}
+        # OL1W is always selected first (highest score). OL3W should beat OL2W
+        # because it is genre-diverse.
+        assert "/works/OL1W" in selected_keys
+        assert "/works/OL3W" in selected_keys
+
+    def test_top_n_respected(self) -> None:
+        books = [_scored(f"/works/OL{i}W", 1.0 - i * 0.1) for i in range(5)]
+        result = select_with_diversity(books, top_n=3, diversity_weight=0.3)
+        assert len(result) == 3
+
+    def test_single_book(self) -> None:
+        books = [_scored("/works/OL1W", 0.9)]
+        result = select_with_diversity(books, top_n=1, diversity_weight=0.5)
+        assert len(result) == 1
+        assert result[0][0].work_key == "/works/OL1W"
+
+    def test_all_identical_genres(self) -> None:
+        """When all books share genres, diversity cannot distinguish them.
+        The result set must still have the correct length."""
+        books = [
+            _scored(f"/works/OL{i}W", 1.0 - i * 0.1, ["mystery"])
+            for i in range(4)
+        ]
+        result = select_with_diversity(books, top_n=3, diversity_weight=0.5)
+        assert len(result) == 3
+
+    def test_top_n_zero_returns_empty(self) -> None:
+        books = [_scored("/works/OL1W", 0.9)]
+        result = select_with_diversity(books, top_n=0, diversity_weight=0.3)
+        assert result == []
+
+    def test_first_selection_is_highest_scoring(self) -> None:
+        """The first book selected by MMR is always the highest-scoring book.
+        Input must be sorted by score descending (as compute_scores guarantees)."""
+        books = [
+            _scored("/works/OL2W", 0.9, ["fantasy"]),
+            _scored("/works/OL3W", 0.7, ["thriller"]),
+            _scored("/works/OL1W", 0.5, ["mystery"]),
+        ]
+        result = select_with_diversity(books, top_n=2, diversity_weight=0.5)
+        assert result[0][0].work_key == "/works/OL2W"

@@ -1,8 +1,8 @@
 # StoryMesh
 
-StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, a deterministic book ranking stage with optional LLM re-ranking, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
+StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, a deterministic book ranking stage with optional LLM re-ranking and MMR diversity selection, a creative theme extraction stage, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
 
-The later creative stages are scaffolded but not implemented yet. Today, a full `generate` run executes the implemented stages, persists artifacts, and returns a placeholder synopsis while stages 3 to 6 remain stubs.
+The later creative stages (proposal drafting, rubric judging, synopsis writing) are scaffolded but not implemented yet. Today, a full `generate` run executes stages 0–3, persists artifacts, and returns a placeholder synopsis while stages 4–6 remain stubs.
 
 ## Current Status
 
@@ -12,26 +12,27 @@ Implemented:
 - LangGraph orchestration with typed shared state and per-node artifact persistence
 - `GenreNormalizerAgent` with deterministic mapping, fuzzy matching, and optional LLM fallback
 - `BookFetcherAgent` backed by the Open Library Search API with disk cache, deduplication, and configurable `max_books` cap
-- `BookRankerAgent` with deterministic weighted composite scoring (genre overlap, reader engagement, rating quality, rating volume) and optional LLM re-ranking by narrative potential
+- `BookRankerAgent` with deterministic weighted composite scoring (genre overlap, reader engagement, rating quality, rating volume), optional LLM re-ranking by narrative potential, and MMR diversity selection to ensure the shortlist covers the thematic space
+- `ThemeExtractorAgent` — the creative engine of the pipeline. Identifies the thematic assumptions each genre tradition takes for granted, finds contradictions between traditions, frames them as creative questions, and generates concrete narrative seeds for the downstream proposal stage
 - LLM provider registry for extensible provider support
 - Rubric retry loop topology (conditional edge wired; noop placeholder always passes)
 - Rich-formatted CLI output with per-stage timing and artifact paths
-- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, book ranking, genre normalization, LLM registry, and artifacts
+- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, book ranking, genre normalization, theme extraction, LLM registry, and artifacts
 
 Not implemented yet:
 
-- `ThemeExtractorAgent`
 - `ProposalDraftAgent`
 - `RubricJudgeAgent`
 - `SynopsisWriterAgent`
 
 Current runtime behavior:
 
-1. Normalize the user's prompt into genres and tones.
+1. Normalize the user's prompt into genres, tones, and narrative context tokens.
 2. Fetch matching books from Open Library.
-3. Rank books by composite score (deterministic; optionally refined by LLM).
-4. Pass through placeholder nodes for stages 3 to 6.
-5. Return a `GenerationResult` with a placeholder `final_synopsis`.
+3. Rank books by composite score with MMR diversity selection (deterministic; optionally refined by LLM).
+4. Extract thematic tensions, genre clusters, and narrative seeds (LLM — requires API key).
+5. Pass through placeholder nodes for stages 4 to 6.
+6. Return a `GenerationResult` with a placeholder `final_synopsis`.
 
 ## Architecture
 
@@ -82,16 +83,36 @@ Status: implemented
   - **Reader engagement** (weight 0.25): min-max normalized `readinglog_count` from Open Library
   - **Rating quality** (weight 0.20): confidence-adjusted average rating (discounts low sample sizes)
   - **Rating volume** (weight 0.15): min-max normalized `ratings_count`
+- Applies **MMR diversity selection** after scoring: uses Maximal Marginal Relevance with Jaccard genre similarity to ensure the shortlist covers distinct genre traditions rather than returning the same dominant titles repeatedly; configurable via `diversity_weight` (default 0.3; set to 0.0 for pure relevance)
+- Output is returned in MMR selection order so downstream LLM agents see genre-diverse books early in the list, which directly influences which genre clusters ThemeExtractorAgent identifies as primary
 - Truncates to a configurable `top_n` (default 10)
 - Emits dual-representation output: full `RankedBook` records in artifacts, slim `RankedBookSummary` objects for downstream LLM token efficiency
 - Optional LLM re-rank pass: when `llm_rerank: true`, passes the shortlist to an LLM which re-orders by narrative potential for the user's creative brief; falls back gracefully on LLM failure
-- All scoring weights and `top_n` are configurable in `storymesh.config.yaml`
+- All scoring weights, `top_n`, and `diversity_weight` are configurable in `storymesh.config.yaml`
 
-### Stages 3 to 6
+### Stage 3: ThemeExtractorAgent
+
+Status: implemented
+
+The creative engine of the pipeline. Rather than asking "what themes do these books share?", it identifies the **thematic assumptions** each genre tradition takes for granted, finds where those assumptions **contradict** each other, and frames each contradiction as a **creative question** that a story could explore.
+
+For example, given "dark post-apocalyptic detective mystery":
+- The mystery tradition assumes: truth is discoverable, there is a resolution, a detective figure restores order
+- The post-apocalyptic tradition assumes: systems have collapsed, survival trumps justice, the world is fundamentally disordered
+- The tension: What does "solving a case" mean when there's no institution to deliver justice to?
+
+Output (the ThemePack) contains:
+- **Genre clusters**: books grouped by tradition with their thematic assumptions and dominant tropes
+- **Thematic tensions**: pairs of opposing assumptions framed as creative questions, each scored by intensity and accompanied by 2–4 **clichéd resolutions** — the predictable narrative moves that lazy writing defaults to. Downstream agents use these as explicit exclusions (ProposalDraft) and evaluation criteria (RubricJudge)
+- **Narrative seeds**: 3–5 concrete 2–3 sentence story kernels that emerge from the tensions, incorporating the user's narrative context tokens (settings, time periods, character archetypes)
+
+Uses `claude-sonnet-4-6` at temperature 0.6 — more capable than classification agents, with enough creative latitude to produce novel tensions while still generating valid structured JSON.
+
+### Stages 4 to 6
 
 Status: scaffolded only
 
-The state fields, graph nodes, and versioning hooks exist, but the runtime logic for thematic extraction, proposal drafting, rubric evaluation, and synopsis synthesis has not been implemented yet.
+The state fields, graph nodes, and versioning hooks exist, but the runtime logic for proposal drafting, rubric evaluation, and synopsis synthesis has not been implemented yet.
 
 ## Requirements
 
@@ -154,7 +175,7 @@ Important behavior:
 Current committed config includes:
 
 - LLM defaults
-- `genre_normalizer`, `book_ranker`, and `proposal_draft` agent overrides
+- `genre_normalizer`, `book_ranker`, `theme_extractor`, and `proposal_draft` agent overrides
 - Open Library client settings including `max_books`
 - Cache and logging settings
 - Optional LangSmith project settings
@@ -275,12 +296,13 @@ Useful files:
 
 ## Known Gaps
 
-- The graph includes placeholder nodes for stages 3 to 6; the final synopsis is a placeholder until `SynopsisWriterAgent` is implemented.
+- The graph includes placeholder nodes for stages 4 to 6; the final synopsis is a placeholder until `SynopsisWriterAgent` is implemented.
 - The rubric retry loop topology is wired but the routing function always passes (noop placeholder).
+- `ThemeExtractorAgent` requires a configured API key; without one, stage 3 runs as a noop and the ThemePack is not produced.
 
 ## Roadmap
 
-- Add theme extraction and proposal-generation stages
+- Implement `ProposalDraftAgent` to select and develop the best narrative seed into a full proposal
 - Activate rubric-based retry logic with real pass/fail signal
 - Implement final synopsis synthesis
 - Expand provider support beyond the current Anthropic implementation

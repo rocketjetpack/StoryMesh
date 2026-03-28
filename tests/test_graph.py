@@ -10,6 +10,7 @@ committed storymesh.config.yaml.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -20,12 +21,16 @@ import pytest
 from storymesh.agents.book_ranker.agent import BookRankerAgent
 from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent
 from storymesh.agents.genre_normalizer.loader import MappingStore
+from storymesh.agents.theme_extractor.agent import ThemeExtractorAgent
+from storymesh.llm.base import FakeLLMClient
 from storymesh.orchestration.nodes.book_ranker import make_book_ranker_node
 from storymesh.orchestration.nodes.genre_normalizer import make_genre_normalizer_node
+from storymesh.orchestration.nodes.theme_extractor import make_theme_extractor_node
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.book_fetcher import BookFetcherAgentOutput, BookRecord
-from storymesh.schemas.book_ranker import BookRankerAgentOutput
+from storymesh.schemas.book_ranker import BookRankerAgentOutput, RankedBookSummary
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
+from storymesh.schemas.theme_extractor import ThemeExtractorAgentOutput
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -240,6 +245,171 @@ class TestBookRankerNode:
         result = node(state)
         output: Any = result["book_ranker_output"]
         assert len(output.ranked_books) == 2
+
+
+# ── TestThemeExtractorNode ────────────────────────────────────────────────────
+
+
+def _valid_theme_response() -> str:
+    return json.dumps({
+        "genre_clusters": [
+            {
+                "genre": "mystery",
+                "books": ["Book 1"],
+                "thematic_assumptions": ["Truth is discoverable"],
+                "dominant_tropes": [],
+            }
+        ],
+        "tensions": [
+            {
+                "tension_id": "T1",
+                "cluster_a": "mystery",
+                "assumption_a": "Truth is discoverable",
+                "cluster_b": "mystery",
+                "assumption_b": "Some truths destroy the investigator",
+                "creative_question": "What does solving a case cost the solver?",
+                "intensity": 0.7,
+                "cliched_resolutions": [
+                    "The detective solves the case and walks away unscathed",
+                ],
+            }
+        ],
+        "narrative_seeds": [
+            {
+                "seed_id": "S1",
+                "concept": "A former detective must reinvent investigation from first principles.",
+                "tensions_used": ["T1"],
+                "tonal_direction": [],
+                "narrative_context_used": [],
+            }
+        ],
+    })
+
+
+def _make_genre_normalizer_output() -> GenreNormalizerAgentOutput:
+    return GenreNormalizerAgentOutput(
+        raw_input="dark mystery",
+        normalized_genres=["mystery"],
+        subgenres=[],
+        user_tones=["dark"],
+        tone_override=False,
+        narrative_context=[],
+        debug={},
+    )
+
+
+def _make_book_ranker_output() -> BookRankerAgentOutput:
+    summary = RankedBookSummary(
+        work_key="/works/OL1W",
+        title="Book 1",
+        authors=["Author"],
+        source_genres=["mystery"],
+        composite_score=0.9,
+        rank=1,
+    )
+    return BookRankerAgentOutput(
+        ranked_books=[],
+        ranked_summaries=[summary],
+        dropped_count=0,
+        llm_reranked=False,
+        debug={},
+    )
+
+
+def _make_theme_agent(response: str = "") -> ThemeExtractorAgent:
+    client = FakeLLMClient(responses=[response or _valid_theme_response()])
+    return ThemeExtractorAgent(llm_client=client)
+
+
+class TestThemeExtractorNode:
+    """Tests for the make_theme_extractor_node factory and resulting node function."""
+
+    def test_returns_theme_extractor_output_type(self) -> None:
+        """The node must return a ThemeExtractorAgentOutput under the correct key."""
+        node = make_theme_extractor_node(_make_theme_agent())
+        state: StoryMeshState = {
+            "user_prompt": "dark mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "genre_normalizer_output": _make_genre_normalizer_output(),
+            "book_ranker_output": _make_book_ranker_output(),
+        }
+
+        result = node(state)
+
+        assert "theme_extractor_output" in result
+        assert isinstance(result["theme_extractor_output"], ThemeExtractorAgentOutput)
+
+    def test_only_returns_own_key(self) -> None:
+        """The node must return a partial state dict with exactly one key."""
+        node = make_theme_extractor_node(_make_theme_agent())
+        state: StoryMeshState = {
+            "user_prompt": "dark mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "genre_normalizer_output": _make_genre_normalizer_output(),
+            "book_ranker_output": _make_book_ranker_output(),
+        }
+
+        result = node(state)
+
+        assert set(result.keys()) == {"theme_extractor_output"}
+
+    def test_none_genre_output_raises_runtime_error(self) -> None:
+        """Node raises RuntimeError when genre_normalizer_output is None."""
+        node = make_theme_extractor_node(_make_theme_agent())
+        state: StoryMeshState = {
+            "user_prompt": "dark mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "genre_normalizer_output": None,
+            "book_ranker_output": _make_book_ranker_output(),
+        }
+
+        with pytest.raises(RuntimeError, match="genre_normalizer_output.*None"):
+            node(state)  # type: ignore[arg-type]
+
+    def test_none_book_ranker_output_raises_runtime_error(self) -> None:
+        """Node raises RuntimeError when book_ranker_output is None."""
+        node = make_theme_extractor_node(_make_theme_agent())
+        state: StoryMeshState = {
+            "user_prompt": "dark mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "genre_normalizer_output": _make_genre_normalizer_output(),
+            "book_ranker_output": None,
+        }
+
+        with pytest.raises(RuntimeError, match="book_ranker_output.*None"):
+            node(state)  # type: ignore[arg-type]
+
+    def test_assembles_input_from_multiple_stages(self) -> None:
+        """The assembled input carries data from both upstream outputs."""
+        captured_inputs: list[object] = []
+
+        class _RecordingAgent(ThemeExtractorAgent):
+            def run(self, input_data: object) -> ThemeExtractorAgentOutput:  # type: ignore[override]
+                captured_inputs.append(input_data)
+                return super().run(input_data)  # type: ignore[arg-type]
+
+        client = FakeLLMClient(responses=[_valid_theme_response()])
+        agent = _RecordingAgent(llm_client=client)
+        node = make_theme_extractor_node(agent)
+
+        genre_out = _make_genre_normalizer_output()
+        state: StoryMeshState = {
+            "user_prompt": "dark mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "genre_normalizer_output": genre_out,
+            "book_ranker_output": _make_book_ranker_output(),
+        }
+        node(state)
+
+        assert len(captured_inputs) == 1
+        inp = captured_inputs[0]
+        assert hasattr(inp, "normalized_genres")
+        assert hasattr(inp, "ranked_summaries")
 
 
 # ── TestStoryMeshState ─────────────────────────────────────────────────────────

@@ -193,6 +193,16 @@ class GenreNormalizerAgentOutput(BaseModel):
         description="Short human-readable summary of which user tones override which genre defaults." # noqa E501
     )
 
+    narrative_context: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Tokens or phrases from the user input that represent narrative "
+            "elements (settings, time periods, character archetypes) rather "
+            "than genres or tones. Consumed by downstream agents to anchor "
+            "creative output in the user's specific vision."
+        ),
+    )
+
     debug: dict[str, Any] = Field(
         default_factory=dict,
         description="Resolution details, audit trails, and expanded tones for observability." # noqa E501

@@ -143,6 +143,7 @@ class GenreNormalizerAgent:
             user_tones = tone_result.user_tones,
             tone_override = tone_result.tone_override,
             override_note = tone_result.override_note,
+            narrative_context = resolver_result.narrative_context,
             debug = debug,
         )
 
