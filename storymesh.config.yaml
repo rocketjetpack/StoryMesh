@@ -34,7 +34,8 @@ agents:
     temperature: 0.0
     max_tokens: 1024
     rating_confidence_threshold: 50
-    diversity_weight: 0.3   # 0.0 = pure relevance, 1.0 = max diversity
+    mmr_lambda: 0.6      # 1.0 = pure relevance, 0.0 = pure diversity (subject-tag Jaccard)
+    mmr_candidates: 30   # top-N pool considered for MMR selection
     weights:
       genre_overlap: 0.40
       reader_engagement: 0.25
@@ -59,6 +60,8 @@ api_clients:
   open_library:
     user_agent:    # Optional; "AppName (contact@email.com)" for higher rate limit
     max_books: 50  # Total cap after deduplication across all genre queries
+    sort_strategies: ["editions", "rating"]  # Per-genre sort passes; more passes = broader candidate pool
+    limit_per_sort: 15  # Books fetched per sort pass per genre (total ≤ max_books after dedup)
 
 # ------
 # Caching Configuration

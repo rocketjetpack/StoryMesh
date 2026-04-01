@@ -162,57 +162,65 @@ def compute_scores(
     return results
 
 
-def _jaccard_similarity(genres_a: list[str], genres_b: list[str]) -> float:
-    """Compute Jaccard similarity between two genre lists.
+def _jaccard_similarity(subjects_a: list[str], subjects_b: list[str]) -> float:
+    """Compute Jaccard similarity between two Open Library subject-tag lists.
+
+    Comparison is case-insensitive. Both empty → 0.0 (no evidence of similarity).
+    One empty → 0.0.
 
     Args:
-        genres_a: First list of genre strings.
-        genres_b: Second list of genre strings.
+        subjects_a: First list of subject tag strings.
+        subjects_b: Second list of subject tag strings.
 
     Returns:
-        Similarity score in [0.0, 1.0]. Returns 1.0 when both lists are empty
-        (identical empty sets), 0.0 when one is empty and the other is not.
+        Similarity score in [0.0, 1.0].
     """
-    set_a, set_b = set(genres_a), set(genres_b)
-    if not set_a and not set_b:
-        return 1.0
-    union = set_a | set_b
-    if not union:
-        return 1.0
-    intersection = set_a & set_b
-    return len(intersection) / len(union)
+    set_a = {s.lower() for s in subjects_a}
+    set_b = {s.lower() for s in subjects_b}
+    if not set_a or not set_b:
+        return 0.0
+    return len(set_a & set_b) / len(set_a | set_b)
 
 
-def select_with_diversity(
-    scored_books: list[tuple[BookRecord, float, ScoreBreakdown]],
+def select_diverse(
+    scored: list[tuple[BookRecord, float, ScoreBreakdown]],
     top_n: int,
-    diversity_weight: float = 0.3,
+    mmr_lambda: float = 0.6,
+    mmr_candidates: int = 30,
 ) -> list[tuple[BookRecord, float, ScoreBreakdown]]:
-    """Select top_n books balancing relevance against redundancy.
+    """MMR-style diversity selection using Open Library subject tags.
 
-    Uses Maximal Marginal Relevance (MMR): each selection maximizes
-    ``(1 - diversity_weight) * composite_score - diversity_weight * max_similarity_to_selected``.
-    Similarity is Jaccard similarity over source_genres sets.
+    Scores each candidate with:
+        mmr_lambda * composite_score - (1 - mmr_lambda) * max_similarity_to_selected
 
-    When ``diversity_weight=0.0`` the result is identical to taking the first
-    ``top_n`` entries from ``scored_books`` (pure relevance). The output is
-    returned in MMR selection order so that downstream LLM agents see diverse
-    genre traditions early in the list.
+    Similarity is Jaccard similarity over the books' ``subjects`` lists (Open
+    Library subject tags), not source_genres. Subject tags carry much richer
+    thematic signal, so similar books are penalized more precisely.
+
+    ``mmr_lambda=1.0`` degenerates to pure relevance (identical to simple
+    truncation). ``mmr_lambda=0.0`` is pure diversity. The first selection is
+    always the highest-scoring candidate regardless of lambda.
 
     Args:
-        scored_books: All books with computed composite scores, sorted by
+        scored: (book, composite_score, breakdown) tuples sorted by
             composite_score descending. Must be non-empty if top_n > 0.
         top_n: Number of books to select.
-        diversity_weight: 0.0 = pure relevance (current behavior),
-            1.0 = maximum diversity.
+        mmr_lambda: Relevance/diversity trade-off in [0.0, 1.0]. Default 0.6.
+        mmr_candidates: Maximum number of top-scored books to consider as
+            candidates. Limits quadratic similarity computation on large pools.
 
     Returns:
         Selected books in MMR selection order (most marginal-relevant first).
     """
-    if diversity_weight == 0.0 or top_n <= 0:
-        return scored_books[:top_n]
+    if top_n <= 0:
+        return []
 
-    remaining = list(scored_books)
+    candidates = scored[:mmr_candidates]
+
+    if mmr_lambda == 1.0 or top_n >= len(candidates):
+        return candidates[:top_n]
+
+    remaining = list(candidates)
     selected: list[tuple[BookRecord, float, ScoreBreakdown]] = []
 
     while remaining and len(selected) < top_n:
@@ -226,12 +234,12 @@ def select_with_diversity(
 
         for i, (book, score, _) in enumerate(remaining):
             max_sim = max(
-                _jaccard_similarity(book.source_genres, sel[0].source_genres)
+                _jaccard_similarity(book.subjects, sel[0].subjects)
                 for sel in selected
             )
-            mmr = (1.0 - diversity_weight) * score - diversity_weight * max_sim
-            if mmr > best_mmr:
-                best_mmr = mmr
+            mmr_score = mmr_lambda * score - (1.0 - mmr_lambda) * max_sim
+            if mmr_score > best_mmr:
+                best_mmr = mmr_score
                 best_idx = i
 
         selected.append(remaining.pop(best_idx))

@@ -15,7 +15,7 @@ from storymesh.agents.book_ranker.scorer import (
     DEFAULT_RATING_CONFIDENCE_THRESHOLD,
     DEFAULT_WEIGHTS,
     compute_scores,
-    select_with_diversity,
+    select_diverse,
 )
 from storymesh.llm.base import LLMClient
 from storymesh.prompts.loader import load_prompt
@@ -52,7 +52,8 @@ class BookRankerAgent:
         llm_client: LLMClient | None = None,
         temperature: float = 0.0,
         max_tokens: int = 1024,
-        diversity_weight: float = 0.0,
+        mmr_lambda: float = 0.6,
+        mmr_candidates: int = 30,
     ) -> None:
         """Construct the agent.
 
@@ -70,10 +71,11 @@ class BookRankerAgent:
             temperature: LLM temperature for the re-rank call. Default 0.0 for
                 deterministic output.
             max_tokens: Maximum tokens for the re-rank LLM call.
-            diversity_weight: MMR diversity weight in [0.0, 1.0]. 0.0 preserves
-                pure relevance ordering (default, backward-compatible). Higher
-                values penalize genre-redundant books, ensuring the shortlist
-                covers the thematic space for ThemeExtractorAgent.
+            mmr_lambda: MMR relevance/diversity trade-off in [0.0, 1.0]. Higher
+                values favour relevance; lower values favour diversity via Open
+                Library subject-tag Jaccard similarity. Default 0.6.
+            mmr_candidates: Number of top-scored books considered as MMR
+                candidates. Limits computation on large pools. Default 30.
         """
         self._top_n = top_n
         self._weights = weights
@@ -82,7 +84,8 @@ class BookRankerAgent:
         self._llm_client = llm_client
         self._temperature = temperature
         self._max_tokens = max_tokens
-        self._diversity_weight = diversity_weight
+        self._mmr_lambda = mmr_lambda
+        self._mmr_candidates = mmr_candidates
 
         if llm_rerank and llm_client is None:
             logger.warning(
@@ -119,10 +122,11 @@ class BookRankerAgent:
         )
 
         # ── MMR diversity selection pass ───────────────────────────────────
-        top_scored = select_with_diversity(
-            scored_books=scored,
+        top_scored = select_diverse(
+            scored=scored,
             top_n=self._top_n,
-            diversity_weight=self._diversity_weight,
+            mmr_lambda=self._mmr_lambda,
+            mmr_candidates=self._mmr_candidates,
         )
         dropped_count = len(scored) - len(top_scored)
         selection_order = [book.work_key for book, _, _ in top_scored]
@@ -157,9 +161,11 @@ class BookRankerAgent:
             "total_scored": len(scored),
             "top_n": self._top_n,
             "dropped_count": dropped_count,
-            "diversity_weight": self._diversity_weight,
-            "diversity_applied": self._diversity_weight > 0.0,
-            "selection_order": selection_order,
+            "mmr": {
+                "lambda": self._mmr_lambda,
+                "candidates_considered": min(self._mmr_candidates, len(scored)),
+                "selection_order": selection_order,
+            },
         }
         if llm_debug:
             debug["llm_rerank"] = llm_debug

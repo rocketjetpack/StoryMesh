@@ -170,11 +170,11 @@ class TestGetAgentConfig:
         assert result.get("model") is not None
 
     def test_agent_specific_keys_preserved(self) -> None:
-        """book_ranker has top_n, weights, diversity_weight — all must survive."""
+        """book_ranker has top_n, weights, mmr_lambda — all must survive."""
         result = get_agent_config("book_ranker")
         assert "top_n" in result
         assert "weights" in result
-        assert "diversity_weight" in result
+        assert "mmr_lambda" in result
 
     def test_book_ranker_top_n_is_correct(self) -> None:
         result = get_agent_config("book_ranker")

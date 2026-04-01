@@ -1,6 +1,6 @@
 GENRE_CONSTRAINT_SCHEMA_VERSION = "3.1"
 BOOK_FETCHER_SCHEMA_VERSION = "1.2"
-BOOK_RANKER_SCHEMA_VERSION = "1.0"
+BOOK_RANKER_SCHEMA_VERSION = "1.1"
 PROPOSAL_SCHEMA_VERSION = "1.0"
 THEMEPACK_SCHEMA_VERSION = "1.1"
 
@@ -40,3 +40,7 @@ SCHEMA_VERSIONS: dict[str, str] = {
 #             ResolutionMethod, InferredGenre model, and inferred_genres field
 #             to GenreNormalizerAgentOutput for Pass 4 holistic genre inference.
 #             Additive change (default_factory=list); existing consumers unaffected.
+# 2026-03-31: Increment Book Ranker schema to 1.1. Replaced select_with_diversity()
+#             (source_genres Jaccard, diversity_weight param) with select_diverse()
+#             (Open Library subject-tag Jaccard, mmr_lambda + mmr_candidates params).
+#             Debug dict now nests MMR metadata under a "mmr" key.

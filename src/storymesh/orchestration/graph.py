@@ -251,7 +251,8 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
         llm_client=book_ranker_llm,
         temperature=book_ranker_cfg.get("temperature", 0.0),
         max_tokens=book_ranker_cfg.get("max_tokens", 1024),
-        diversity_weight=book_ranker_cfg.get("diversity_weight", 0.0),
+        mmr_lambda=book_ranker_cfg.get("mmr_lambda", 0.6),
+        mmr_candidates=book_ranker_cfg.get("mmr_candidates", 30),
     )
     book_ranker_node = make_book_ranker_node(book_ranker_agent, artifact_store=artifact_store)
 

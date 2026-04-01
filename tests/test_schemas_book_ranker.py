@@ -306,7 +306,7 @@ class TestBookRankerAgentOutput:
         assert out.schema_version == BOOK_RANKER_SCHEMA_VERSION
 
     def test_schema_version_value(self) -> None:
-        assert BOOK_RANKER_SCHEMA_VERSION == "1.0"
+        assert BOOK_RANKER_SCHEMA_VERSION == "1.1"
 
     def test_frozen(self) -> None:
         out = _ranker_output()

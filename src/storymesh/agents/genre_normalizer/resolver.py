@@ -300,8 +300,9 @@ def resolve_llm(
         parsed = _ClassificationResponse.model_validate(raw_response)
     except Exception:
         logger.warning(
-            "LLM response failed schema validation: treating all tokens as unresolved.",
-            exc_info = True
+            "LLM response failed schema validation. Parsed data: %s",
+            raw_response,
+            exc_info=True,
         )
         return [], [], [], fallback_unresolved
     
@@ -443,7 +444,8 @@ def resolve_holistic(
         parsed = _HolisticInferenceResponse.model_validate(raw_response)
     except Exception:
         logger.warning(
-            "Pass 4 LLM response failed schema validation: returning empty inferred_genres.",
+            "Pass 4 LLM response failed schema validation. Parsed data: %s",
+            raw_response,
             exc_info=True,
         )
         return []

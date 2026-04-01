@@ -32,6 +32,8 @@ class _StubClient:
         self._responses = responses or {}
         self.rate_limit_delay = rate_limit_delay
         self.fetch_calls: list[str] = []
+        # Full (subject, sort) pair log for multi-sort assertions.
+        self.fetch_call_args: list[tuple[str, str]] = []
 
     def fetch_books_by_subject(
         self,
@@ -40,6 +42,7 @@ class _StubClient:
         sort: str = "editions",
     ) -> list[dict[str, Any]]:
         self.fetch_calls.append(subject)
+        self.fetch_call_args.append((subject, sort))
         return self._responses.get(subject, [])
 
     def close(self) -> None:
@@ -734,6 +737,127 @@ class TestMaxBooks:
             a = BookFetcherAgent(client=stub)  # type: ignore[arg-type]
 
         assert a._max_books == 50
+
+
+# ---------------------------------------------------------------------------
+# Multi-sort strategy
+# ---------------------------------------------------------------------------
+
+
+class TestMultiSortStrategies:
+    """sort_strategies with more than one entry doubles the API call count per genre."""
+
+    def test_single_sort_makes_one_call_per_genre(self, tmp_path: Path) -> None:
+        """With one sort strategy, each genre produces exactly one API call."""
+        stub = _StubClient(responses={"mystery": [_MYSTERY_DOC]})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(
+                client=stub,  # type: ignore[arg-type]
+                sort_strategies=["editions"],
+            )
+        a.run(BookFetcherAgentInput(normalized_genres=["mystery"]))
+        assert stub.fetch_call_args == [("mystery", "editions")]
+
+    def test_two_sorts_make_two_calls_per_genre(self, tmp_path: Path) -> None:
+        """With two sort strategies, each genre produces two API calls."""
+        stub = _StubClient(responses={"mystery": [_MYSTERY_DOC]})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(
+                client=stub,  # type: ignore[arg-type]
+                sort_strategies=["editions", "rating"],
+            )
+        with patch("storymesh.agents.book_fetcher.agent.time.sleep"):
+            a.run(BookFetcherAgentInput(normalized_genres=["mystery"]))
+        assert stub.fetch_call_args == [("mystery", "editions"), ("mystery", "rating")]
+
+    def test_deduplication_across_sorts(self, tmp_path: Path) -> None:
+        """A book returned by both sort passes appears only once in the output."""
+        stub = _StubClient(responses={"mystery": [_MYSTERY_DOC]})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(
+                client=stub,  # type: ignore[arg-type]
+                sort_strategies=["editions", "rating"],
+            )
+        with patch("storymesh.agents.book_fetcher.agent.time.sleep"):
+            output = a.run(BookFetcherAgentInput(normalized_genres=["mystery"]))
+        # OL1W comes back from both editions and rating — must be deduplicated.
+        assert len(output.books) == 1
+        assert output.books[0].work_key == "/works/OL1W"
+
+    def test_source_genres_not_duplicated_across_sorts(self, tmp_path: Path) -> None:
+        """source_genres lists each genre at most once even across multiple sorts."""
+        stub = _StubClient(responses={"mystery": [_MYSTERY_DOC]})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(
+                client=stub,  # type: ignore[arg-type]
+                sort_strategies=["editions", "rating"],
+            )
+        with patch("storymesh.agents.book_fetcher.agent.time.sleep"):
+            output = a.run(BookFetcherAgentInput(normalized_genres=["mystery"]))
+        assert output.books[0].source_genres == ["mystery"]
+
+    def test_queries_executed_deduplicates_subjects(self, tmp_path: Path) -> None:
+        """queries_executed contains each subject once regardless of sort count."""
+        stub = _StubClient(responses={"mystery": [_MYSTERY_DOC]})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(
+                client=stub,  # type: ignore[arg-type]
+                sort_strategies=["editions", "rating"],
+            )
+        with patch("storymesh.agents.book_fetcher.agent.time.sleep"):
+            output = a.run(BookFetcherAgentInput(normalized_genres=["mystery"]))
+        assert output.queries_executed == ["mystery"]
+
+    def test_sleep_between_multi_sort_calls(self, tmp_path: Path) -> None:
+        """Sleep fires between every consecutive API miss, including across sorts."""
+        stub = _StubClient(responses={"mystery": [_MYSTERY_DOC], "fantasy": [_FANTASY_DOC]})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(
+                client=stub,  # type: ignore[arg-type]
+                sort_strategies=["editions", "rating"],
+            )
+        with patch("storymesh.agents.book_fetcher.agent.time.sleep") as mock_sleep:
+            a.run(BookFetcherAgentInput(normalized_genres=["mystery", "fantasy"]))
+        # Calls: mystery:editions, mystery:rating, fantasy:editions, fantasy:rating
+        # Sleep fires after all but the last → 3 sleeps.
+        assert mock_sleep.call_count == 3
+
+    def test_per_genre_debug_has_per_sort_detail(self, tmp_path: Path) -> None:
+        """debug['per_genre'][subject]['sorts'] maps each sort to its own stats."""
+        stub = _StubClient(responses={"mystery": [_MYSTERY_DOC]})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            a = BookFetcherAgent(
+                client=stub,  # type: ignore[arg-type]
+                sort_strategies=["editions", "rating"],
+            )
+        with patch("storymesh.agents.book_fetcher.agent.time.sleep"):
+            output = a.run(BookFetcherAgentInput(normalized_genres=["mystery"]))
+        sorts = output.debug["per_genre"]["mystery"]["sorts"]
+        assert "editions" in sorts
+        assert "rating" in sorts
+        assert sorts["editions"]["cache"] == "miss"
+        assert sorts["rating"]["cache"] == "miss"
 
 
 # ---------------------------------------------------------------------------

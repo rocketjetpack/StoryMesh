@@ -1,0 +1,17 @@
+{
+  "_comment": "Maps canonical genre names (snake_case) to Open Library subject query strings. Only the first entry is used by resolve_subjects(); additional entries are documented for future use. Genres with an empty list have no valid Open Library subject equivalent and are silently dropped.",
+  "fantasy": ["fantasy"],
+  "science_fiction": ["science fiction"],
+  "horror": ["horror"],
+  "romance": ["romance"],
+  "mystery": ["mystery"],
+  "thriller": ["thriller", "suspense"],
+  "historical_fiction": ["historical fiction"],
+  "literary_fiction": ["literary fiction"],
+  "adventure": ["adventure"],
+  "crime": ["crime"],
+  "western": ["western"],
+  "young_adult": ["young adult fiction", "juvenile fiction"],
+  "workplace_fiction": [],
+  "techno_thriller": ["technothriller", "thriller"]
+}

@@ -1,8 +1,9 @@
 """BookFetcherAgent — Stage 1 of the StoryMesh pipeline.
 
 Receives normalized genre names from the GenreNormalizerAgent, queries
-the Open Library Search API for each genre, caches results to disk, and
-returns a deduplicated list of BookRecord objects for the BookRankerAgent.
+the Open Library Search API for each genre using one or more sort strategies,
+caches results to disk, and returns a deduplicated list of BookRecord objects
+for the BookRankerAgent.
 """
 
 from __future__ import annotations
@@ -29,12 +30,15 @@ class BookFetcherAgent:
     """Fetches genre-relevant books from the Open Library Search API (Stage 1).
 
     Accepts normalized genre names from the GenreNormalizerAgent, queries the
-    Open Library Search API for each genre, caches results to disk, and returns
-    a deduplicated flat list of BookRecord objects keyed by work_key.
+    Open Library Search API for each genre using one or more sort strategies,
+    caches results to disk, and returns a deduplicated flat list of BookRecord
+    objects keyed by work_key.
 
-    Books found under multiple genre queries are merged into a single record
-    with all matched genres listed in ``source_genres``. This agent makes no
-    LLM calls — it is a thin wrapper around the Open Library Search API.
+    Books found under multiple genre queries or sort passes are merged into a
+    single record with all matched genres listed in ``source_genres``. Each
+    genre name appears at most once in ``source_genres`` regardless of how many
+    sort passes returned it. This agent makes no LLM calls — it is a thin
+    wrapper around the Open Library Search API.
     """
 
     def __init__(
@@ -42,6 +46,8 @@ class BookFetcherAgent:
         client: OpenLibraryClient | None = None,
         cache_ttl: int = 86400,
         max_books: int = 50,
+        sort_strategies: list[str] | None = None,
+        limit_per_sort: int = 30,
     ) -> None:
         """Construct the agent.
 
@@ -55,7 +61,14 @@ class BookFetcherAgent:
             max_books: Maximum number of books to return after deduplication.
                 When ``client`` is None (normal runtime), the value from
                 ``api_clients.open_library.max_books`` in config takes
-                precedence over this parameter. Default 50.
+                precedence. Default 50.
+            sort_strategies: Sort orders to use per genre. Each strategy is a
+                separate API call, broadening the candidate pool. When ``client``
+                is None, the value from config takes precedence. Default
+                ``["editions"]`` (single pass, identical to previous behaviour).
+            limit_per_sort: Books to fetch per (genre, sort) pair. When
+                ``client`` is None, the value from config takes precedence.
+                Default 30.
         """
         self._cache_ttl = cache_ttl
 
@@ -63,10 +76,16 @@ class BookFetcherAgent:
             ol_cfg = get_api_client_config("open_library")
             user_agent: str | None = ol_cfg.get("user_agent") or None
             self._max_books: int = ol_cfg.get("max_books", max_books)
+            self._sort_strategies: list[str] = ol_cfg.get(
+                "sort_strategies", sort_strategies or ["editions"]
+            )
+            self._limit_per_sort: int = ol_cfg.get("limit_per_sort", limit_per_sort)
             self._client = OpenLibraryClient(user_agent=user_agent)
             self._owns_client = True
         else:
             self._max_books = max_books
+            self._sort_strategies = sort_strategies or ["editions"]
+            self._limit_per_sort = limit_per_sort
             self._client = client
             self._owns_client = False
 
@@ -74,16 +93,19 @@ class BookFetcherAgent:
         self._cache: diskcache.Cache = diskcache.Cache(str(cache_dir))
 
     def run(self, input_data: BookFetcherAgentInput) -> BookFetcherAgentOutput:
-        """Fetch books for each normalized genre and return deduplicated results.
+        """Fetch books for each normalized genre across all sort strategies.
 
-        For each genre:
+        For each (genre, sort) pair:
           1. Convert underscores to spaces for the Open Library subject format.
-          2. Check the disk cache. Return cached results without an API call.
+          2. Check the disk cache using a key that encodes subject, limit, and
+             sort. Return cached results without an API call.
           3. On a cache miss, query the API and store the result.
-          4. Merge results by work_key: books found under multiple genres
-             accumulate all matched genres in their ``source_genres`` list.
+          4. Merge results by work_key: books found under multiple genres or
+             sort passes accumulate matched genres in ``source_genres`` (each
+             genre name appears at most once per book).
           5. Sleep between consecutive API calls to respect the rate limit.
-             The sleep is skipped on cache hits and after the final genre.
+             The sleep is skipped on cache hits, on errors, and after the
+             final (genre, sort) call.
 
         Args:
             input_data: Validated input contract from the GenreNormalizerAgent.
@@ -93,9 +115,12 @@ class BookFetcherAgent:
             a debug dict containing per-genre counts and deduplication summary.
         """
         genres = input_data.normalized_genres
-        limit = input_data.limit_per_genre
 
-        logger.info("BookFetcherAgent starting | genres=%s", genres)
+        logger.info(
+            "BookFetcherAgent starting | genres=%s | sorts=%s",
+            genres,
+            self._sort_strategies,
+        )
 
         # Accumulator keyed by work_key for deduplication.
         seen: dict[str, BookRecord] = {}
@@ -103,12 +128,26 @@ class BookFetcherAgent:
         per_genre_debug: dict[str, dict[str, Any]] = {}
         total_raw = 0
 
-        for index, genre in enumerate(genres):
-            subject = genre.replace("_", " ").lower()
-            cache_key = f"ol_search:{subject}:{limit}:editions"
+        # Flat call list enables clean "is this the last API call?" check.
+        calls = [
+            (genre, sort)
+            for genre in genres
+            for sort in self._sort_strategies
+        ]
+        last_idx = len(calls) - 1
 
+        for idx, (genre, sort) in enumerate(calls):
+            subject = genre.replace("_", " ").lower()
+
+            # Initialise per-genre tracking on first sort for this genre.
+            if subject not in per_genre_debug:
+                per_genre_debug[subject] = {"books_fetched": 0, "sorts": {}}
+                queries_executed.append(subject)
+
+            cache_key = f"ol_search:{subject}:{self._limit_per_sort}:{sort}"
             cached_bytes: bytes | None = self._cache.get(cache_key)
             cache_status: str
+
             if cached_bytes is not None:
                 cache_status = "hit"
                 raw_docs: list[dict[str, Any]] = orjson.loads(cached_bytes)
@@ -116,50 +155,77 @@ class BookFetcherAgent:
                 cache_status = "miss"
                 try:
                     raw_docs = self._client.fetch_books_by_subject(
-                        subject=subject, limit=limit
+                        subject=subject,
+                        limit=self._limit_per_sort,
+                        sort=sort,
                     )
                 except OpenLibraryAPIError:
-                    logger.exception("Genre '%s': API call failed, skipping", subject)
-                    per_genre_debug[subject] = {"books_fetched": 0, "cache": "error"}
-                    queries_executed.append(subject)
+                    logger.exception(
+                        "Genre '%s' sort '%s': API call failed, skipping",
+                        subject,
+                        sort,
+                    )
+                    per_genre_debug[subject]["sorts"][sort] = {
+                        "books_fetched": 0,
+                        "cache": "error",
+                    }
                     continue
+
                 self._cache.set(
                     cache_key,
                     orjson.dumps(raw_docs),
                     expire=self._cache_ttl,
                 )
-                # Sleep between API calls, but not after the last genre.
-                if index < len(genres) - 1:
+                # Sleep between API calls, but not after the last one.
+                if idx < last_idx:
                     time.sleep(self._client.rate_limit_delay)
 
-            queries_executed.append(subject)
-            books_fetched = 0
-
+            sort_books_fetched = 0
             for doc in raw_docs:
                 record = self._parse_book_record(doc, source_genres=[subject])
                 if record is None:
                     continue
-                books_fetched += 1
+                sort_books_fetched += 1
                 total_raw += 1
                 work_key = record.work_key
                 if work_key in seen:
                     existing = seen[work_key]
-                    seen[work_key] = existing.model_copy(
-                        update={"source_genres": [*existing.source_genres, subject]}
-                    )
+                    # Add genre only if it hasn't been recorded for this book.
+                    if subject not in existing.source_genres:
+                        seen[work_key] = existing.model_copy(
+                            update={
+                                "source_genres": [*existing.source_genres, subject]
+                            }
+                        )
                 else:
                     seen[work_key] = record
 
-            per_genre_debug[subject] = {
-                "books_fetched": books_fetched,
+            per_genre_debug[subject]["sorts"][sort] = {
+                "books_fetched": sort_books_fetched,
                 "cache": cache_status,
             }
+            per_genre_debug[subject]["books_fetched"] += sort_books_fetched
+
             logger.info(
-                "Genre '%s': fetched %d books | cache=%s",
+                "Genre '%s' sort '%s': fetched %d books | cache=%s",
                 subject,
-                books_fetched,
+                sort,
+                sort_books_fetched,
                 cache_status,
             )
+
+        # Compute aggregate cache status per genre:
+        # "hit"   → all sort passes were cache hits
+        # "error" → all sort passes errored (no books at all)
+        # "miss"  → any pass missed the cache (API was called)
+        for gdata in per_genre_debug.values():
+            sort_statuses = [s["cache"] for s in gdata["sorts"].values()]
+            if all(s == "hit" for s in sort_statuses):
+                gdata["cache"] = "hit"
+            elif sort_statuses and all(s == "error" for s in sort_statuses):
+                gdata["cache"] = "error"
+            else:
+                gdata["cache"] = "miss"
 
         all_books = list(seen.values())
         total_dedup = len(all_books)

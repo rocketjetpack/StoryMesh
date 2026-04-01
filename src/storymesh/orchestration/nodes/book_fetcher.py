@@ -54,13 +54,17 @@ def make_book_fetcher_node(
         if genre_output is None:
             msg = "book_fetcher_node requires genre_normalizer_output but it is None"
             raise RuntimeError(msg)
-        # Combine explicit genres (Passes 1–3) with Pass 4 inferred genres so
-        # that books implied by holistic context signals are also fetched.
+        from storymesh.agents.book_fetcher.subject_map import resolve_subjects  # noqa: PLC0415
+
+        # Combine explicit genres (Passes 1–3) with Pass 4 inferred genres,
+        # then translate canonical names to Open Library subject strings.
+        # Genres with no OL equivalent (e.g. workplace_fiction) are dropped;
+        # unknown genres fall back to underscore→space normalisation.
         genres_to_query = genre_output.normalized_genres + [
             ig.canonical_genre for ig in genre_output.inferred_genres
         ]
         input_data = BookFetcherAgentInput(
-            normalized_genres=genres_to_query,
+            normalized_genres=resolve_subjects(genres_to_query),
         )
         output = agent.run(input_data)
 

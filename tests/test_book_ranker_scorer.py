@@ -17,7 +17,7 @@ from storymesh.agents.book_ranker.scorer import (
     score_rating_quality,
     score_rating_volume,
     score_reader_engagement,
-    select_with_diversity,
+    select_diverse,
 )
 from storymesh.schemas.book_fetcher import BookRecord
 
@@ -261,38 +261,45 @@ class TestComputeScores:
 
 
 class TestJaccardSimilarity:
-    def test_identical_genres(self) -> None:
-        assert _jaccard_similarity(["fantasy", "mystery"], ["fantasy", "mystery"]) == pytest.approx(1.0)
+    """_jaccard_similarity operates on Open Library subject-tag lists (case-insensitive)."""
 
-    def test_disjoint_genres(self) -> None:
-        assert _jaccard_similarity(["fantasy"], ["mystery"]) == pytest.approx(0.0)
+    def test_identical_subjects(self) -> None:
+        assert _jaccard_similarity(["Mystery", "Victorian"], ["Mystery", "Victorian"]) == pytest.approx(1.0)
+
+    def test_disjoint_subjects(self) -> None:
+        assert _jaccard_similarity(["Fantasy"], ["Mystery"]) == pytest.approx(0.0)
 
     def test_partial_overlap(self) -> None:
         # intersection={"mystery"}, union={"fantasy","mystery","thriller"} → 1/3
-        result = _jaccard_similarity(["fantasy", "mystery"], ["mystery", "thriller"])
+        result = _jaccard_similarity(["Fantasy", "Mystery"], ["Mystery", "Thriller"])
         assert result == pytest.approx(1 / 3)
 
-    def test_empty_both(self) -> None:
-        assert _jaccard_similarity([], []) == pytest.approx(1.0)
+    def test_both_empty_returns_zero(self) -> None:
+        """Both empty → 0.0 (no evidence of similarity, unlike old genre-based version)."""
+        assert _jaccard_similarity([], []) == pytest.approx(0.0)
 
-    def test_empty_one(self) -> None:
-        assert _jaccard_similarity(["fantasy"], []) == pytest.approx(0.0)
+    def test_one_empty_returns_zero(self) -> None:
+        assert _jaccard_similarity(["Fantasy"], []) == pytest.approx(0.0)
 
-    def test_empty_other(self) -> None:
-        assert _jaccard_similarity([], ["mystery"]) == pytest.approx(0.0)
+    def test_other_empty_returns_zero(self) -> None:
+        assert _jaccard_similarity([], ["Mystery"]) == pytest.approx(0.0)
+
+    def test_case_insensitive(self) -> None:
+        """Tags "MYSTERY" and "mystery" are the same subject."""
+        assert _jaccard_similarity(["MYSTERY"], ["mystery"]) == pytest.approx(1.0)
 
 
 # ---------------------------------------------------------------------------
-# select_with_diversity
+# select_diverse
 # ---------------------------------------------------------------------------
 
 
 def _scored(
     work_key: str,
     score: float,
-    source_genres: list[str] | None = None,
+    subjects: list[str] | None = None,
 ) -> tuple:
-    book = _book(work_key=work_key, source_genres=source_genres or ["mystery"])
+    book = _book(work_key=work_key, subjects=subjects or [])
     from storymesh.schemas.book_ranker import ScoreBreakdown
 
     breakdown = ScoreBreakdown(
@@ -304,66 +311,97 @@ def _scored(
     return (book, score, breakdown)
 
 
-class TestSelectWithDiversity:
-    def test_zero_weight_matches_pure_relevance(self) -> None:
-        """diversity_weight=0.0 must produce the same order as sorted-by-score."""
+class TestSelectDiverse:
+    def test_lambda_one_matches_pure_relevance(self) -> None:
+        """mmr_lambda=1.0 must produce the same order as sorted-by-score."""
         books = [
-            _scored("/works/OL1W", 0.9, ["mystery"]),
-            _scored("/works/OL2W", 0.8, ["mystery"]),
-            _scored("/works/OL3W", 0.7, ["fantasy"]),
+            _scored("/works/OL1W", 0.9, ["Mystery", "Victorian"]),
+            _scored("/works/OL2W", 0.8, ["Mystery", "Victorian"]),
+            _scored("/works/OL3W", 0.7, ["Fantasy", "Epic"]),
         ]
-        result = select_with_diversity(books, top_n=2, diversity_weight=0.0)
+        result = select_diverse(books, top_n=2, mmr_lambda=1.0)
         assert [b[0].work_key for b in result] == ["/works/OL1W", "/works/OL2W"]
 
-    def test_diversity_changes_selection(self) -> None:
-        """With high diversity_weight, a lower-scoring but genre-diverse book
-        should be preferred over a higher-scoring genre-redundant book."""
-        # OL1W and OL2W are both mystery (redundant). OL3W is fantasy (diverse).
+    def test_low_lambda_promotes_diverse_book(self) -> None:
+        """With low mmr_lambda, a lower-scoring but subject-diverse book
+        is preferred over a higher-scoring subject-redundant book."""
+        # OL1W and OL2W share all subjects (redundant). OL3W has disjoint subjects.
         books = [
-            _scored("/works/OL1W", 0.9, ["mystery"]),
-            _scored("/works/OL2W", 0.85, ["mystery"]),
-            _scored("/works/OL3W", 0.7, ["fantasy"]),
+            _scored("/works/OL1W", 0.9, ["Mystery", "Victorian"]),
+            _scored("/works/OL2W", 0.85, ["Mystery", "Victorian"]),
+            _scored("/works/OL3W", 0.7, ["Fantasy", "Epic"]),
         ]
-        result = select_with_diversity(books, top_n=2, diversity_weight=0.8)
+        result = select_diverse(books, top_n=2, mmr_lambda=0.1)
         selected_keys = {b[0].work_key for b in result}
-        # OL1W is always selected first (highest score). OL3W should beat OL2W
-        # because it is genre-diverse.
+        # OL1W is always first. OL3W should beat OL2W due to diversity.
         assert "/works/OL1W" in selected_keys
         assert "/works/OL3W" in selected_keys
 
-    def test_top_n_respected(self) -> None:
-        books = [_scored(f"/works/OL{i}W", 1.0 - i * 0.1) for i in range(5)]
-        result = select_with_diversity(books, top_n=3, diversity_weight=0.3)
+    def test_first_selection_is_always_highest_scoring(self) -> None:
+        """First pick is always the highest-scoring candidate regardless of lambda."""
+        books = [
+            _scored("/works/OL2W", 0.9, ["Fantasy"]),
+            _scored("/works/OL3W", 0.7, ["Thriller"]),
+            _scored("/works/OL1W", 0.5, ["Mystery"]),
+        ]
+        result = select_diverse(books, top_n=2, mmr_lambda=0.5)
+        assert result[0][0].work_key == "/works/OL2W"
+
+    def test_top_n_gte_candidates_returns_all(self) -> None:
+        """When top_n >= len(candidates), all candidates are returned."""
+        books = [_scored(f"/works/OL{i}W", 1.0 - i * 0.1) for i in range(3)]
+        result = select_diverse(books, top_n=10, mmr_lambda=0.5)
         assert len(result) == 3
 
-    def test_single_book(self) -> None:
-        books = [_scored("/works/OL1W", 0.9)]
-        result = select_with_diversity(books, top_n=1, diversity_weight=0.5)
+    def test_single_book_input(self) -> None:
+        books = [_scored("/works/OL1W", 0.9, ["Mystery"])]
+        result = select_diverse(books, top_n=1, mmr_lambda=0.5)
         assert len(result) == 1
         assert result[0][0].work_key == "/works/OL1W"
 
-    def test_all_identical_genres(self) -> None:
-        """When all books share genres, diversity cannot distinguish them.
-        The result set must still have the correct length."""
+    def test_empty_subjects_no_crash(self) -> None:
+        """Books with empty subjects produce 0.0 similarity and do not crash."""
         books = [
-            _scored(f"/works/OL{i}W", 1.0 - i * 0.1, ["mystery"])
-            for i in range(4)
+            _scored("/works/OL1W", 0.9, []),
+            _scored("/works/OL2W", 0.8, []),
+            _scored("/works/OL3W", 0.7, []),
         ]
-        result = select_with_diversity(books, top_n=3, diversity_weight=0.5)
-        assert len(result) == 3
+        result = select_diverse(books, top_n=2, mmr_lambda=0.5)
+        assert len(result) == 2
 
     def test_top_n_zero_returns_empty(self) -> None:
         books = [_scored("/works/OL1W", 0.9)]
-        result = select_with_diversity(books, top_n=0, diversity_weight=0.3)
+        result = select_diverse(books, top_n=0, mmr_lambda=0.5)
         assert result == []
 
-    def test_first_selection_is_highest_scoring(self) -> None:
-        """The first book selected by MMR is always the highest-scoring book.
-        Input must be sorted by score descending (as compute_scores guarantees)."""
-        books = [
-            _scored("/works/OL2W", 0.9, ["fantasy"]),
-            _scored("/works/OL3W", 0.7, ["thriller"]),
-            _scored("/works/OL1W", 0.5, ["mystery"]),
+    def test_top_n_respected(self) -> None:
+        books = [_scored(f"/works/OL{i}W", 1.0 - i * 0.1) for i in range(5)]
+        result = select_diverse(books, top_n=3, mmr_lambda=0.6)
+        assert len(result) == 3
+
+    def test_mmr_candidates_limits_pool(self) -> None:
+        """mmr_candidates truncates the input pool before MMR selection."""
+        # 5 books but only consider top 2 candidates.
+        books = [_scored(f"/works/OL{i}W", 1.0 - i * 0.1) for i in range(5)]
+        result = select_diverse(books, top_n=3, mmr_lambda=0.6, mmr_candidates=2)
+        # Can only return up to mmr_candidates books.
+        assert len(result) == 2
+
+    def test_integration_diverse_books_promoted(self) -> None:
+        """Integration: with 5 near-identical and 5 unique-subject books,
+        unique books appear in top_n even if scored slightly lower."""
+        similar = [
+            _scored(f"/works/OLsim{i}W", 0.85, ["Mystery", "Victorian", "Crime"])
+            for i in range(5)
         ]
-        result = select_with_diversity(books, top_n=2, diversity_weight=0.5)
-        assert result[0][0].work_key == "/works/OL2W"
+        unique = [
+            _scored(f"/works/OLuniq{i}W", 0.75, [f"Genre{i}", f"Subject{i}"])
+            for i in range(5)
+        ]
+        # Sort by score descending as compute_scores guarantees.
+        all_books = sorted(similar + unique, key=lambda t: t[1], reverse=True)
+        result = select_diverse(all_books, top_n=6, mmr_lambda=0.4, mmr_candidates=30)
+        selected_keys = {b[0].work_key for b in result}
+        unique_keys = {b[0].work_key for b in unique}
+        # At least some unique books should be promoted over similar ones.
+        assert len(selected_keys & unique_keys) >= 2

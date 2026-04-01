@@ -26,6 +26,13 @@ system: |
     That list is provided specifically to prevent duplication.
   - Each inferred genre must include a rationale explaining the specific evidence
     from the prompt that implies it.
+  - canonical_genre MUST be one of the widely recognized top-level literary genres:
+    fantasy, science_fiction, horror, romance, mystery, thriller,
+    historical_fiction, literary_fiction, adventure, crime, western.
+  - You may suggest more specific subgenres in the subgenres field, but canonical_genre
+    must always be one of the top-level genres listed above.
+  - Do NOT use audience categories such as young_adult or middle_grade as
+    canonical_genre — these are marketing labels, not literary genres.
   - Subgenres should use snake_case and should only be included when the prompt
     contains specific evidence (e.g., "optimizing code" + "programmer" → techno_thriller,
     not just thriller generically).

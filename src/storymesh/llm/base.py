@@ -94,33 +94,58 @@ class LLMClient(ABC):
         """
 
         for attempt in range(max_retries + 1):
+            logger.debug(
+                "LLM call [attempt %d/%d]\n--- SYSTEM ---\n%s\n--- USER ---\n%s",
+                attempt + 1,
+                max_retries + 1,
+                system_prompt or "(none)",
+                prompt,
+            )
+
             raw = self.complete(
                 prompt,
-                system_prompt = system_prompt,
-                temperature = temperature,
-                max_tokens = max_tokens
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
             )
+
+            logger.debug(
+                "LLM response [attempt %d/%d]\n--- RESPONSE ---\n%s",
+                attempt + 1,
+                max_retries + 1,
+                raw,
+            )
+
             cleaned = _strip_markdown_fences(raw.strip())
 
             try:
                 parsed = orjson.loads(cleaned)
             except orjson.JSONDecodeError:
+                logger.warning(
+                    "JSON parse failed (attempt %d/%d). Raw response:\n%s",
+                    attempt + 1,
+                    max_retries + 1,
+                    raw,
+                )
                 if attempt < max_retries:
-                    logger.warning("JSON parse failed. Retrying (attempt %d of %d)", attempt + 1, max_retries)
                     continue
                 raise
-            
+
             if not isinstance(parsed, dict):
+                logger.warning(
+                    "Expected JSON object, got %s (attempt %d/%d). Raw response:\n%s",
+                    type(parsed).__name__,
+                    attempt + 1,
+                    max_retries + 1,
+                    raw,
+                )
                 if attempt < max_retries:
-                    logger.warning(
-                        "Expected JSON object, got %s. Retrying.", type(parsed).__name__
-                    )
                     continue
                 raise ValueError(
                     f"Expected JSON object as response from the LLM, got {type(parsed).__name__}"
                 )
             return parsed
-        
+
         raise RuntimeError("Reached code that should be unreachable in complete_json()!")
 
 # ---------------------------------------------------------------------------
