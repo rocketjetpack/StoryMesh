@@ -1,4 +1,4 @@
-GENRE_CONSTRAINT_SCHEMA_VERSION = "3.0"
+GENRE_CONSTRAINT_SCHEMA_VERSION = "3.1"
 BOOK_FETCHER_SCHEMA_VERSION = "1.2"
 BOOK_RANKER_SCHEMA_VERSION = "1.0"
 PROPOSAL_SCHEMA_VERSION = "1.0"
@@ -36,3 +36,7 @@ SCHEMA_VERSIONS: dict[str, str] = {
 #             (required, min_length=1) to ThematicTension. Downstream agents
 #             ProposalDraft and RubricJudge use this list as exclusions and
 #             evaluation criteria respectively.
+# 2026-03-31: Increment Genre Constraint schema to 3.1. Added LLM_INFERRED
+#             ResolutionMethod, InferredGenre model, and inferred_genres field
+#             to GenreNormalizerAgentOutput for Pass 4 holistic genre inference.
+#             Additive change (default_factory=list); existing consumers unaffected.

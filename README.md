@@ -57,17 +57,25 @@ Stages 0, 1, and 2 currently perform real work. Stages 3 to 6 are registered as 
 
 Status: implemented
 
+Four-pass resolution pipeline:
+
+- **Pass 1** — Greedy longest-match against `genre_map.json` (exact then fuzzy)
+- **Pass 2** — Greedy longest-match against `tone_map.json` (exact then fuzzy)
+- **Pass 3** — LLM fallback for unresolved tokens: classifies each remaining token as genre, tone, narrative context, or unknown
+- **Pass 4** — Holistic genre inference: sends the full original prompt plus everything already resolved to an LLM and asks what genres are *implied* by the overall context but not yet captured. Results are stored as `InferredGenre` objects in a separate `inferred_genres` field, distinct from `normalized_genres`. Each inference carries a `rationale` string and a `confidence` score (default 0.7, lower than Pass 3's 0.8 to reflect the higher uncertainty of holistic inference). If Passes 1–3 find no explicit genres but Pass 4 infers some, the inferred genres are promoted into `normalized_genres` as a last-resort fallback so the pipeline can continue.
+
+Other behaviors:
 - Reads taxonomy data from `src/storymesh/data/genre_map.json` and `src/storymesh/data/tone_map.json`
-- Resolves genre and tone tokens deterministically where possible
-- Uses fuzzy matching for near-matches
-- Can fall back to an LLM client when unresolved tokens remain and API keys are configured
+- Passes 3 and 4 share the same LLM client, model, and temperature (both are lightweight classification tasks)
 - Produces a strict `GenreNormalizerAgentOutput` including debug traces and preserved narrative context
+- `InferredGenre.default_tones` is informational only and does **not** feed into the tone-merge pipeline. Revisit when downstream agents (ProposalDraft, SynopsisWriter) need richer tone data from implied genres.
 
 ### Stage 1: BookFetcherAgent
 
 Status: implemented
 
 - Queries Open Library's search API by subject
+- Queries both `normalized_genres` (explicit, Passes 1–3) and `inferred_genres` (holistic, Pass 4) so books implied by contextual signals surface alongside explicitly named genres
 - Uses disk cache via `diskcache`
 - Deduplicates books by Open Library work key
 - Preserves all matched source genres per book

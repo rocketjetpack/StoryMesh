@@ -16,7 +16,11 @@ from storymesh.agents.genre_normalizer.resolver import resolve_all
 from storymesh.agents.genre_normalizer.tone_merge import merge_tones
 from storymesh.exceptions import GenreResolutionError
 from storymesh.llm.base import LLMClient
-from storymesh.schemas.genre_normalizer import GenreNormalizerAgentInput, GenreNormalizerAgentOutput
+from storymesh.schemas.genre_normalizer import (
+    GenreNormalizerAgentInput,
+    GenreNormalizerAgentOutput,
+    InferredGenre,
+)
 
 
 class GenreNormalizerAgent:
@@ -97,6 +101,26 @@ class GenreNormalizerAgent:
                 for subgenre in resolution.subgenres
         ])
 
+        inferred_genres: list[InferredGenre] = resolver_result.inferred_genres
+
+        # Option B: When Passes 1–3 find nothing but Pass 4 infers genres,
+        # promote the inferred canonical genres into normalized_genres as a
+        # last-resort fallback so the pipeline can continue. The full
+        # InferredGenre objects remain in inferred_genres for downstream
+        # consumers that want rationale and confidence data.
+        if not normalized_genres and inferred_genres:
+            import logging as _logging  # noqa: PLC0415
+            _logging.getLogger(__name__).warning(
+                "Passes 1–3 found no explicit genres for %r. "
+                "Promoting %d Pass 4 inferred genre(s) into normalized_genres "
+                "as a last-resort fallback.",
+                input_data.raw_genre,
+                len(inferred_genres),
+            )
+            normalized_genres = _deduplicate_preserve_order(
+                [ig.canonical_genre for ig in inferred_genres]
+            )
+
         # Build the debug dict with full resolution and audit data.
         debug: dict[str, Any] = {
             **tone_result.debug,
@@ -104,6 +128,7 @@ class GenreNormalizerAgent:
             "tone_resolutions": [r.model_dump() for r in resolver_result.tone_resolutions],
             "narrative_context": resolver_result.narrative_context,
             "unresolved_tokens": resolver_result.unresolved_tokens,
+            "inferred_genres": [ig.model_dump() for ig in inferred_genres],
         }
 
         if not normalized_genres:
@@ -137,14 +162,15 @@ class GenreNormalizerAgent:
 
         # Assemble the output contract.
         return GenreNormalizerAgentOutput(
-            raw_input = input_data.raw_genre,
-            normalized_genres = normalized_genres,
-            subgenres = subgenres,
-            user_tones = tone_result.user_tones,
-            tone_override = tone_result.tone_override,
-            override_note = tone_result.override_note,
-            narrative_context = resolver_result.narrative_context,
-            debug = debug,
+            raw_input=input_data.raw_genre,
+            normalized_genres=normalized_genres,
+            subgenres=subgenres,
+            user_tones=tone_result.user_tones,
+            tone_override=tone_result.tone_override,
+            override_note=tone_result.override_note,
+            narrative_context=resolver_result.narrative_context,
+            inferred_genres=inferred_genres,
+            debug=debug,
         )
 
 def _deduplicate_preserve_order(items: list[str]) -> list[str]:

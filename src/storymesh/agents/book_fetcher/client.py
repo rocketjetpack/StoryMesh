@@ -56,6 +56,7 @@ class OpenLibraryClient:
         if user_agent:
             headers["User-Agent"] = user_agent
         self._client = httpx.Client(headers=headers, timeout=timeout)
+        logger.warning("OpenLibraryClient initialized with User-Agent '%s'. ", user_agent)
 
     def fetch_books_by_subject(
         self,
@@ -109,6 +110,9 @@ class OpenLibraryClient:
         Raises:
             OpenLibraryAPIError: On unrecoverable errors or exhausted retries.
         """
+
+        logger.debug("OpenLibraryClient GET %s with params %s", self._BASE_URL, params)
+
         for attempt in range(2):
             try:
                 response = self._client.get(self._BASE_URL, params=params)

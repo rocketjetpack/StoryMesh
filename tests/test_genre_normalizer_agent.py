@@ -448,3 +448,105 @@ class TestErrorHandling:
                 raw_genre="a world of warcraft paladin who marries his hammer",
                 allow_llm_fallback=True,
             ))
+
+# ---------------------------------------------------------------------------
+# Pass 4: Holistic Genre Inference (Agent Level)
+# ---------------------------------------------------------------------------
+
+
+class TestPass4HolisticInference:
+    def test_inferred_genres_in_output(self, store: MappingStore) -> None:
+        """Agent output includes inferred_genres populated from Pass 4."""
+        import json
+
+        from storymesh.llm.base import FakeLLMClient
+
+        # "mystery" resolves in Pass 1; no leftovers so Pass 3 is skipped.
+        # Pass 4 is the only LLM call.
+        pass4_response = json.dumps({
+            "inferred_genres": [
+                {
+                    "canonical_genre": "historical_fiction",
+                    "subgenres": ["historical_mystery"],
+                    "default_tones": ["atmospheric", "period"],
+                    "rationale": "1920s Harlem setting implies historical fiction.",
+                    "confidence": 0.85,
+                }
+            ]
+        })
+        client = FakeLLMClient(responses=[pass4_response])
+        agent_with_llm = GenreNormalizerAgent(store=store, llm_client=client)
+
+        result = agent_with_llm.run(GenreNormalizerAgentInput(raw_genre="mystery"))
+
+        assert len(result.inferred_genres) == 1
+        assert result.inferred_genres[0].canonical_genre == "historical_fiction"
+        assert result.inferred_genres[0].subgenres == ["historical_mystery"]
+
+    def test_inferred_genres_in_debug(self, store: MappingStore) -> None:
+        """Pass 4 results are also recorded in the debug dict."""
+        import json
+
+        from storymesh.llm.base import FakeLLMClient
+
+        pass4_response = json.dumps({
+            "inferred_genres": [
+                {
+                    "canonical_genre": "historical_fiction",
+                    "subgenres": [],
+                    "default_tones": ["atmospheric"],
+                    "rationale": "Period setting implies historical fiction.",
+                    "confidence": 0.8,
+                }
+            ]
+        })
+        client = FakeLLMClient(responses=[pass4_response])
+        agent_with_llm = GenreNormalizerAgent(store=store, llm_client=client)
+
+        result = agent_with_llm.run(GenreNormalizerAgentInput(raw_genre="mystery"))
+
+        assert "inferred_genres" in result.debug
+        assert len(result.debug["inferred_genres"]) == 1
+        assert result.debug["inferred_genres"][0]["canonical_genre"] == "historical_fiction"
+
+    def test_inferred_genres_empty_when_no_llm(self, agent: GenreNormalizerAgent) -> None:
+        """Without an LLM client, inferred_genres is always empty."""
+        result = agent.run(GenreNormalizerAgentInput(raw_genre="fantasy"))
+        assert result.inferred_genres == []
+
+    def test_option_b_promotes_inferred_when_no_explicit_genres(
+        self, store: MappingStore,
+    ) -> None:
+        """When Passes 1–3 find nothing, Pass 4 inferences are promoted into normalized_genres."""
+        import json
+
+        from storymesh.llm.base import FakeLLMClient
+
+        # Pass 3 response: all tokens classified as narrative_context (no genres found).
+        pass3_response = json.dumps({"classifications": [
+            {"token": "programmer", "type": "narrative_context", "is_stopword": False},
+            {"token": "optimizing", "type": "narrative_context", "is_stopword": False},
+            {"token": "code", "type": "narrative_context", "is_stopword": False},
+        ]})
+        # Pass 4 response: infer science_fiction from context.
+        pass4_response = json.dumps({"inferred_genres": [
+            {
+                "canonical_genre": "science_fiction",
+                "subgenres": ["techno_thriller"],
+                "default_tones": ["cerebral"],
+                "rationale": "Programmer optimizing code implies a sci-fi sensibility.",
+                "confidence": 0.7,
+            }
+        ]})
+        client = FakeLLMClient(responses=[pass3_response, pass4_response])
+        agent_with_llm = GenreNormalizerAgent(store=store, llm_client=client)
+
+        result = agent_with_llm.run(GenreNormalizerAgentInput(
+            raw_genre="programmer optimizing code",
+        ))
+
+        # Option B: inferred genre promoted into normalized_genres
+        assert "science_fiction" in result.normalized_genres
+        # Still available as a full InferredGenre object
+        assert len(result.inferred_genres) == 1
+        assert result.inferred_genres[0].canonical_genre == "science_fiction"

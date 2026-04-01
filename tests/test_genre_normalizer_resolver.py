@@ -6,17 +6,19 @@ import json
 from pathlib import Path
 
 import orjson
+import pytest
 
 from storymesh.agents.genre_normalizer.loader import MappingStore
 from storymesh.agents.genre_normalizer.resolver import (
     ResolverResult,
     resolve_all,
     resolve_genres,
+    resolve_holistic,
     resolve_llm,
     resolve_tones,
 )
 from storymesh.llm.base import FakeLLMClient
-from storymesh.schemas.genre_normalizer import ResolutionMethod
+from storymesh.schemas.genre_normalizer import InferredGenre, ResolutionMethod
 
 
 # Helpers
@@ -695,3 +697,156 @@ class TestResolveLlmWithClient:
         assert len(captured_prompts) == 1
         assert "suspenseful" in captured_prompts[0]
         assert "<function" not in captured_prompts[0]
+
+# ---------------------------------------------------------------------------
+# TestResolveHolistic (Pass 4)
+# ---------------------------------------------------------------------------
+
+
+def _holistic_response(genres: list[dict] | None = None) -> str:
+    return json.dumps({"inferred_genres": genres or []})
+
+
+def _one_inference(**overrides: object) -> dict:
+    defaults: dict[str, object] = {
+        "canonical_genre": "science_fiction",
+        "subgenres": ["techno_thriller"],
+        "default_tones": ["cerebral", "tense"],
+        "rationale": "Programmer optimizing code implies a technology-forward sci-fi sensibility.",
+        "confidence": 0.75,
+    }
+    return {**defaults, **overrides}
+
+
+class TestResolveHolistic:
+    def test_no_client_returns_empty(self) -> None:
+        result = resolve_holistic(
+            raw_input="a programmer saves one millisecond",
+            resolved_genres=["thriller"],
+            resolved_subgenres=[],
+            resolved_tones=["optimistic"],
+            narrative_context=["programmer", "millisecond"],
+            llm_client=None,
+        )
+        assert result == []
+
+    def test_valid_response_parsed_correctly(self) -> None:
+        client = FakeLLMClient(responses=[_holistic_response([_one_inference()])])
+        result = resolve_holistic(
+            raw_input="techno optimistic thriller about a c++ programmer",
+            resolved_genres=["thriller"],
+            resolved_subgenres=[],
+            resolved_tones=["optimistic"],
+            narrative_context=["programmer"],
+            llm_client=client,
+        )
+        assert len(result) == 1
+        assert isinstance(result[0], InferredGenre)
+        assert result[0].canonical_genre == "science_fiction"
+        assert result[0].subgenres == ["techno_thriller"]
+        assert result[0].confidence == pytest.approx(0.75)
+
+    def test_deduplication_removes_already_resolved_genre(self) -> None:
+        # The LLM incorrectly infers "thriller" which is already resolved.
+        bad_inference = _one_inference(canonical_genre="thriller")
+        client = FakeLLMClient(responses=[_holistic_response([bad_inference])])
+        result = resolve_holistic(
+            raw_input="thriller about a programmer",
+            resolved_genres=["thriller"],
+            resolved_subgenres=[],
+            resolved_tones=[],
+            narrative_context=["programmer"],
+            llm_client=client,
+        )
+        assert result == []
+
+    def test_llm_failure_returns_empty(self) -> None:
+        client = FakeLLMClient(responses=["not valid json {{{{"])
+        result = resolve_holistic(
+            raw_input="mystery in 1920s harlem",
+            resolved_genres=["mystery"],
+            resolved_subgenres=[],
+            resolved_tones=[],
+            narrative_context=["1920s", "harlem"],
+            llm_client=client,
+        )
+        assert result == []
+
+    def test_malformed_schema_returns_empty(self) -> None:
+        # Valid JSON but wrong shape — missing "inferred_genres" key.
+        client = FakeLLMClient(responses=[json.dumps({"classifications": []})])
+        result = resolve_holistic(
+            raw_input="mystery",
+            resolved_genres=["mystery"],
+            resolved_subgenres=[],
+            resolved_tones=[],
+            narrative_context=[],
+            llm_client=client,
+        )
+        # Missing required field defaults via default_factory — valid but empty.
+        assert result == []
+
+    def test_empty_inference_list_is_valid(self) -> None:
+        client = FakeLLMClient(responses=[_holistic_response([])])
+        result = resolve_holistic(
+            raw_input="dark fantasy adventure in a medieval kingdom",
+            resolved_genres=["fantasy", "adventure"],
+            resolved_subgenres=[],
+            resolved_tones=["dark"],
+            narrative_context=["medieval", "kingdom"],
+            llm_client=client,
+        )
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# TestResolveAllPass4 (integration with resolve_all)
+# ---------------------------------------------------------------------------
+
+
+def _pass4_response(genres: list[dict] | None = None) -> str:
+    return json.dumps({"inferred_genres": genres or []})
+
+
+class TestResolveAllPass4:
+    def test_pass4_populates_inferred_genres(self, tmp_path: Path) -> None:
+        """resolve_all() result includes inferred_genres from Pass 4."""
+        store = _make_store(tmp_path)
+        # "mystery" resolves in Pass 1; no leftovers so Pass 3 is skipped.
+        # Pass 4 should run and infer historical_fiction.
+        client = FakeLLMClient(responses=[_pass4_response([
+            {
+                "canonical_genre": "historical_fiction",
+                "subgenres": ["historical_mystery"],
+                "default_tones": ["atmospheric"],
+                "rationale": "1920s Harlem setting implies historical fiction.",
+                "confidence": 0.85,
+            }
+        ])])
+        result = resolve_all(
+            raw_input="mystery",
+            store=store,
+            llm_client=client,
+        )
+        assert len(result.inferred_genres) == 1
+        assert result.inferred_genres[0].canonical_genre == "historical_fiction"
+
+    def test_pass4_skipped_when_llm_fallback_disabled(self, tmp_path: Path) -> None:
+        """allow_llm_fallback=False must skip Pass 4 entirely."""
+        store = _make_store(tmp_path)
+        # Client would raise if called — ensures it is never called.
+        client = FakeLLMClient(responses=[])
+        result = resolve_all(
+            raw_input="mystery",
+            store=store,
+            allow_llm_fallback=False,
+            llm_client=client,
+        )
+        assert result.inferred_genres == []
+        assert client.call_count == 0
+
+    def test_pass4_skipped_when_no_llm_client(self, tmp_path: Path) -> None:
+        """No LLM client — inferred_genres is empty, no crash."""
+        store = _make_store(tmp_path)
+        result = resolve_all(raw_input="mystery", store=store, llm_client=None)
+        assert result.inferred_genres == []

@@ -1,6 +1,20 @@
 """StoryMesh configuration loader.
 
 Reads storymesh.config.yaml and .env, provides resolved settings to agents.
+
+Config loading uses a two-layer merge strategy:
+
+1. **Project-level config** — ``storymesh.config.yaml`` found by walking up
+   from the package directory.  This file is checked into the repository and
+   contains defaults shared by all contributors.
+
+2. **User-level override** — ``~/.storymesh/storymesh.config.yaml``.  When
+   present this file is deep-merged on top of the project config, so a
+   developer can set personal values (e.g. ``user_agent``, API keys paths,
+   preferred models) without modifying the tracked project file.
+
+Deep-merge semantics: nested dicts are merged recursively; scalar values and
+lists are replaced wholesale by the override value.
 """
 
 from __future__ import annotations
@@ -39,28 +53,94 @@ def _configure_logging(level_name: str) -> None:
     storymesh_logger.addHandler(handler)
 
 
-def find_config_file() -> Path:
-    """Locate storymesh.config.yaml by walking up from the package directory,
-    falling back to ~/.storymesh/.
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge *override* into *base*, with override values winning.
+
+    Nested dicts are merged recursively so that a user-level config that only
+    specifies ``api_clients.open_library.user_agent`` does not erase the
+    project-level ``api_clients.open_library.max_books`` value.  All other
+    value types (strings, ints, floats, booleans, lists, ``None``) are
+    replaced wholesale by the override value.
+
+    Neither input dict is mutated.
+
+    Args:
+        base: The base config dict (project-level values).
+        override: Values to merge on top of *base* (user-level values).
+
+    Returns:
+        A new dict with the merged result.
     """
+    result: dict[str, Any] = dict(base)
+    for key, val in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(val, dict):
+            result[key] = _deep_merge(result[key], val)
+        else:
+            result[key] = val
+    return result
+
+
+def _find_config_files() -> list[Path]:
+    """Return config file paths in merge order: project-level first, then user override.
+
+    The project-level config is discovered by walking up from the package
+    directory (``src/storymesh/``) until ``storymesh.config.yaml`` is found or
+    the filesystem root is reached.
+
+    The user-level config at ``~/.storymesh/storymesh.config.yaml`` is always
+    appended as an additional layer when it exists and is not already the file
+    found above.
+
+    Returns:
+        List of one or two existing config file paths in load order.
+
+    Raises:
+        FileNotFoundError: If no config file is found in the project tree *and*
+            no user-level config exists.
+    """
+    paths: list[Path] = []
+
     current = Path(__file__).resolve().parent  # src/storymesh/
     while True:
         candidate = current / _CONFIG_FILENAME
         if candidate.is_file():
-            return candidate
+            paths.append(candidate)
+            break
         parent = current.parent
         if parent == current:
             break
         current = parent
 
     user_config = Path.home() / ".storymesh" / _CONFIG_FILENAME
-    if user_config.is_file():
-        return user_config
+    if user_config.is_file() and user_config not in paths:
+        paths.append(user_config)
 
-    raise FileNotFoundError(
-        f"Could not find {_CONFIG_FILENAME} in any parent directory "
-        f"of {Path(__file__).resolve().parent} or in ~/.storymesh/"
-    )
+    if not paths:
+        raise FileNotFoundError(
+            f"Could not find {_CONFIG_FILENAME} in any parent directory "
+            f"of {Path(__file__).resolve().parent} or in ~/.storymesh/"
+        )
+
+    return paths
+
+
+def find_config_file() -> Path:
+    """Locate the primary (project-level) storymesh.config.yaml.
+
+    .. note::
+        This function returns only the project-level config path.  A
+        user-level override at ``~/.storymesh/storymesh.config.yaml`` is
+        automatically layered on top by :func:`get_config` but is *not*
+        reflected here.  Callers that need the fully merged configuration
+        should use :func:`get_config` instead.
+
+    Returns:
+        Path to the primary config file.
+
+    Raises:
+        FileNotFoundError: If no config file is found anywhere.
+    """
+    return _find_config_files()[0]
 
 
 def _get_required_env_keys(config: dict[str, Any]) -> set[str]:
@@ -142,44 +222,55 @@ def warn_missing_provider_keys(config: dict[str, Any]) -> None:
 
 
 def get_config() -> dict[str, Any]:
-    """Load and cache the StoryMesh configuration.
+    """Load and cache the merged StoryMesh configuration.
 
-    On first call: reads the YAML config, loads .env (best-effort), configures
-    logging, and caches the result. Subsequent calls return the cached dict.
+    On first call: discovers all config files via :func:`_find_config_files`,
+    deep-merges them (project-level base, user-level override), loads .env
+    (best-effort), configures logging, and caches the result.  Subsequent
+    calls return the cached dict.
+
+    Config merge order:
+
+    1. Project-level ``storymesh.config.yaml`` (checked into the repository).
+    2. User-level ``~/.storymesh/storymesh.config.yaml`` (personal overrides,
+       not in the repository).  Values here win for any key they specify.
 
     API key presence is intentionally *not* validated here so that CLI
     commands like ``show-config`` and ``show-version`` work without any keys
-    configured. Call ``warn_missing_provider_keys(get_config())`` explicitly
+    configured.  Call ``warn_missing_provider_keys(get_config())`` explicitly
     when the pipeline is about to run.
     """
     global _config_cache  # noqa: PLW0603
     if _config_cache is not None:
         return _config_cache
 
-    # 1. Load YAML
-    config_path = find_config_file()
-    try:
-        with open(config_path) as f:
-            loaded = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML in {config_path}: {e}") from e
+    # 1. Load and merge all config files
+    config_paths = _find_config_files()
+    merged: dict[str, Any] = {}
+    for path in config_paths:
+        try:
+            with open(path) as f:
+                loaded: Any = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML in {path}: {e}") from e
 
-    if not isinstance(loaded, dict):
-        raise ValueError(
-            f"Expected a YAML mapping in {config_path}, got {type(loaded).__name__}"
-        )
+        if not isinstance(loaded, dict):
+            raise ValueError(
+                f"Expected a YAML mapping in {path}, got {type(loaded).__name__}"
+            )
+
+        merged = _deep_merge(merged, loaded)
+        logger.debug("Configuration layer loaded from %s", path)
 
     # 2. Load .env unconditionally (best-effort, no error if absent)
     _load_env_best_effort()
 
-    # 3. Configure logging
-    log_level = loaded.get("logging", {}).get("level", "INFO")
+    # 3. Configure logging from the merged result
+    log_level = merged.get("logging", {}).get("level", "INFO")
     _configure_logging(log_level)
 
     # 4. Cache and return
-    _config_cache = loaded
-
-    logger.debug("Configuration loaded from %s", config_path)
+    _config_cache = merged
 
     return _config_cache
 
@@ -225,22 +316,39 @@ def get_cache_dir(name: str) -> Path:
 
 
 def get_agent_config(agent_name: str) -> dict[str, Any]:
-    """Return the resolved LLM configuration for a specific agent.
+    """Return the fully resolved configuration for a specific agent.
 
-    Merges agent-specific overrides with llm defaults. If no entry exists
-    for the given agent, all values fall back to defaults.
+    Builds the result in two steps:
+
+    1. Start with all agent-specific keys from ``agents.<agent_name>`` in the
+       merged config (which may include any agent-specific settings such as
+       ``top_n``, ``weights``, ``diversity_weight``, ``max_seeds``, etc.).
+    2. Fill in missing LLM keys (``provider``, ``model``, ``temperature``,
+       ``max_tokens``) from the global ``llm`` defaults section.
+
+    This means agent-specific values always win over LLM defaults, and all
+    non-LLM agent keys are preserved rather than silently dropped.
+
+    Args:
+        agent_name: Key under ``agents`` in storymesh.config.yaml.
+
+    Returns:
+        Dict containing all agent config keys merged with LLM defaults.
     """
     config = get_config()
     llm_defaults = config.get("llm", {})
     agents_section = config.get("agents", {})
-    agent_overrides = agents_section.get(agent_name, {})
 
     if agent_name not in agents_section:
         logger.warning("No config entry for agent '%s', using llm defaults", agent_name)
 
-    return {
-        "provider": agent_overrides.get("provider", llm_defaults.get("default_provider")),
-        "model": agent_overrides.get("model", llm_defaults.get("default_model")),
-        "temperature": agent_overrides.get("temperature", llm_defaults.get("default_temperature")),
-        "max_tokens": agent_overrides.get("max_tokens", llm_defaults.get("default_max_tokens")),
-    }
+    # Start with all agent-specific keys (preserves top_n, weights, etc.)
+    result: dict[str, Any] = dict(agents_section.get(agent_name, {}))
+
+    # Fill missing LLM keys from global defaults
+    result.setdefault("provider", llm_defaults.get("default_provider"))
+    result.setdefault("model", llm_defaults.get("default_model"))
+    result.setdefault("temperature", llm_defaults.get("default_temperature"))
+    result.setdefault("max_tokens", llm_defaults.get("default_max_tokens"))
+
+    return result

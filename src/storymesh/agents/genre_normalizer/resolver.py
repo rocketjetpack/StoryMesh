@@ -23,6 +23,7 @@ from storymesh.llm.base import LLMClient
 from storymesh.schemas.genre_normalizer import (
     GenreMapEntry,
     GenreResolution,
+    InferredGenre,
     ResolutionMethod,
     ToneMapEntry,
     ToneResolution,
@@ -33,14 +34,16 @@ logger= logging.getLogger(__name__)
 # Resolver result class
 @dataclass(frozen=True)
 class ResolverResult:
-    """
-    Bundle all outputs from the three resolution passes.
+    """Bundle all outputs from the four resolution passes.
+
     This is an intermediate class and does not require a Pydantic model.
     """
+
     genre_resolutions: list[GenreResolution] = field(default_factory=list)
     tone_resolutions: list[ToneResolution] = field(default_factory=list)
     narrative_context: list[str] = field(default_factory=list)
     unresolved_tokens: list[str] = field(default_factory=list)
+    inferred_genres: list[InferredGenre] = field(default_factory=list)
 
 # Private model for parsing LLM classification responses
 class _Classification(BaseModel):
@@ -348,6 +351,123 @@ def resolve_llm(
 
     return genre_resolutions, tone_resolutions, narrative_context, unresolved
 
+# Pass 4: Holistic genre inference
+_LLM_INFERRED_CONFIDENCE = 0.7
+
+
+class _InferredGenreItem(BaseModel):
+    """A single inferred genre entry from the Pass 4 LLM response."""
+
+    model_config = {"frozen": True}
+
+    canonical_genre: str = Field(min_length=1)
+    subgenres: list[str] = Field(default_factory=list)
+    default_tones: list[str] = Field(default_factory=list)
+    rationale: str = Field(min_length=1)
+    confidence: float = Field(ge=0.0, le=1.0, default=_LLM_INFERRED_CONFIDENCE)
+
+
+class _HolisticInferenceResponse(BaseModel):
+    """Top-level wrapper for the Pass 4 LLM response."""
+
+    model_config = {"frozen": True}
+
+    inferred_genres: list[_InferredGenreItem] = Field(default_factory=list)
+
+
+def resolve_holistic(
+    *,
+    raw_input: str,
+    resolved_genres: list[str],
+    resolved_subgenres: list[str],
+    resolved_tones: list[str],
+    narrative_context: list[str],
+    llm_client: LLMClient | None = None,
+    temperature: float = 0.0,
+    max_tokens: int = 1024,
+) -> list[InferredGenre]:
+    """Pass 4: Holistic genre inference from the full user prompt.
+
+    Asks the LLM to identify genres that the prompt *implies* through its
+    overall themes, setting, and narrative direction — genres that no single
+    token names explicitly.  Each inference includes a rationale string that
+    records the textual evidence used.
+
+    This pass is purely additive and best-effort.  A failed LLM call or a
+    response that fails validation returns an empty list without crashing the
+    pipeline.  No retries are made.
+
+    Args:
+        raw_input: The original user-provided string.
+        resolved_genres: Canonical genre names resolved in Passes 1–3.
+        resolved_subgenres: Subgenre names resolved in Passes 1–3.
+        resolved_tones: Tone names resolved in Passes 1–3.
+        narrative_context: Narrative context tokens from Pass 3.
+        llm_client: LLM client to use. Returns ``[]`` immediately when ``None``.
+        temperature: Sampling temperature for the LLM call.
+        max_tokens: Token budget for the LLM response.
+
+    Returns:
+        List of ``InferredGenre`` objects, deduplicated against
+        ``resolved_genres``.  May be empty.
+    """
+    if llm_client is None:
+        return []
+
+    from storymesh.prompts.loader import load_prompt  # noqa: PLC0415
+
+    prompt_template = load_prompt("genre_inference")
+    user_prompt = prompt_template.format_user(
+        raw_input=raw_input,
+        resolved_genres=resolved_genres,
+        resolved_subgenres=resolved_subgenres,
+        resolved_tones=resolved_tones,
+        narrative_context=narrative_context,
+    )
+
+    try:
+        raw_response = llm_client.complete_json(
+            user_prompt,
+            system_prompt=prompt_template.system,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+    except Exception:
+        logger.warning(
+            "Pass 4 holistic inference LLM call failed: returning empty inferred_genres.",
+            exc_info=True,
+        )
+        return []
+
+    try:
+        parsed = _HolisticInferenceResponse.model_validate(raw_response)
+    except Exception:
+        logger.warning(
+            "Pass 4 LLM response failed schema validation: returning empty inferred_genres.",
+            exc_info=True,
+        )
+        return []
+
+    resolved_set = set(resolved_genres)
+    results: list[InferredGenre] = []
+    for item in parsed.inferred_genres:
+        if item.canonical_genre in resolved_set:
+            logger.debug(
+                "Pass 4: discarding '%s' — already resolved in Passes 1–3.",
+                item.canonical_genre,
+            )
+            continue
+        results.append(InferredGenre(
+            canonical_genre=item.canonical_genre,
+            subgenres=item.subgenres,
+            default_tones=item.default_tones,
+            rationale=item.rationale,
+            confidence=item.confidence,
+        ))
+
+    return results
+
+
 # Full resolution pipeline
 def resolve_all(
         *,
@@ -388,13 +508,13 @@ def resolve_all(
         fuzzy_threshold = fuzzy_threshold
     )
 
-    # LLM fallback
+    # Pass 3: LLM fallback for unresolved tokens
     if allow_llm_fallback and leftover_after_tones:
         resolved_genre_names = [
             genre for g in genre_resolutions
                   for genre in g.canonical_genres
         ]
-        
+
         resolved_tone_names = [
             tone for t in tone_resolutions
                 for tone in t.normalized_tones
@@ -403,13 +523,13 @@ def resolve_all(
         remaining_text = " ".join(leftover_after_tones)
 
         llm_genres, llm_tones, narrative_context, unresolved = resolve_llm(
-            raw_input = raw_input,
-            resolved_genres = resolved_genre_names,
-            resolved_tones = resolved_tone_names,
-            remaining_text = remaining_text,
-            llm_client = llm_client,
-            temperature = temperature,
-            max_tokens = max_tokens
+            raw_input=raw_input,
+            resolved_genres=resolved_genre_names,
+            resolved_tones=resolved_tone_names,
+            remaining_text=remaining_text,
+            llm_client=llm_client,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
 
         genre_resolutions = genre_resolutions + llm_genres
@@ -418,9 +538,39 @@ def resolve_all(
         narrative_context = []
         unresolved = leftover_after_tones
 
+    # Pass 4: Holistic genre inference from full prompt context.
+    # Runs only when an LLM client is configured and fallback is enabled.
+    # Returns [] gracefully on any failure — never crashes the pipeline.
+    if allow_llm_fallback and llm_client is not None:
+        resolved_genre_names_p4 = [
+            genre for g in genre_resolutions
+                  for genre in g.canonical_genres
+        ]
+        resolved_subgenre_names_p4 = [
+            sg for g in genre_resolutions
+               for sg in g.subgenres
+        ]
+        resolved_tone_names_p4 = [
+            tone for t in tone_resolutions
+                 for tone in t.normalized_tones
+        ]
+        inferred = resolve_holistic(
+            raw_input=raw_input,
+            resolved_genres=resolved_genre_names_p4,
+            resolved_subgenres=resolved_subgenre_names_p4,
+            resolved_tones=resolved_tone_names_p4,
+            narrative_context=narrative_context,
+            llm_client=llm_client,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+    else:
+        inferred = []
+
     return ResolverResult(
-        genre_resolutions = genre_resolutions,
-        tone_resolutions = tone_resolutions,
-        narrative_context = narrative_context,
-        unresolved_tokens = unresolved
+        genre_resolutions=genre_resolutions,
+        tone_resolutions=tone_resolutions,
+        narrative_context=narrative_context,
+        unresolved_tokens=unresolved,
+        inferred_genres=inferred,
     )

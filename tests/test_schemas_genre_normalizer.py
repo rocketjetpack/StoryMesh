@@ -10,6 +10,7 @@ from storymesh.schemas.genre_normalizer import (
     GenreNormalizerAgentInput,
     GenreNormalizerAgentOutput,
     GenreResolution,
+    InferredGenre,
     ResolutionMethod,
     ToneMapEntry,
     ToneResolution,
@@ -296,6 +297,127 @@ class TestGenreNormalizerAgentOutput:
 # ---------------------------------------------------------------------------
 # Round Trip JSON Validation
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# ResolutionMethod — LLM_INFERRED (Pass 4)
+# ---------------------------------------------------------------------------
+
+
+class TestResolutionMethodLlmInferred:
+    def test_enum_value_exists(self) -> None:
+        assert ResolutionMethod.LLM_INFERRED == "llm_inferred"
+
+    def test_usable_in_genre_resolution_method_field(self) -> None:
+        """LLM_INFERRED can be assigned to a GenreResolution.method field."""
+        gr = GenreResolution(
+            input_token="techno",
+            canonical_genres=["science_fiction"],
+            method=ResolutionMethod.LLM_INFERRED,
+            confidence=0.7,
+        )
+        assert gr.method == ResolutionMethod.LLM_INFERRED
+
+
+# ---------------------------------------------------------------------------
+# InferredGenre (Pass 4)
+# ---------------------------------------------------------------------------
+
+
+def _inferred_genre(**overrides: object) -> InferredGenre:
+    defaults: dict[str, object] = {
+        "canonical_genre": "science_fiction",
+        "rationale": "The prompt describes a programmer in a high-stakes optimization loop.",
+    }
+    return InferredGenre(**(defaults | overrides))
+
+
+class TestInferredGenre:
+    def test_valid_minimal(self) -> None:
+        ig = _inferred_genre()
+        assert ig.canonical_genre == "science_fiction"
+        assert ig.rationale != ""
+        assert ig.method == ResolutionMethod.LLM_INFERRED
+
+    def test_default_confidence(self) -> None:
+        ig = _inferred_genre()
+        assert ig.confidence == pytest.approx(0.7)
+
+    def test_confidence_override(self) -> None:
+        ig = _inferred_genre(confidence=0.85)
+        assert ig.confidence == pytest.approx(0.85)
+
+    def test_confidence_lower_bound(self) -> None:
+        with pytest.raises(ValidationError):
+            _inferred_genre(confidence=-0.01)
+
+    def test_confidence_upper_bound(self) -> None:
+        with pytest.raises(ValidationError):
+            _inferred_genre(confidence=1.01)
+
+    def test_subgenres_default_empty(self) -> None:
+        ig = _inferred_genre()
+        assert ig.subgenres == []
+
+    def test_default_tones_default_empty(self) -> None:
+        ig = _inferred_genre()
+        assert ig.default_tones == []
+
+    def test_subgenres_populated(self) -> None:
+        ig = _inferred_genre(subgenres=["techno_thriller", "workplace_fiction"])
+        assert ig.subgenres == ["techno_thriller", "workplace_fiction"]
+
+    def test_empty_canonical_genre_raises(self) -> None:
+        with pytest.raises(ValidationError):
+            _inferred_genre(canonical_genre="")
+
+    def test_empty_rationale_raises(self) -> None:
+        with pytest.raises(ValidationError):
+            _inferred_genre(rationale="")
+
+    def test_frozen(self) -> None:
+        ig = _inferred_genre()
+        with pytest.raises(ValidationError):
+            ig.canonical_genre = "fantasy"  # type: ignore[misc]
+
+    def test_method_always_llm_inferred(self) -> None:
+        ig = _inferred_genre()
+        assert ig.method == ResolutionMethod.LLM_INFERRED
+
+
+# ---------------------------------------------------------------------------
+# GenreNormalizerAgentOutput — inferred_genres field
+# ---------------------------------------------------------------------------
+
+
+class TestGenreNormalizerAgentOutputInferredGenres:
+    def test_inferred_genres_defaults_to_empty(self) -> None:
+        out = _output()
+        assert out.inferred_genres == []
+
+    def test_inferred_genres_accepted(self) -> None:
+        ig = _inferred_genre()
+        out = _output(inferred_genres=[ig])
+        assert len(out.inferred_genres) == 1
+        assert out.inferred_genres[0].canonical_genre == "science_fiction"
+
+    def test_inferred_genres_multiple(self) -> None:
+        igs = [
+            _inferred_genre(canonical_genre="science_fiction"),
+            _inferred_genre(
+                canonical_genre="literary_fiction",
+                rationale="Obsessive single-character focus implies literary fiction.",
+            ),
+        ]
+        out = _output(inferred_genres=igs)
+        assert len(out.inferred_genres) == 2
+
+    def test_inferred_genres_round_trip(self) -> None:
+        ig = _inferred_genre(subgenres=["techno_thriller"], default_tones=["cerebral"])
+        out = _output(inferred_genres=[ig])
+        json_str = out.model_dump_json()
+        reconstructed = GenreNormalizerAgentOutput.model_validate_json(json_str)
+        assert reconstructed.inferred_genres[0].subgenres == ["techno_thriller"]
+
 
 class TestRoundTrip:
     def test_input_roundtrip(self) -> None:

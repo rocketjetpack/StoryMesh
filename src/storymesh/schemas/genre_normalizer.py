@@ -72,10 +72,11 @@ class ToneMapEntry(BaseModel):
 class ResolutionMethod(StrEnum):
     """Document how a token was resolved during genre normalization."""
 
-    STATIC_EXACT = "static_exact" # Came from an exact match in a local mapping file.
-    STATIC_FUZZY = "static_fuzzy" # Came from a fuzzy match in a local mapping file.
-    LLM_LIVE = "llm_live" # Came from a LLM query run in this pass.
-    LLM_CACHED = "llm_cached" # Came from a cached LLM response from a previous run.
+    STATIC_EXACT = "static_exact"    # Came from an exact match in a local mapping file.
+    STATIC_FUZZY = "static_fuzzy"    # Came from a fuzzy match in a local mapping file.
+    LLM_LIVE = "llm_live"            # Came from a LLM query run in this pass.
+    LLM_CACHED = "llm_cached"        # Came from a cached LLM response from a previous run.
+    LLM_INFERRED = "llm_inferred"    # Inferred holistically from full prompt context (Pass 4).
 
 class GenreResolution(BaseModel):
     """
@@ -141,6 +142,59 @@ class ToneResolution(BaseModel):
 
     is_override: bool = True
 
+# -------- Pass 4: Holistic Inference Schema --------
+class InferredGenre(BaseModel):
+    """A genre inferred from holistic analysis of the full user prompt (Pass 4).
+
+    Unlike ``GenreResolution``, which tracks a specific input token, an
+    ``InferredGenre`` emerges from the overall context, theme, or setting
+    described in the prompt.  No single token maps to it; the genre is implied
+    by the combination of narrative signals.
+
+    The ``rationale`` field records *why* the LLM inferred the genre, providing
+    an audit trail and improving downstream creative alignment.
+    """
+
+    model_config = {"frozen": True}
+
+    canonical_genre: str = Field(
+        min_length=1,
+        description="The inferred canonical genre name (snake_case).",
+    )
+
+    subgenres: list[str] = Field(
+        default_factory=list,
+        description="Any subgenres implied by the inference.",
+    )
+
+    default_tones: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Tones commonly associated with this inferred genre. "
+            "Informational only — not fed into the tone-merge pipeline. "
+            "Revisit when downstream agents need richer tone data."
+        ),
+    )
+
+    rationale: str = Field(
+        min_length=1,
+        description="Brief explanation of why the prompt implies this genre.",
+    )
+
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        default=0.7,
+        description=(
+            "Confidence score for this inference. Default 0.7, intentionally "
+            "lower than LLM_LIVE (0.8) to reflect the higher uncertainty of "
+            "holistic context inference vs. direct token classification."
+        ),
+    )
+
+    method: ResolutionMethod = Field(default=ResolutionMethod.LLM_INFERRED)
+
+
 # -------- GenreNormalizerAgent Input Schema --------
 class GenreNormalizerAgentInput(BaseModel):
     """Input contract for the GenreNormalizerAgent."""
@@ -200,6 +254,18 @@ class GenreNormalizerAgentOutput(BaseModel):
             "elements (settings, time periods, character archetypes) rather "
             "than genres or tones. Consumed by downstream agents to anchor "
             "creative output in the user's specific vision."
+        ),
+    )
+
+    inferred_genres: list[InferredGenre] = Field(
+        default_factory=list,
+        description=(
+            "Genres inferred from holistic prompt analysis (Pass 4). "
+            "These are not mapped from specific tokens but emerge from the "
+            "overall context, themes, and narrative signals in the prompt. "
+            "Downstream agents that want the full genre picture should combine "
+            "normalized_genres and inferred_genres; agents needing only "
+            "high-confidence explicit genres should use normalized_genres alone."
         ),
     )
 
