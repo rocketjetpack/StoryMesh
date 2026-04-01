@@ -56,15 +56,25 @@ def make_book_fetcher_node(
             raise RuntimeError(msg)
         from storymesh.agents.book_fetcher.subject_map import resolve_subjects  # noqa: PLC0415
 
-        # Combine explicit genres (Passes 1–3) with Pass 4 inferred genres,
-        # then translate canonical names to Open Library subject strings.
-        # Genres with no OL equivalent (e.g. workplace_fiction) are dropped;
-        # unknown genres fall back to underscore→space normalisation.
-        genres_to_query = genre_output.normalized_genres + [
-            ig.canonical_genre for ig in genre_output.inferred_genres
-        ]
+        # Passes 1–3 genres are already validated against the canonical subject
+        # map, so they go through resolve_subjects() without further checking.
+        normalized_subjects = resolve_subjects(genre_output.normalized_genres)
+
+        # Pass 4 inferred genres may include audience labels or other strings
+        # that do not correspond to any Open Library subject. Resolve them to
+        # subject strings first, then probe the OL Subjects API to confirm
+        # work_count > 0 before querying. Confirmed-zero subjects are cached
+        # so subsequent runs skip the probe entirely.
+        inferred_subjects = resolve_subjects(
+            [ig.canonical_genre for ig in genre_output.inferred_genres]
+        )
+        validated_inferred = agent.validate_subjects(inferred_subjects)
+
+        # Merge preserving order, deduplicating across both lists.
+        all_subjects = list(dict.fromkeys(normalized_subjects + validated_inferred))
+
         input_data = BookFetcherAgentInput(
-            normalized_genres=resolve_subjects(genres_to_query),
+            normalized_genres=all_subjects,
         )
         output = agent.run(input_data)
 

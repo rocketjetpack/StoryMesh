@@ -28,12 +28,15 @@ class _StubClient:
         self,
         responses: dict[str, list[dict[str, Any]]] | None = None,
         rate_limit_delay: float = 0.4,
+        subject_info_responses: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self._responses = responses or {}
         self.rate_limit_delay = rate_limit_delay
         self.fetch_calls: list[str] = []
         # Full (subject, sort) pair log for multi-sort assertions.
         self.fetch_call_args: list[tuple[str, str]] = []
+        self.subject_info_responses: dict[str, dict[str, Any]] = subject_info_responses or {}
+        self.subject_info_calls: list[str] = []
 
     def fetch_books_by_subject(
         self,
@@ -44,6 +47,10 @@ class _StubClient:
         self.fetch_calls.append(subject)
         self.fetch_call_args.append((subject, sort))
         return self._responses.get(subject, [])
+
+    def fetch_subject_info(self, subject: str) -> dict[str, Any]:
+        self.subject_info_calls.append(subject)
+        return self.subject_info_responses.get(subject, {"work_count": 1})
 
     def close(self) -> None:
         pass
@@ -858,6 +865,119 @@ class TestMultiSortStrategies:
         assert "rating" in sorts
         assert sorts["editions"]["cache"] == "miss"
         assert sorts["rating"]["cache"] == "miss"
+
+
+# ---------------------------------------------------------------------------
+# validate_subjects
+# ---------------------------------------------------------------------------
+
+
+class TestValidateSubjects:
+    """Tests for BookFetcherAgent.validate_subjects()."""
+
+    def _make_agent(
+        self,
+        tmp_path: Path,
+        subject_info_responses: dict[str, dict[str, Any]] | None = None,
+    ) -> BookFetcherAgent:
+        client = _StubClient(subject_info_responses=subject_info_responses)
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            return BookFetcherAgent(client=client)  # type: ignore[arg-type]
+
+    def test_subject_with_works_included(self, tmp_path: Path) -> None:
+        """Subject with work_count > 0 is included."""
+        agent = self._make_agent(
+            tmp_path, {"adventure": {"work_count": 500}}
+        )
+        result = agent.validate_subjects(["adventure"])
+        assert result == ["adventure"]
+
+    def test_subject_with_zero_works_excluded(self, tmp_path: Path) -> None:
+        """Subject with work_count == 0 is dropped."""
+        agent = self._make_agent(
+            tmp_path, {"middle grade": {"work_count": 0}}
+        )
+        result = agent.validate_subjects(["middle grade"])
+        assert result == []
+
+    def test_empty_input_returns_empty(self, tmp_path: Path) -> None:
+        agent = self._make_agent(tmp_path)
+        assert agent.validate_subjects([]) == []
+
+    def test_api_error_includes_subject_by_default(self, tmp_path: Path) -> None:
+        """When the Subjects API call fails, the subject is included (benefit of the doubt)."""
+        client = _StubClient()
+
+        def _raise(subject: str) -> dict[str, Any]:
+            raise OpenLibraryAPIError("connection error")
+
+        client.fetch_subject_info = _raise  # type: ignore[method-assign]
+
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            agent = BookFetcherAgent(client=client)  # type: ignore[arg-type]
+
+        result = agent.validate_subjects(["unknown"])
+        assert result == ["unknown"]
+
+    def test_positive_result_cached(self, tmp_path: Path) -> None:
+        """A work_count > 0 result is cached; second call skips the API."""
+        client = _StubClient(subject_info_responses={"fantasy": {"work_count": 100}})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            agent = BookFetcherAgent(client=client)  # type: ignore[arg-type]
+
+        agent.validate_subjects(["fantasy"])
+        agent.validate_subjects(["fantasy"])
+
+        assert client.subject_info_calls.count("fantasy") == 1
+
+    def test_negative_result_cached(self, tmp_path: Path) -> None:
+        """A work_count == 0 result is cached; second call skips the API."""
+        client = _StubClient(subject_info_responses={"middle grade": {"work_count": 0}})
+        with patch(
+            "storymesh.agents.book_fetcher.agent.get_cache_dir",
+            return_value=tmp_path,
+        ):
+            agent = BookFetcherAgent(client=client)  # type: ignore[arg-type]
+
+        agent.validate_subjects(["middle grade"])
+        agent.validate_subjects(["middle grade"])
+
+        assert client.subject_info_calls.count("middle grade") == 1
+
+    def test_mixed_subjects_filtered_correctly(self, tmp_path: Path) -> None:
+        """Valid subjects kept, zero-work-count subjects dropped."""
+        agent = self._make_agent(
+            tmp_path,
+            {
+                "adventure": {"work_count": 200},
+                "middle grade": {"work_count": 0},
+                "mystery": {"work_count": 1500},
+            },
+        )
+        result = agent.validate_subjects(["adventure", "middle grade", "mystery"])
+        assert result == ["adventure", "mystery"]
+
+    def test_order_preserved(self, tmp_path: Path) -> None:
+        """Output order matches input order for passing subjects."""
+        agent = self._make_agent(
+            tmp_path,
+            {
+                "fantasy": {"work_count": 300},
+                "thriller": {"work_count": 400},
+                "horror": {"work_count": 200},
+            },
+        )
+        result = agent.validate_subjects(["fantasy", "thriller", "horror"])
+        assert result == ["fantasy", "thriller", "horror"]
 
 
 # ---------------------------------------------------------------------------

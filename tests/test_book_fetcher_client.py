@@ -5,8 +5,9 @@ All tests mock httpx so no real network calls are made.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import httpx
 import pytest
@@ -16,6 +17,7 @@ from storymesh.agents.book_fetcher.client import OpenLibraryAPIError, OpenLibrar
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _mock_response(
     status_code: int,
@@ -38,6 +40,11 @@ def _docs_response(docs: list[dict[str, Any]]) -> MagicMock:
     return _mock_response(200, json_data={"docs": docs, "numFound": len(docs)})
 
 
+def _subject_response(work_count: int, name: str = "Test Subject") -> MagicMock:
+    """Build a successful (200) mock Subjects API response."""
+    return _mock_response(200, json_data={"work_count": work_count, "name": name})
+
+
 _SAMPLE_DOCS: list[dict[str, Any]] = [
     {
         "key": "/works/OL1W",
@@ -57,6 +64,7 @@ _SAMPLE_DOCS: list[dict[str, Any]] = [
 # ---------------------------------------------------------------------------
 # Construction / rate limit delay
 # ---------------------------------------------------------------------------
+
 
 class TestOpenLibraryClientInit:
     def test_no_user_agent_sets_slow_rate_limit(self) -> None:
@@ -88,15 +96,26 @@ class TestOpenLibraryClientInit:
             OpenLibraryClient(user_agent=None, timeout=30.0)
             mock_class.assert_called_once_with(headers={}, timeout=30.0)
 
+    def test_default_max_retries(self) -> None:
+        client = OpenLibraryClient()
+        assert client._max_retries == 8
+        client.close()
+
+    def test_custom_max_retries(self) -> None:
+        client = OpenLibraryClient(max_retries=3)
+        assert client._max_retries == 3
+        client.close()
+
 
 # ---------------------------------------------------------------------------
-# Successful responses
+# Successful responses — fetch_books_by_subject
 # ---------------------------------------------------------------------------
+
 
 class TestFetchBooksBySubject:
     def test_successful_response_returns_docs(self) -> None:
         client = OpenLibraryClient()
-        client._client.get = MagicMock(return_value=_docs_response(_SAMPLE_DOCS))
+        client._client.get = MagicMock(return_value=_docs_response(_SAMPLE_DOCS))  # type: ignore[method-assign]
 
         result = client.fetch_books_by_subject("mystery")
 
@@ -105,7 +124,7 @@ class TestFetchBooksBySubject:
 
     def test_empty_docs_key_returns_empty_list(self) -> None:
         client = OpenLibraryClient()
-        client._client.get = MagicMock(
+        client._client.get = MagicMock(  # type: ignore[method-assign]
             return_value=_mock_response(200, json_data={"numFound": 0})
         )
 
@@ -116,7 +135,7 @@ class TestFetchBooksBySubject:
     def test_subject_passed_in_params(self) -> None:
         client = OpenLibraryClient()
         mock_get = MagicMock(return_value=_docs_response([]))
-        client._client.get = mock_get
+        client._client.get = mock_get  # type: ignore[method-assign]
 
         client.fetch_books_by_subject("post apocalyptic")
 
@@ -126,7 +145,7 @@ class TestFetchBooksBySubject:
     def test_limit_passed_in_params(self) -> None:
         client = OpenLibraryClient()
         mock_get = MagicMock(return_value=_docs_response([]))
-        client._client.get = mock_get
+        client._client.get = mock_get  # type: ignore[method-assign]
 
         client.fetch_books_by_subject("mystery", limit=10)
 
@@ -136,7 +155,7 @@ class TestFetchBooksBySubject:
     def test_sort_editions_in_params(self) -> None:
         client = OpenLibraryClient()
         mock_get = MagicMock(return_value=_docs_response([]))
-        client._client.get = mock_get
+        client._client.get = mock_get  # type: ignore[method-assign]
 
         client.fetch_books_by_subject("mystery")
 
@@ -146,7 +165,7 @@ class TestFetchBooksBySubject:
     def test_fields_parameter_included(self) -> None:
         client = OpenLibraryClient()
         mock_get = MagicMock(return_value=_docs_response([]))
-        client._client.get = mock_get
+        client._client.get = mock_get  # type: ignore[method-assign]
 
         client.fetch_books_by_subject("mystery")
 
@@ -165,58 +184,112 @@ class TestFetchBooksBySubject:
 
 
 # ---------------------------------------------------------------------------
-# Error handling and retry logic
+# fetch_subject_info
 # ---------------------------------------------------------------------------
 
-class TestErrorHandling:
-    def test_429_retries_once_then_raises(self) -> None:
+
+class TestFetchSubjectInfo:
+    def test_returns_work_count_for_known_subject(self) -> None:
         client = OpenLibraryClient()
-        client._client.get = MagicMock(
-            side_effect=[
-                _mock_response(429, text="Rate limited"),
-                _mock_response(429, text="Rate limited"),
-            ]
+        client._client.get = MagicMock(return_value=_subject_response(1234))  # type: ignore[method-assign]
+
+        result = client.fetch_subject_info("mystery")
+
+        assert result["work_count"] == 1234
+
+    def test_url_encodes_spaces(self) -> None:
+        """Spaces in the subject must be percent-encoded in the URL path."""
+        client = OpenLibraryClient()
+        mock_get = MagicMock(return_value=_subject_response(500))
+        client._client.get = mock_get  # type: ignore[method-assign]
+
+        client.fetch_subject_info("science fiction")
+
+        url_called = mock_get.call_args[0][0]
+        assert "science%20fiction" in url_called
+        assert " " not in url_called
+
+    def test_url_encodes_special_characters(self) -> None:
+        """Characters like '&' and '/' in subject names must be encoded."""
+        client = OpenLibraryClient()
+        mock_get = MagicMock(return_value=_subject_response(10))
+        client._client.get = mock_get  # type: ignore[method-assign]
+
+        client.fetch_subject_info("science & technology")
+
+        url_called = mock_get.call_args[0][0]
+        assert "&" not in url_called.split("subjects/")[1]
+
+    def test_404_returns_zero_work_count(self) -> None:
+        """404 means the subject does not exist — treat as work_count=0."""
+        client = OpenLibraryClient()
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            return_value=_mock_response(404, text="Not found")
         )
 
-        with patch("time.sleep"), pytest.raises(OpenLibraryAPIError, match="429"):
-            client.fetch_books_by_subject("mystery")
+        result = client.fetch_subject_info("nonexistent_subject_xyz")
 
-        assert client._client.get.call_count == 2
+        assert result == {"work_count": 0}
 
-    def test_429_retries_once_succeeds(self) -> None:
+    def test_404_does_not_raise(self) -> None:
         client = OpenLibraryClient()
-        client._client.get = MagicMock(
-            side_effect=[
-                _mock_response(429, text="Rate limited"),
-                _docs_response(_SAMPLE_DOCS),
-            ]
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            return_value=_mock_response(404, text="Not found")
         )
 
-        with patch("time.sleep") as mock_sleep:
-            result = client.fetch_books_by_subject("mystery")
+        # Should not raise
+        result = client.fetch_subject_info("nonexistent")
+        assert "work_count" in result
 
-        assert len(result) == 2
-        mock_sleep.assert_called_once_with(2.0)
-
-    def test_5xx_retries_once_then_raises(self) -> None:
-        client = OpenLibraryClient()
-        client._client.get = MagicMock(
+    def test_5xx_retries_then_raises(self) -> None:
+        client = OpenLibraryClient(max_retries=2)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
             side_effect=[
                 _mock_response(503, text="Service unavailable"),
                 _mock_response(503, text="Service unavailable"),
             ]
+        )
+
+        with patch("time.sleep"), pytest.raises(OpenLibraryAPIError):
+            client.fetch_subject_info("mystery")
+
+    def test_subjects_url_contains_json_extension(self) -> None:
+        client = OpenLibraryClient()
+        mock_get = MagicMock(return_value=_subject_response(100))
+        client._client.get = mock_get  # type: ignore[method-assign]
+
+        client.fetch_subject_info("fantasy")
+
+        url_called = mock_get.call_args[0][0]
+        assert url_called.endswith(".json")
+        assert "/subjects/" in url_called
+
+
+# ---------------------------------------------------------------------------
+# Retry logic — exponential backoff
+# ---------------------------------------------------------------------------
+
+
+class TestRetryLogic:
+    def test_5xx_retries_up_to_max_then_raises(self) -> None:
+        """After max_retries 503s, OpenLibraryAPIError is raised."""
+        client = OpenLibraryClient(max_retries=3)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[_mock_response(503)] * 3
         )
 
         with patch("time.sleep"), pytest.raises(OpenLibraryAPIError, match="503"):
             client.fetch_books_by_subject("mystery")
 
-        assert client._client.get.call_count == 2
+        assert client._client.get.call_count == 3
 
-    def test_5xx_retries_once_succeeds(self) -> None:
-        client = OpenLibraryClient()
-        client._client.get = MagicMock(
+    def test_5xx_succeeds_after_multiple_retries(self) -> None:
+        """Succeeds on the third attempt after two 503s."""
+        client = OpenLibraryClient(max_retries=5)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
             side_effect=[
-                _mock_response(500, text="Internal server error"),
+                _mock_response(503),
+                _mock_response(503),
                 _docs_response(_SAMPLE_DOCS),
             ]
         )
@@ -225,22 +298,124 @@ class TestErrorHandling:
             result = client.fetch_books_by_subject("mystery")
 
         assert len(result) == 2
+        assert mock_sleep.call_count == 2
+
+    def test_429_retries_up_to_max_then_raises(self) -> None:
+        client = OpenLibraryClient(max_retries=3)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[_mock_response(429)] * 3
+        )
+
+        with patch("time.sleep"), pytest.raises(OpenLibraryAPIError, match="429"):
+            client.fetch_books_by_subject("mystery")
+
+        assert client._client.get.call_count == 3
+
+    def test_429_succeeds_on_second_attempt(self) -> None:
+        client = OpenLibraryClient(max_retries=5)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[
+                _mock_response(429),
+                _docs_response(_SAMPLE_DOCS),
+            ]
+        )
+
+        with patch("time.sleep") as mock_sleep:
+            result = client.fetch_books_by_subject("mystery")
+
+        assert len(result) == 2
+        mock_sleep.assert_called_once()
+
+    def test_5xx_first_retry_wait_is_one_second(self) -> None:
+        """First 5xx retry waits base * 2^0 = 1.0s."""
+        client = OpenLibraryClient(max_retries=3)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[_mock_response(503), _docs_response(_SAMPLE_DOCS)]
+        )
+
+        with patch("time.sleep") as mock_sleep:
+            client.fetch_books_by_subject("mystery")
+
         mock_sleep.assert_called_once_with(1.0)
+
+    def test_429_first_retry_wait_is_two_seconds(self) -> None:
+        """First 429 retry waits base * 2^0 = 2.0s."""
+        client = OpenLibraryClient(max_retries=3)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[_mock_response(429), _docs_response(_SAMPLE_DOCS)]
+        )
+
+        with patch("time.sleep") as mock_sleep:
+            client.fetch_books_by_subject("mystery")
+
+        mock_sleep.assert_called_once_with(2.0)
+
+    def test_exponential_backoff_doubles_each_retry(self) -> None:
+        """5xx wait doubles: 1s, 2s, 4s for attempts 0, 1, 2."""
+        client = OpenLibraryClient(max_retries=4)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[
+                _mock_response(503),
+                _mock_response(503),
+                _mock_response(503),
+                _docs_response(_SAMPLE_DOCS),
+            ]
+        )
+
+        with patch("time.sleep") as mock_sleep:
+            client.fetch_books_by_subject("mystery")
+
+        assert mock_sleep.call_args_list == [call(1.0), call(2.0), call(4.0)]
+
+    def test_backoff_capped_at_thirty_seconds(self) -> None:
+        """Wait never exceeds 30s regardless of attempt count."""
+        client = OpenLibraryClient(max_retries=10)
+        # 9 failures then success
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[_mock_response(503)] * 9 + [_docs_response(_SAMPLE_DOCS)]
+        )
+
+        with patch("time.sleep") as mock_sleep:
+            client.fetch_books_by_subject("mystery")
+
+        for actual_call in mock_sleep.call_args_list:
+            assert actual_call[0][0] <= 30.0
+
+    def test_retry_logged_at_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Each retry attempt is logged at WARNING level."""
+        client = OpenLibraryClient(max_retries=3)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[
+                _mock_response(503),
+                _mock_response(503),
+                _docs_response(_SAMPLE_DOCS),
+            ]
+        )
+
+        with patch("time.sleep"), caplog.at_level(
+            logging.WARNING, logger="storymesh.agents.book_fetcher.client"
+        ):
+            client.fetch_books_by_subject("mystery")
+
+        retry_logs = [r for r in caplog.records if "retrying" in r.message.lower()]
+        assert len(retry_logs) == 2
 
     def test_4xx_raises_immediately_without_retry(self) -> None:
         client = OpenLibraryClient()
-        client._client.get = MagicMock(
-            return_value=_mock_response(404, text="Not found")
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            return_value=_mock_response(403, text="Forbidden")
         )
 
-        with pytest.raises(OpenLibraryAPIError, match="404"):
+        with pytest.raises(OpenLibraryAPIError, match="403"):
             client.fetch_books_by_subject("mystery")
 
         assert client._client.get.call_count == 1
 
-    def test_timeout_raises(self) -> None:
+    def test_timeout_raises_immediately(self) -> None:
         client = OpenLibraryClient()
-        client._client.get = MagicMock(
+        client._client.get = MagicMock(  # type: ignore[method-assign]
             side_effect=httpx.TimeoutException("timed out")
         )
 
@@ -249,8 +424,7 @@ class TestErrorHandling:
 
     def test_json_parse_failure_raises(self) -> None:
         client = OpenLibraryClient()
-        bad_response = _mock_response(200, json_data=None)
-        client._client.get = MagicMock(return_value=bad_response)
+        client._client.get = MagicMock(return_value=_mock_response(200, json_data=None))  # type: ignore[method-assign]
 
         with pytest.raises(OpenLibraryAPIError, match="JSON"):
             client.fetch_books_by_subject("mystery")
@@ -260,15 +434,28 @@ class TestErrorHandling:
         response = MagicMock(spec=httpx.Response)
         response.status_code = 200
         response.json.return_value = ["not", "a", "dict"]
-        client._client.get = MagicMock(return_value=response)
+        client._client.get = MagicMock(return_value=response)  # type: ignore[method-assign]
 
         with pytest.raises(OpenLibraryAPIError, match="JSON object"):
             client.fetch_books_by_subject("mystery")
+
+    def test_error_has_status_code_attribute(self) -> None:
+        """OpenLibraryAPIError carries the HTTP status code for callers."""
+        client = OpenLibraryClient(max_retries=1)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            return_value=_mock_response(503, text="unavailable")
+        )
+
+        with patch("time.sleep"), pytest.raises(OpenLibraryAPIError) as exc_info:
+            client.fetch_books_by_subject("mystery")
+
+        assert exc_info.value.status_code == 503
 
 
 # ---------------------------------------------------------------------------
 # Context manager
 # ---------------------------------------------------------------------------
+
 
 class TestContextManager:
     def test_context_manager_calls_close(self) -> None:

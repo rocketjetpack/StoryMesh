@@ -25,6 +25,10 @@ from storymesh.schemas.book_fetcher import (
 
 logger = logging.getLogger(__name__)
 
+# Subjects API results are stable: a subject with zero works today will almost
+# certainly still have zero works tomorrow. Cache validation results for 7 days.
+_SUBJECT_VALIDATE_TTL: int = 7 * 24 * 3600
+
 
 class BookFetcherAgent:
     """Fetches genre-relevant books from the Open Library Search API (Stage 1).
@@ -80,7 +84,10 @@ class BookFetcherAgent:
                 "sort_strategies", sort_strategies or ["editions"]
             )
             self._limit_per_sort: int = ol_cfg.get("limit_per_sort", limit_per_sort)
-            self._client = OpenLibraryClient(user_agent=user_agent)
+            self._client = OpenLibraryClient(
+                user_agent=user_agent,
+                max_retries=ol_cfg.get("max_retries", 8),
+            )
             self._owns_client = True
         else:
             self._max_books = max_books
@@ -303,6 +310,70 @@ class BookFetcherAgent:
             cover_id=doc.get("cover_i"),
             source_genres=source_genres,
         )
+
+    def validate_subjects(self, subjects: list[str]) -> list[str]:
+        """Return only subjects that Open Library has at least one work for.
+
+        Checks the disk cache before hitting the network. Both positive
+        (``work_count > 0``) and negative (``work_count == 0``) results are
+        cached so that repeated pipeline runs avoid redundant API calls.
+
+        Subjects that cannot be validated due to a transient API error are
+        included in the output (benefit of the doubt — only confirmed zeros
+        are dropped).
+
+        Args:
+            subjects: Resolved Open Library subject strings to validate.
+
+        Returns:
+            Filtered list preserving original order, containing only subjects
+            with a confirmed ``work_count > 0`` or that could not be checked.
+        """
+        valid: list[str] = []
+
+        for subject in subjects:
+            cache_key = f"ol_subject_wc:{subject}"
+            cached: int | None = self._cache.get(cache_key)
+
+            if cached is not None:
+                if cached > 0:
+                    valid.append(subject)
+                else:
+                    logger.debug(
+                        "validate_subjects: '%s' cached with work_count=0 — skipping.",
+                        subject,
+                    )
+                continue
+
+            # Cache miss — probe the Subjects API.
+            try:
+                info = self._client.fetch_subject_info(subject)
+                work_count = int(info.get("work_count", 0))
+            except OpenLibraryAPIError:
+                logger.warning(
+                    "validate_subjects: failed to probe '%s' — including by default.",
+                    subject,
+                    exc_info=True,
+                )
+                valid.append(subject)
+                continue
+
+            self._cache.set(cache_key, work_count, expire=_SUBJECT_VALIDATE_TTL)
+
+            if work_count > 0:
+                logger.debug(
+                    "validate_subjects: '%s' has work_count=%d — including.",
+                    subject,
+                    work_count,
+                )
+                valid.append(subject)
+            else:
+                logger.warning(
+                    "validate_subjects: '%s' has work_count=0 — dropping.",
+                    subject,
+                )
+
+        return valid
 
     def close(self) -> None:
         """Close the cache and, if owned by this instance, the HTTP client."""
