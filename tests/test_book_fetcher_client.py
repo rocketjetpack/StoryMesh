@@ -83,13 +83,13 @@ class TestOpenLibraryClientInit:
             OpenLibraryClient(user_agent=ua)
             mock_class.assert_called_once_with(
                 headers={"User-Agent": ua},
-                timeout=10.0,
+                timeout=30.0,
             )
 
     def test_no_user_agent_no_header(self) -> None:
         with patch("httpx.Client") as mock_class:
             OpenLibraryClient(user_agent=None)
-            mock_class.assert_called_once_with(headers={}, timeout=10.0)
+            mock_class.assert_called_once_with(headers={}, timeout=30.0)
 
     def test_custom_timeout(self) -> None:
         with patch("httpx.Client") as mock_class:
@@ -413,14 +413,48 @@ class TestRetryLogic:
 
         assert client._client.get.call_count == 1
 
-    def test_timeout_raises_immediately(self) -> None:
-        client = OpenLibraryClient()
+    def test_timeout_retries_then_raises(self) -> None:
+        """Timeouts are retried like 5xx errors, then raise after max_retries."""
+        client = OpenLibraryClient(max_retries=3)
         client._client.get = MagicMock(  # type: ignore[method-assign]
             side_effect=httpx.TimeoutException("timed out")
         )
 
-        with pytest.raises(OpenLibraryAPIError, match="timed out"):
+        with patch("time.sleep"), pytest.raises(OpenLibraryAPIError, match="timed out"):
             client.fetch_books_by_subject("mystery")
+
+        assert client._client.get.call_count == 3
+
+    def test_timeout_succeeds_after_retry(self) -> None:
+        """A timeout followed by a successful response returns data normally."""
+        client = OpenLibraryClient(max_retries=3)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[
+                httpx.TimeoutException("timed out"),
+                _docs_response(_SAMPLE_DOCS),
+            ]
+        )
+
+        with patch("time.sleep") as mock_sleep:
+            result = client.fetch_books_by_subject("mystery")
+
+        assert len(result) == 2
+        mock_sleep.assert_called_once_with(1.0)
+
+    def test_timeout_first_retry_wait_is_one_second(self) -> None:
+        """Timeout retries use the same 1 s base backoff as 5xx."""
+        client = OpenLibraryClient(max_retries=3)
+        client._client.get = MagicMock(  # type: ignore[method-assign]
+            side_effect=[
+                httpx.TimeoutException("timed out"),
+                _docs_response(_SAMPLE_DOCS),
+            ]
+        )
+
+        with patch("time.sleep") as mock_sleep:
+            client.fetch_books_by_subject("mystery")
+
+        mock_sleep.assert_called_once_with(1.0)
 
     def test_json_parse_failure_raises(self) -> None:
         client = OpenLibraryClient()

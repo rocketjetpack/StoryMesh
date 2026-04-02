@@ -49,7 +49,7 @@ class OpenLibraryClient:
     def __init__(
         self,
         user_agent: str | None = None,
-        timeout: float = 10.0,
+        timeout: float = 30.0,
         max_retries: int = 8,
     ) -> None:
         """Construct the client.
@@ -72,7 +72,7 @@ class OpenLibraryClient:
         if user_agent:
             headers["User-Agent"] = user_agent
         self._client = httpx.Client(headers=headers, timeout=timeout)
-        logger.warning("OpenLibraryClient initialized with User-Agent '%s'. ", user_agent)
+        logger.debug("OpenLibraryClient initialized with User-Agent '%s'.", user_agent)
 
     def fetch_books_by_subject(
         self,
@@ -177,8 +177,18 @@ class OpenLibraryClient:
             try:
                 response = self._client.get(url, params=params or {})
             except httpx.TimeoutException as exc:
+                wait = min(1.0 * (2.0 ** attempt), 30.0)
+                if attempt < self._max_retries - 1:
+                    logger.warning(
+                        "OL API [attempt %d/%d]: timed out — retrying in %.1fs.",
+                        attempt + 1,
+                        self._max_retries,
+                        wait,
+                    )
+                    time.sleep(wait)
+                    continue
                 raise OpenLibraryAPIError(
-                    f"Request to Open Library timed out: {exc}"
+                    f"Request to Open Library timed out after {self._max_retries} attempts: {exc}"
                 ) from exc
 
             if response.status_code == 200:

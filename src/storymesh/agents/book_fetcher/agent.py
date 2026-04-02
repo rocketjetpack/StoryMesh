@@ -86,6 +86,7 @@ class BookFetcherAgent:
             self._limit_per_sort: int = ol_cfg.get("limit_per_sort", limit_per_sort)
             self._client = OpenLibraryClient(
                 user_agent=user_agent,
+                timeout=float(ol_cfg.get("timeout", 30.0)),
                 max_retries=ol_cfg.get("max_retries", 8),
             )
             self._owns_client = True
@@ -166,11 +167,12 @@ class BookFetcherAgent:
                         limit=self._limit_per_sort,
                         sort=sort,
                     )
-                except OpenLibraryAPIError:
-                    logger.exception(
-                        "Genre '%s' sort '%s': API call failed, skipping",
+                except OpenLibraryAPIError as exc:
+                    logger.warning(
+                        "Genre '%s' sort '%s': API call failed, skipping: %s",
                         subject,
                         sort,
+                        exc,
                     )
                     per_genre_debug[subject]["sorts"][sort] = {
                         "books_fetched": 0,
@@ -349,11 +351,11 @@ class BookFetcherAgent:
             try:
                 info = self._client.fetch_subject_info(subject)
                 work_count = int(info.get("work_count", 0))
-            except OpenLibraryAPIError:
+            except OpenLibraryAPIError as exc:
                 logger.warning(
-                    "validate_subjects: failed to probe '%s' — including by default.",
+                    "validate_subjects: failed to probe '%s' — including by default: %s",
                     subject,
-                    exc_info=True,
+                    exc,
                 )
                 valid.append(subject)
                 continue

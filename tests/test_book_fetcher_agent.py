@@ -627,7 +627,7 @@ class TestAPIErrorGracefulDegradation:
         assert output.debug["per_genre"]["fantasy"]["cache"] == "error"
 
     def test_api_failure_logged(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-        """API failures are logged at ERROR level."""
+        """API failures are logged at WARNING level (no traceback)."""
         stub = _FailingClient(fail_on={"mystery"})
         with patch(
             "storymesh.agents.book_fetcher.agent.get_cache_dir",
@@ -635,7 +635,7 @@ class TestAPIErrorGracefulDegradation:
         ):
             a = BookFetcherAgent(client=stub)  # type: ignore[arg-type]
 
-        with caplog.at_level(logging.ERROR, logger="storymesh.agents.book_fetcher.agent"):
+        with caplog.at_level(logging.WARNING, logger="storymesh.agents.book_fetcher.agent"):
             a.run(BookFetcherAgentInput(normalized_genres=["mystery"]))
 
         assert any("API call failed" in r.message for r in caplog.records)

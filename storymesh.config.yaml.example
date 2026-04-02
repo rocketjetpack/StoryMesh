@@ -59,6 +59,10 @@ api_clients:
   open_library:
     user_agent:    # Optional; "AppName (contact@email.com)" for higher rate limit
     max_books: 50  # Total cap after deduplication across all genre queries
+    sort_strategies: ["editions", "rating"]
+    limit_per_sort: 15
+    timeout: 30         # HTTP request timeout in seconds (OL can be slow for large result sets)
+    max_retries: 8
 
 # ------
 # Caching Configuration
