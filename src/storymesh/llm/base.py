@@ -4,13 +4,25 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from contextvars import ContextVar
+from datetime import UTC, datetime
 from typing import Any
 
 import orjson
 
 logger = logging.getLogger(__name__)
+
+# A callable that accepts (run_id, record) and writes it somewhere.
+# Using a type alias avoids importing ArtifactStore here (circular dep risk).
+LLMCallLogger = Callable[[str, dict[str, Any]], None]
+
+# Set by node wrappers before calling agent.run(). Read by complete_json()
+# when writing LLM call records. Defaults to empty string so that calls made
+# outside a pipeline run (e.g., in tests) do not raise.
+current_run_id: ContextVar[str] = ContextVar("current_run_id", default="")
 
 # This is a defensive regular expression to strip markdown fences from LLM replies.
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
@@ -56,10 +68,14 @@ class LLMClient(ABC):
             *,
             api_key: str | None = None,
             model: str | None = None,
+            agent_name: str = "unknown",
+            on_call: LLMCallLogger | None = None,
         ) -> None:
 
         self.api_key = api_key
         self.model = model
+        self.agent_name = agent_name
+        self._on_call = on_call
 
     @abstractmethod
     def complete(
@@ -90,31 +106,19 @@ class LLMClient(ABC):
         Call the complete() implementation and parse the response as a JSON object.
 
         Strip markdown fences if present in the response. Retry one time on parse failure
-        or if the response is valid JSON but not a dict.
+        or if the response is valid JSON but not a dict. Each attempt is recorded via
+        ``_write_call_record()`` regardless of success or failure.
         """
 
         for attempt in range(max_retries + 1):
-            logger.debug(
-                "LLM call [attempt %d/%d]\n--- SYSTEM ---\n%s\n--- USER ---\n%s",
-                attempt + 1,
-                max_retries + 1,
-                system_prompt or "(none)",
-                prompt,
-            )
-
+            t0 = time.perf_counter()
             raw = self.complete(
                 prompt,
                 system_prompt=system_prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-
-            logger.debug(
-                "LLM response [attempt %d/%d]\n--- RESPONSE ---\n%s",
-                attempt + 1,
-                max_retries + 1,
-                raw,
-            )
+            latency_ms = round((time.perf_counter() - t0) * 1000)
 
             cleaned = _strip_markdown_fences(raw.strip())
 
@@ -126,6 +130,15 @@ class LLMClient(ABC):
                     attempt + 1,
                     max_retries + 1,
                     raw,
+                )
+                self._write_call_record(
+                    system_prompt=system_prompt,
+                    user_prompt=prompt,
+                    raw_response=raw,
+                    temperature=temperature,
+                    attempt=attempt + 1,
+                    latency_ms=latency_ms,
+                    parse_success=False,
                 )
                 if attempt < max_retries:
                     continue
@@ -139,14 +152,78 @@ class LLMClient(ABC):
                     max_retries + 1,
                     raw,
                 )
+                self._write_call_record(
+                    system_prompt=system_prompt,
+                    user_prompt=prompt,
+                    raw_response=raw,
+                    temperature=temperature,
+                    attempt=attempt + 1,
+                    latency_ms=latency_ms,
+                    parse_success=False,
+                )
                 if attempt < max_retries:
                     continue
                 raise ValueError(
                     f"Expected JSON object as response from the LLM, got {type(parsed).__name__}"
                 )
+
+            self._write_call_record(
+                system_prompt=system_prompt,
+                user_prompt=prompt,
+                raw_response=raw,
+                temperature=temperature,
+                attempt=attempt + 1,
+                latency_ms=latency_ms,
+                parse_success=True,
+            )
             return parsed
 
         raise RuntimeError("Reached code that should be unreachable in complete_json()!")
+
+    def _write_call_record(
+        self,
+        *,
+        system_prompt: str | None,
+        user_prompt: str,
+        raw_response: str,
+        temperature: float,
+        attempt: int,
+        latency_ms: int,
+        parse_success: bool,
+    ) -> None:
+        """Build and dispatch one LLM call record to self._on_call, if set.
+
+        Never raises — logging errors must not crash the pipeline.
+
+        Args:
+            system_prompt: System prompt sent to the model, or None.
+            user_prompt: User prompt sent to the model.
+            raw_response: Raw string returned by the model.
+            temperature: Sampling temperature used for this call.
+            attempt: 1-based attempt number within the retry loop.
+            latency_ms: Wall-clock milliseconds for the complete() call.
+            parse_success: Whether the response parsed as a valid JSON object.
+        """
+        if self._on_call is None:
+            return
+        run_id = current_run_id.get()
+        record: dict[str, Any] = {
+            "ts": datetime.now(tz=UTC).isoformat(),
+            "run_id": run_id,
+            "agent": self.agent_name,
+            "model": self.model,
+            "temperature": temperature,
+            "attempt": attempt,
+            "system_prompt": system_prompt or "",
+            "user_prompt": user_prompt,
+            "raw_response": raw_response,
+            "parse_success": parse_success,
+            "latency_ms": latency_ms,
+        }
+        try:
+            self._on_call(run_id, record)
+        except Exception:
+            logger.warning("Failed to write LLM call record", exc_info=True)
 
 # ---------------------------------------------------------------------------
 # Provider registry
@@ -201,8 +278,13 @@ def get_provider_class(name: str) -> type[LLMClient]:
 class FakeLLMClient(LLMClient):
     """This implementation exists solely for pytest testing of the base class without any implementation."""
 
-    def __init__(self, responses: list[str]) -> None:
-        super().__init__(api_key="fake", model="fake")
+    def __init__(
+        self,
+        responses: list[str],
+        agent_name: str = "fake",
+        on_call: LLMCallLogger | None = None,
+    ) -> None:
+        super().__init__(api_key="fake", model="fake", agent_name=agent_name, on_call=on_call)
         self.responses = responses
         self.call_count = 0
 

@@ -76,7 +76,11 @@ def _ensure_provider_imported(provider: str) -> None:
             )
 
 
-def _build_llm_client(agent_cfg: dict[str, Any]) -> LLMClient | None:
+def _build_llm_client(
+    agent_cfg: dict[str, Any],
+    agent_name: str = "unknown",
+    artifact_store: ArtifactStore | None = None,
+) -> LLMClient | None:
     """Instantiate the correct LLMClient subclass from an agent config dict.
 
     Uses the provider registry in ``storymesh.llm.base``. Returns ``None``
@@ -85,6 +89,9 @@ def _build_llm_client(agent_cfg: dict[str, Any]) -> LLMClient | None:
 
     Args:
         agent_cfg: Resolved agent config dict from ``get_agent_config()``.
+        agent_name: Label used in LLM call records (matches the LangGraph node name).
+        artifact_store: If provided, wires ``ArtifactStore.log_llm_call`` as the
+            ``on_call`` handler so every LLM call is appended to llm_calls.jsonl.
 
     Returns:
         A concrete ``LLMClient`` instance, or ``None`` if the API key is absent.
@@ -111,7 +118,8 @@ def _build_llm_client(agent_cfg: dict[str, Any]) -> LLMClient | None:
     from storymesh.llm.base import get_provider_class  # noqa: PLC0415
 
     cls = get_provider_class(provider)
-    return cls(model=model)
+    on_call = artifact_store.log_llm_call if artifact_store is not None else None
+    return cls(model=model, agent_name=agent_name, on_call=on_call)
 
 
 MAX_RUBRIC_RETRIES: int = 2
@@ -214,7 +222,7 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     """
     # ── Stage 0: GenreNormalizerAgent ──────────────────────────────────────
     genre_cfg = get_agent_config("genre_normalizer")
-    genre_llm = _build_llm_client(genre_cfg)
+    genre_llm = _build_llm_client(genre_cfg, agent_name="genre_normalizer", artifact_store=artifact_store)
 
     from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent  # noqa: PLC0415
 
@@ -241,7 +249,11 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     )
 
     book_ranker_cfg = get_agent_config("book_ranker")
-    book_ranker_llm = _build_llm_client(book_ranker_cfg) if book_ranker_cfg.get("llm_rerank") else None
+    book_ranker_llm = (
+        _build_llm_client(book_ranker_cfg, agent_name="book_ranker", artifact_store=artifact_store)
+        if book_ranker_cfg.get("llm_rerank")
+        else None
+    )
 
     book_ranker_agent = BookRankerAgent(
         top_n=book_ranker_cfg.get("top_n", 10),
@@ -263,7 +275,7 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     )
 
     theme_cfg = get_agent_config("theme_extractor")
-    theme_llm = _build_llm_client(theme_cfg)
+    theme_llm = _build_llm_client(theme_cfg, agent_name="theme_extractor", artifact_store=artifact_store)
 
     if theme_llm is None:
         logger.warning(

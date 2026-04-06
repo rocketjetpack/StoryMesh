@@ -7,7 +7,7 @@ from typing import Any
 
 import anthropic
 
-from storymesh.llm.base import LLMClient, _traceable, register_provider
+from storymesh.llm.base import LLMCallLogger, LLMClient, _traceable, register_provider
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
@@ -18,7 +18,9 @@ class AnthropicClient(LLMClient):
             self,
             *,
             api_key: str | None = None,
-            model: str | None = None
+            model: str | None = None,
+            agent_name: str = "unknown",
+            on_call: LLMCallLogger | None = None,
         ) -> None:
         resolved_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not resolved_key:
@@ -28,7 +30,7 @@ class AnthropicClient(LLMClient):
 
         resolved_model = model or _DEFAULT_MODEL
 
-        super().__init__(api_key=resolved_key, model=resolved_model)
+        super().__init__(api_key=resolved_key, model=resolved_model, agent_name=agent_name, on_call=on_call)
         self.client = anthropic.Anthropic(api_key=resolved_key)
 
     @_traceable

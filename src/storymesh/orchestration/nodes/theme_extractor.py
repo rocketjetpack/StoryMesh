@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from storymesh.agents.theme_extractor.agent import ThemeExtractorAgent
+from storymesh.llm.base import current_run_id
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.theme_extractor import ThemeExtractorAgentInput
 
@@ -74,7 +75,11 @@ def make_theme_extractor_node(
             user_prompt=state["user_prompt"],
         )
 
-        output = agent.run(input_data)
+        token = current_run_id.set(state.get("run_id", ""))
+        try:
+            output = agent.run(input_data)
+        finally:
+            current_run_id.reset(token)
 
         if artifact_store is not None:
             from storymesh.core.artifacts import persist_node_output  # noqa: PLC0415

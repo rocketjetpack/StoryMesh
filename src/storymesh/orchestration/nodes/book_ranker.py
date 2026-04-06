@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from storymesh.agents.book_ranker.agent import BookRankerAgent
+from storymesh.llm.base import current_run_id
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.book_ranker import BookRankerAgentInput
 
@@ -60,7 +61,11 @@ def make_book_ranker_node(
             user_prompt=state["user_prompt"],
             total_genres_queried=len(book_fetcher_output.queries_executed),
         )
-        output = agent.run(input_data)
+        token = current_run_id.set(state.get("run_id", ""))
+        try:
+            output = agent.run(input_data)
+        finally:
+            current_run_id.reset(token)
 
         if artifact_store is not None:
             from storymesh.core.artifacts import persist_node_output  # noqa: PLC0415

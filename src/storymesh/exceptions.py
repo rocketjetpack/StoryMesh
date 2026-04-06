@@ -16,3 +16,7 @@ class GenreResolutionError(StoryMeshError):
     This is a terminal condition: without at least one resolved genre the
     downstream pipeline has no meaningful work to perform.
     """
+
+
+class RunNotFoundError(StoryMeshError):
+    """Raised when a requested run ID does not exist in the runs directory."""

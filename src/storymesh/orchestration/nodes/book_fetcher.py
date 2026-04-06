@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from storymesh.agents.book_fetcher.agent import BookFetcherAgent
+from storymesh.llm.base import current_run_id
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.book_fetcher import BookFetcherAgentInput
 
@@ -76,7 +77,11 @@ def make_book_fetcher_node(
         input_data = BookFetcherAgentInput(
             normalized_genres=all_subjects,
         )
-        output = agent.run(input_data)
+        token = current_run_id.set(state.get("run_id", ""))
+        try:
+            output = agent.run(input_data)
+        finally:
+            current_run_id.reset(token)
 
         if artifact_store is not None:
             from storymesh.core.artifacts import persist_node_output  # noqa: PLC0415

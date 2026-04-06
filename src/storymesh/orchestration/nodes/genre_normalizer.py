@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent
 from storymesh.exceptions import GenreResolutionError
+from storymesh.llm.base import current_run_id
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentInput
 
@@ -55,10 +56,13 @@ def make_genre_normalizer_node(
             allow_llm_fallback=True,
         )
 
+        token = current_run_id.set(state.get("run_id", ""))
         try:
             output = agent.run(input_data)
         except GenreResolutionError as exc:
             return {"genre_normalizer_output": None, "errors": [str(exc)]}
+        finally:
+            current_run_id.reset(token)
 
         if artifact_store is not None:
             from storymesh.core.artifacts import persist_node_output  # noqa: PLC0415

@@ -53,11 +53,14 @@ class StoryMeshPipeline:
         # Generate run_id before invocation so metadata is on disk even if the
         # graph crashes mid-run (enables partial-run post-mortem inspection).
         run_id = uuid.uuid4().hex
+        # Capture timestamp before graph execution so both the initial write and
+        # the post-run update reflect the run *start* time, not the end time.
+        run_timestamp = datetime.now(tz=timezone.utc).isoformat()  # noqa: UP017
 
         self._artifact_store.save_run(run_id, {
             "user_prompt": user_prompt,
             "pipeline_version": storymesh_version,
-            "timestamp": datetime.now(tz=timezone.utc).isoformat(),  # noqa: UP017
+            "timestamp": run_timestamp,
             "run_id": run_id,
         })
 
@@ -93,6 +96,18 @@ class StoryMeshPipeline:
         # Individual stage artifacts are now written by each node as it
         # completes (see persist_node_output in core/artifacts.py), so no
         # post-invocation artifact loop is needed here.
+
+        # Update run_metadata.json with stage timings now that the graph has
+        # finished. The initial save (before graph execution) records the run
+        # for crash post-mortems; this second write adds timing data for the
+        # run inspector and any future tooling.
+        self._artifact_store.save_run(run_id, {
+            "user_prompt": user_prompt,
+            "pipeline_version": storymesh_version,
+            "timestamp": run_timestamp,
+            "run_id": run_id,
+            "stage_timings": stage_timings,
+        })
 
         base_metadata: dict[str, Any] = {
             "user_prompt": final_state.get("user_prompt", user_prompt),
