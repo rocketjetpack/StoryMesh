@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StoryMesh Run 8a984221d31547928d845244a13a998f</title>
+  <style>
+body {
+  font-family: system-ui, sans-serif;
+  max-width: 960px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  color: #1a1a1a;
+  line-height: 1.5;
+}
+header { border-bottom: 2px solid #ccc; margin-bottom: 1.5rem; padding-bottom: 1rem; }
+h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+h2 { font-size: 1.2rem; margin-top: 2rem; }
+h4 { margin: 0.75rem 0 0.25rem; font-size: 0.95rem; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 1rem; }
+dt { font-weight: 600; color: #555; }
+details { border: 1px solid #ddd; border-radius: 4px; margin: 0.5rem 0; padding: 0.5rem; }
+details[open] { background: #fafafa; }
+summary { cursor: pointer; font-weight: 600; padding: 0.2rem 0; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.stage-name { font-family: monospace; }
+.status-done  { color: #2a7a2a; }
+.status-missing { color: #888; }
+.status-corrupt { color: #c0392b; }
+.override-note { color: #b7600a; font-style: italic; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin: 0.5rem 0; }
+th, td { border: 1px solid #ddd; padding: 0.3rem 0.5rem; text-align: left; }
+th { background: #f0f0f0; }
+pre {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 0.75rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.82rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+ul { margin: 0.25rem 0; padding-left: 1.5rem; }
+li { margin: 0.2rem 0; }
+code { font-family: monospace; background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>StoryMesh Run Report</h1>
+    <dl>
+      <dt>Run ID</dt><dd><code>8a984221d31547928d845244a13a998f</code></dd>
+      <dt>Prompt</dt><dd>a romance book</dd>
+      <dt>Version</dt><dd>0.6.0</dd>
+      <dt>Timestamp</dt><dd>2026-04-03T17:45:08.588670+00:00</dd>
+    </dl>
+  </header>
+
+  <section id="stages">
+    <h2>Pipeline Stages</h2>
+    <details open><summary><span class="stage-name">genre_normalizer</span> <span class="status-done">&#10003; done</span></summary>
+<dl><dt>Genres</dt><dd>romance</dd><dt>Subgenres</dt><dd>—</dd><dt>Tones</dt><dd>—</dd><dt>Inferred genres</dt><dd>—</dd><dt>Narrative context</dt><dd>—</dd></dl>
+</details>
+<details open><summary><span class="stage-name">book_fetcher</span> <span class="status-done">&#10003; done</span></summary>
+<dl><dt>Queries</dt><dd>romance</dd><dt>Total books fetched</dt><dd>29</dd></dl><h4>Top books (up to 5)</h4><table><thead><tr><th>Title</th><th>Authors</th><th>Year</th></tr></thead><tbody><tr><td>Pride and Prejudice</td><td>Jane Austen</td><td>1813</td></tr><tr><td>Wuthering Heights</td><td>Emily Brontë</td><td>1846</td></tr><tr><td>The Scarlet Letter</td><td>Nathaniel Hawthorne</td><td>1800</td></tr><tr><td>Emma</td><td>Jane Austen</td><td>1815</td></tr><tr><td>Sense and Sensibility</td><td>Jane Austen</td><td>1811</td></tr></tbody></table>
+</details>
+<details open><summary><span class="stage-name">book_ranker</span> <span class="status-done">&#10003; done</span></summary>
+<dl><dt>Books below cutoff</dt><dd>19</dd></dl><h4>Top ranked books (up to 5)</h4><table><thead><tr><th>Rank</th><th>Title</th><th>Authors</th><th>Score</th><th>Genre Overlap</th><th>Reader Engagement</th></tr></thead><tbody><tr><td>1</td><td>It Ends With Us</td><td>Colleen Hoover</td><td>0.956</td><td>1.000</td><td>1.000</td></tr><tr><td>2</td><td>Um casamento arranjado</td><td>Zana Kheiron</td><td>0.849</td><td>1.000</td><td>0.533</td></tr><tr><td>3</td><td>Pride and Prejudice</td><td>Jane Austen</td><td>0.655</td><td>1.000</td><td>0.156</td></tr><tr><td>4</td><td>Guess How Much I Love You</td><td>Sam McBratney, Anita Jeram</td><td>0.588</td><td>1.000</td><td>0.025</td></tr><tr><td>5</td><td>Le Comte de Monte Cristo</td><td>Alexandre Dumas</td><td>0.600</td><td>1.000</td><td>0.026</td></tr></tbody></table>
+</details>
+<details open><summary><span class="stage-name">theme_extractor</span> <span class="status-done">&#10003; done</span></summary>
+<h4>Genre Clusters</h4><ul><li><strong>contemporary_romance</strong> (2 books) — Love is the most transformative force in a person&#x27;s life, capable of reshaping identity and circumstance; Authentic emotional connection requires confronting and overcoming personal trauma or social constraint; A good ending means the protagonist chooses herself — love that diminishes the self is not true love; Vulnerability between two people is the primary site of moral and emotional growth</li><li><strong>classic_literary_romance</strong> (4 books) — Society&#x27;s structures — class, reputation, law, fate — are real forces that love must negotiate, not simply overcome; Self-knowledge is achieved through ordeal, misreading, or obsession, not through direct introspection; Justice and romantic fulfillment are intertwined: the world must be set right for love to be possible; Desire can be irrational, destructive, or cosmically comic — and this is as true as its redemptive power</li><li><strong>young_adult_romance</strong> (4 books) — Love is discovered through identity formation — you must become yourself before you can truly love another; The world&#x27;s unfairness (social hierarchies, competitions, impossible odds) can be transcended by the right partnership; Emotional bonds are proven through loyalty under external threat, not through internal psychological work; A good ending preserves both the relationship and the protagonist&#x27;s sense of self and belonging</li></ul><h4>Thematic Tensions</h4><ul><li><strong>T1</strong> (intensity 0.78) — What happens when setting the world right requires a protagonist to subsume herself into a larger cause — can self-sacrifice and self-determination coexist as the condition of love?</li><li><strong>T2</strong> (intensity 0.72) — If desire is fundamentally irrational and potentially ruinous, can the therapeutic model of vulnerability and mutual growth survive contact with love&#x27;s darker, ungovernable energies?</li><li><strong>T3</strong> (intensity 0.85) — When structural inequality is not a backdrop to be escaped but a living system that reshapes the lovers from within, what does &#x27;transcendence&#x27; actually look like — and is it honest?</li><li><strong>T4</strong> (intensity 0.68) — Can a love forged entirely in the crucible of external danger be trusted when the danger ends — and what does a relationship look like when the monster is inside rather than outside?</li><li><strong>T5</strong> (intensity 0.60) — What if the self that must be formed before love is possible is only legible through the distortions of misreading and obsession — what if becoming yourself requires first being catastrophically wrong about yourself?</li></ul><h4>Narrative Seeds</h4><ul><li><strong>S1</strong> — A woman who built her entire sense of self around surviving an abusive marriage finally escapes — only to find herself appointed, against her will, as the public face of a landmark domestic violence legal case that could change the law but will consume the private healing she has just begun. The case demands she perform her trauma for institutional justice while every therapist, ally, and well-meaning friend insists that speaking out is the same as getting better. She must decide whether the world being set right and her own self being set right are the same project — or whether they are, at this moment in her life, incompatible.</li><li><strong>S2</strong> — In a rigidly stratified city-state where marriage determines guild membership and therefore survival, two apprentices from enemy guilds are paired in a state-mandated &#x27;compatibility trial&#x27; designed to fail — a bureaucratic tool for consolidating power, not making matches. As they discover genuine feeling, they also discover that the system has anticipated and weaponized exactly this outcome: their love is the trap, not the escape. The story refuses the revolution and the secret lineage; instead it asks what two people owe each other when the honest answer to &#x27;can we be together&#x27; is &#x27;not without cost to everyone around us.&#x27;</li><li><strong>S3</strong> — Two soldiers who fell in love during an impossible campaign return home to find that the version of each other they bonded with — forged under fire, stripped of ordinary personality — no longer exists in peacetime. The loyalty they proved a hundred times over has no grammar for the quieter, stranger, more embarrassing people they actually are. The novel is a love story about two people who must grieve the selves they were in order to meet the selves they have become, uncertain whether those new selves will want each other.</li><li><strong>S4</strong> — A woman who has spent a decade methodically misreading every relationship — constructing elaborate, wrong theories about what people want and who she is to them — meets someone who is also, for entirely different reasons, catastrophically wrong about himself. Neither of them is in a position to offer the other clarity. The novel tracks their circling approach to each other not as a comedy of errors to be resolved but as a genuine epistemological problem: what does it mean to love someone when your instrument for knowing people is demonstrably broken, and so is theirs?</li><li><strong>S5</strong> — A young woman enters a prestigious arranged-marriage selection process fully intending to game it — she has studied the system, mapped the power dynamics, and planned her exit. What she has not planned for is that the process itself, with its ordeals and humiliations and forced intimacies, begins to dismantle the carefully constructed self she brought into it. By the time she understands what she actually wants, she can no longer tell whether that desire is hers or whether the institution manufactured it — and the person she wants is asking her the same question about himself.</li></ul>
+</details>
+<details><summary><span class="stage-name">proposal_draft</span> <span class="status-missing">&#9675; missing</span></summary>
+<p><em>Stage not yet run.</em></p>
+</details>
+<details><summary><span class="stage-name">rubric_judge</span> <span class="status-missing">&#9675; missing</span></summary>
+<p><em>Stage not yet run.</em></p>
+</details>
+<details><summary><span class="stage-name">synopsis_writer</span> <span class="status-missing">&#9675; missing</span></summary>
+<p><em>Stage not yet run.</em></p>
+</details>
+  </section>
+
+  <section id="llm-calls">
+    <h2>LLM Calls</h2>
+    <details><summary>[genre_normalizer] attempt 1 &mdash; 906ms &mdash; <span class="status-done">&#10003; parse</span></summary><h4>System Prompt</h4><pre>You are a fiction genre and tone classification specialist for a book synopsis pipeline.
+
+You will receive a list of tokens extracted from a user&#x27;s story description. Tokens appear in order
+and may be merged into phrases when appropriate. These tokens have already been checked against a
+static mapping of known genres and tones and were not matched. Your job is to classify each token
+or merged phrase into exactly one category.
+
+CATEGORIES:
+- &quot;genre&quot;: A recognized literary genre or subgenre (e.g., &quot;solarpunk&quot;, &quot;wuxia&quot;, &quot;cli-fi&quot;, &quot;LitRPG&quot;).
+  Provided canonical genre(s), subgenre(s), and default tones commonly associated with them.
+- &quot;tone&quot;: A mood, atmosphere, or tonal quality (e.g., &quot;moody&quot;, &quot;whimsical&quot;, &quot;optimistic&quot;). Provided
+  normalized tone name(s).
+- &quot;narrative_context&quot;: A setting, location, time period, character detail, plot element, or thematic
+  concept (e.g., &quot;2085&quot;, &quot;Chicago&quot;, &quot;detroit&quot;, &quot;rebellion&quot;, &quot;pirates&quot;, &quot;medieval&quot;). These are story
+  details, not genres or tones. Mark stopwords with is_stopword: true.
+- &quot;unknown&quot;: The token is meaningless, a typo that removes any meaning, or cannot be classified.
+
+RULES:
+- You may merge adjacent tokens into a multi-word phrase when they form a single named entity
+  or fixed concept (e.g., &quot;New York&quot;, &quot;fallen angel&quot;, &quot;world war iii&quot;). Classify the phrase as one
+  item. Merged phrases should normally contain 2–3 adjacent tokens unless the phrase is a widely 
+  recognized name. Merged phrases must consist only of tokens that are adjacent in the input list.
+  Do not skip tokens or reorder tokens when forming phrases. When merging tokens into a phrase,
+  preserve original capitalization if present.
+- Classify ONLY what each token IS with the possible exception of adding &quot;is_stopword&quot;: true to
+  tokens or phrases classified as &quot;narrative_context&quot;.  
+- Only classify a token or phrase as a genre if it corresponds to a widely recognized literary genre
+  or subgenre. DO NOT INVENT GENRES.
+- Common function words (articles, prepositions, conjunctions, auxiliary verbs, and common linking
+  verbs) should be classified as &quot;narrative_context&quot; and marked with &quot;is_stopword&quot;: true in the output.
+- If a token expresses an approximate tone using a modifier or suffix (e.g., &quot;darkish&quot;, &quot;creepy-ish&quot;),
+  normalize it to the closest common tone descriptor.
+- Conversational filler words, hedging terms, vague meta-descriptions, and request-language
+  (e.g., &quot;kinda&quot;, &quot;sorta&quot;, &quot;maybe&quot;, &quot;thing&quot;, &quot;stuff&quot;, &quot;something&quot;, &quot;like&quot;, &quot;story&quot;, &quot;idea&quot;, &quot;concept&quot;)
+  should normally be classified as narrative_context with &quot;is_stopword&quot;: true.
+  However, if a hedging word directly modifies an adjacent token to form a recognizable phrase
+  (e.g., &quot;kinda dark&quot;, &quot;sorta creepy&quot;), merge the tokens into a phrase and normalize the tone
+  to the closest common tone descriptor.
+- When a token could be either a genre or narrative_context (e.g. &quot;pirates&quot; could imply the adventure
+  genre or be a setting detail), prefer &quot;genre&quot; only if it clearly maps to a recognized literary genre
+  or subgenre. Otherwise classify it as &quot;narrative_context&quot;.
+- Canonical genres should use widely recognized top-level literary genres such as:
+  fantasy, science_fiction, horror, romance, mystery, thriller, historical_fiction, literary_fiction, adventure.
+- Use snake_case for all genre, subgenre, and tone names.
+- If a token or phrase could belong to multiple categories, prefer the most specific classification:
+  genre &gt; tone &gt; narrative_context &gt; unknown.
+- If a token or phrase appears to be nonsense, random characters, or a misspelling that cannot clearly
+  be interpreted, classify it as &quot;unknown&quot;.
+- Each input token must be represented exactly once either individually or as part of a merged phrase.
+  Do not duplicate tokens and do not invent new tokens.
+- Return classifications in the same order that the tokens or merged phrases appear in the input.
+- Normalized tones should contain 1–3 common tone descriptors. Avoid rare or overly creative tone labels.
+- Provide 1–3 tones commonly associated with the genre if applicable. If none are obvious, return an empty list.
+- The &quot;token&quot; field must exactly match the original input text for that token or merged phrase.
+  Do not correct spelling or alter casing except when merging tokens into a phrase.
+- Return ONLY the JSON object described below. Do not include commentary or explanations.
+  If unsure about a classification, choose &quot;unknown&quot;.
+- All list fields must always be arrays. Use [] when no values apply.
+
+RESPONSE FORMAT:
+{
+  &quot;classifications&quot;: [
+    {
+      &quot;token&quot;: &quot;&lt;original text&gt;&quot;,
+      &quot;type&quot;: &quot;genre&quot;,
+      &quot;genres&quot;: [&quot;&lt;name_of_canonical_genre&gt;&quot;],
+      &quot;subgenres&quot;: [&quot;list&quot;, &quot;of&quot;, &quot;associated&quot;, &quot;subgenres&quot;],
+      &quot;default_tones&quot;: [&quot;tone1&quot;, &quot;tone2&quot;]
+    },
+    {
+      &quot;token&quot;: &quot;&lt;original text&gt;&quot;,
+      &quot;type&quot;: &quot;tone&quot;,
+      &quot;normalized_tones&quot;: [&quot;&lt;tone1&gt;&quot;, &quot;&lt;tone2&gt;&quot;, &quot;&lt;tone3&gt;&quot;]
+    },
+    {
+      &quot;token&quot;: &quot;&lt;original text&gt;&quot;,
+      &quot;type&quot;: &quot;narrative_context&quot;,
+      &quot;is_stopword&quot;: &lt;true or false&gt;
+    },
+    {
+      &quot;token&quot;: &quot;&lt;original text&gt;&quot;,
+      &quot;type&quot;: &quot;unknown&quot;
+    }
+  ]
+}
+
+EXAMPLES:
+
+Input tokens: &quot;solarpunk rebellion in 2085 xyzzyfrob&quot;
+Already resolved genres: [&quot;science_fiction&quot;]
+Already resolved tones: [&quot;gritty&quot;]
+
+Response:
+{
+  &quot;classifications&quot;: [
+    {&quot;token&quot;: &quot;solarpunk&quot;, &quot;type&quot;: &quot;genre&quot;, &quot;genres&quot;: [&quot;science_fiction&quot;], &quot;subgenres&quot;: [&quot;solarpunk&quot;], &quot;default_tones&quot;: [&quot;optimistic&quot;, &quot;hopeful&quot;, &quot;ecological&quot;]},
+    {&quot;token&quot;: &quot;rebellion&quot;, &quot;type&quot;: &quot;narrative_context&quot;, &quot;is_stopword&quot;: false},
+    {&quot;token&quot;: &quot;in&quot;, &quot;type&quot;: &quot;narrative_context&quot;, &quot;is_stopword&quot;: true},
+    {&quot;token&quot;: &quot;2085&quot;, &quot;type&quot;: &quot;narrative_context&quot;, &quot;is_stopword&quot;: false},
+    {&quot;token&quot;: &quot;xyzzyfrob&quot;, &quot;type&quot;: &quot;unknown&quot;}
+  ]
+}
+
+Input tokens: &quot;moody fallen angel in New York&quot;
+Already resolved genres: [&quot;fantasy&quot;]
+Already resolved tones: [&quot;dark&quot;]
+
+Response:
+{
+  &quot;classifications&quot;: [
+    {&quot;token&quot;: &quot;moody&quot;, &quot;type&quot;: &quot;tone&quot;, &quot;normalized_tones&quot;: [&quot;moody&quot;, &quot;brooding&quot;]},
+    {&quot;token&quot;: &quot;fallen angel&quot;, &quot;type&quot;: &quot;narrative_context&quot;, &quot;is_stopword&quot;: false},
+    {&quot;token&quot;: &quot;in&quot;, &quot;type&quot;: &quot;narrative_context&quot;, &quot;is_stopword&quot;: true},
+    {&quot;token&quot;: &quot;New York&quot;, &quot;type&quot;: &quot;narrative_context&quot;, &quot;is_stopword&quot;: false}
+  ]
+}
+</pre><h4>User Prompt</h4><pre>Original user input: &quot;a romance book&quot;
+
+Already resolved genres: [&#x27;romance&#x27;]
+Already resolved tones: []
+
+Remaining text to classify: &quot;a book&quot;
+
+Classify each meaningful token or phrase from the remaining text.</pre><h4>Response</h4><pre>```json
+{
+  &quot;classifications&quot;: [
+    {
+      &quot;token&quot;: &quot;a&quot;,
+      &quot;type&quot;: &quot;narrative_context&quot;,
+      &quot;is_stopword&quot;: true
+    },
+    {
+      &quot;token&quot;: &quot;book&quot;,
+      &quot;type&quot;: &quot;narrative_context&quot;,
+      &quot;is_stopword&quot;: true
+    }
+  ]
+}
+```</pre></details>
+<details><summary>[genre_normalizer] attempt 1 &mdash; 627ms &mdash; <span class="status-done">&#10003; parse</span></summary><h4>System Prompt</h4><pre>You are a literary genre inference specialist. Your task is to read a user&#x27;s story
+description and identify any literary genres or subgenres that the prompt IMPLIES
+through its themes, setting, character details, or narrative direction — but that
+are NOT already captured in the resolved genre list provided.
+
+You are NOT classifying tokens. You are reasoning holistically about the full
+creative intent of the prompt.
+
+CANONICAL GENRES (use these exact snake_case names):
+fantasy, science_fiction, horror, romance, mystery, thriller,
+historical_fiction, literary_fiction, adventure, crime, western
+
+RULES:
+- Only infer genres with clear textual evidence in the prompt. Do not speculate.
+- Do NOT include any genre that is already listed in &quot;Already resolved genres.&quot;
+  That list is provided specifically to prevent duplication.
+- Each inferred genre must include a rationale explaining the specific evidence
+  from the prompt that implies it.
+- canonical_genre MUST be one of the widely recognized top-level literary genres:
+  fantasy, science_fiction, horror, romance, mystery, thriller,
+  historical_fiction, literary_fiction, adventure, crime, western.
+- You may suggest more specific subgenres in the subgenres field, but canonical_genre
+  must always be one of the top-level genres listed above.
+- Do NOT use audience categories such as young_adult or middle_grade as
+  canonical_genre — these are marketing labels, not literary genres.
+- Subgenres should use snake_case and should only be included when the prompt
+  contains specific evidence (e.g., &quot;optimizing code&quot; + &quot;programmer&quot; → techno_thriller,
+  not just thriller generically).
+- Default tones should reflect the tonal conventions of the inferred genre in the
+  context of this specific prompt, not generic genre defaults.
+- If no additional genres are clearly implied, return an empty inferred_genres list.
+  An empty result is correct and common — do not force inferences.
+- Use snake_case for all genre, subgenre, and tone names.
+- Return ONLY the JSON object described below. No commentary, no explanation outside
+  the rationale fields.
+- Confidence must be between 0.0 and 1.0. Use 0.7 as the default. Use 0.8–0.9 only
+  when the evidence is very strong (e.g., a setting that unambiguously places the
+  story in a specific genre tradition).
+
+RESPONSE FORMAT:
+{
+  &quot;inferred_genres&quot;: [
+    {
+      &quot;canonical_genre&quot;: &quot;&lt;snake_case genre name&gt;&quot;,
+      &quot;subgenres&quot;: [&quot;&lt;subgenre1&gt;&quot;, &quot;&lt;subgenre2&gt;&quot;],
+      &quot;default_tones&quot;: [&quot;&lt;tone1&gt;&quot;, &quot;&lt;tone2&gt;&quot;],
+      &quot;rationale&quot;: &quot;&lt;specific textual evidence from the prompt&gt;&quot;,
+      &quot;confidence&quot;: 0.7
+    }
+  ]
+}
+
+EXAMPLES:
+
+--- Example 1: Inference adds value ---
+
+Original prompt: &quot;techno optimistic thriller about a c++ programmer who is doing
+everything he can to optimize his code to save one more millisecond&quot;
+Already resolved genres: [&quot;thriller&quot;]
+Already resolved tones: [&quot;optimistic&quot;]
+Narrative context tokens: [&quot;techno&quot;, &quot;c&quot;, &quot;programmer&quot;, &quot;optimize&quot;, &quot;code&quot;, &quot;millisecond&quot;]
+
+Response:
+{
+  &quot;inferred_genres&quot;: [
+    {
+      &quot;canonical_genre&quot;: &quot;science_fiction&quot;,
+      &quot;subgenres&quot;: [&quot;techno_thriller&quot;],
+      &quot;default_tones&quot;: [&quot;cerebral&quot;, &quot;tense&quot;],
+      &quot;rationale&quot;: &quot;The prompt centers on a programmer obsessively optimizing code with a &#x27;techno optimistic&#x27; framing, implying a technology-forward science fiction sensibility. The precision-at-all-costs premise (saving one millisecond) is a hallmark of hard sci-fi craft fiction.&quot;,
+      &quot;confidence&quot;: 0.75
+    },
+    {
+      &quot;canonical_genre&quot;: &quot;literary_fiction&quot;,
+      &quot;subgenres&quot;: [&quot;workplace_fiction&quot;],
+      &quot;default_tones&quot;: [&quot;introspective&quot;, &quot;driven&quot;],
+      &quot;rationale&quot;: &quot;The narrative centers on a single professional&#x27;s obsessive relationship with their craft rather than external stakes. The focus on internal motivation (optimize, save one more millisecond) is characteristic of literary workplace fiction.&quot;,
+      &quot;confidence&quot;: 0.65
+    }
+  ]
+}
+
+--- Example 2: Inference returns empty (all genres already explicit) ---
+
+Original prompt: &quot;dark fantasy adventure in a medieval kingdom with dragons&quot;
+Already resolved genres: [&quot;fantasy&quot;, &quot;adventure&quot;]
+Already resolved tones: [&quot;dark&quot;]
+Narrative context tokens: [&quot;medieval&quot;, &quot;kingdom&quot;, &quot;dragons&quot;]
+
+Response:
+{
+  &quot;inferred_genres&quot;: []
+}
+
+--- Example 3: Inference catches a non-obvious genre from setting ---
+
+Original prompt: &quot;a detective in 1920s Harlem navigating jazz clubs and bootleggers&quot;
+Already resolved genres: [&quot;mystery&quot;]
+Already resolved tones: []
+Narrative context tokens: [&quot;detective&quot;, &quot;1920s&quot;, &quot;harlem&quot;, &quot;jazz&quot;, &quot;clubs&quot;, &quot;bootleggers&quot;]
+
+Response:
+{
+  &quot;inferred_genres&quot;: [
+    {
+      &quot;canonical_genre&quot;: &quot;historical_fiction&quot;,
+      &quot;subgenres&quot;: [&quot;historical_mystery&quot;],
+      &quot;default_tones&quot;: [&quot;atmospheric&quot;, &quot;period&quot;, &quot;gritty&quot;],
+      &quot;rationale&quot;: &quot;The specific 1920s Harlem setting with jazz clubs and bootleggers (Prohibition era) places the story firmly in a historical period with documented cultural context, making historical_fiction an implicit genre even though the prompt frames it as detective fiction.&quot;,
+      &quot;confidence&quot;: 0.85
+    }
+  ]
+}
+</pre><h4>User Prompt</h4><pre>Original user prompt: &quot;a romance book&quot;
+
+Already resolved genres: [&#x27;romance&#x27;]
+Already resolved subgenres: []
+Already resolved tones: []
+Narrative context tokens: []
+
+Based on the FULL original prompt — including its themes, setting, character details,
+and overall narrative direction — identify any literary genres or subgenres that are
+strongly implied but NOT already captured in the resolved lists above.
+
+Only include genres with clear textual evidence. Do not speculate.
+</pre><h4>Response</h4><pre>```json
+{
+  &quot;inferred_genres&quot;: []
+}
+```</pre></details>
+<details><summary>[theme_extractor] attempt 1 &mdash; 57015ms &mdash; <span class="status-done">&#10003; parse</span></summary><h4>System Prompt</h4><pre>You are a literary analyst specializing in genre dialectics for a fiction synopsis pipeline.
+
+Your task is to analyze a ranked list of books drawn from multiple genre traditions and
+produce a structured ThemePack — a JSON object that captures the thematic DNA of those
+traditions and identifies the creative tensions between them.
+
+YOUR METHOD (follow this exactly):
+
+STEP 1 — CLUSTER:
+Group the provided books by their primary genre tradition, using the source_genres field.
+A book may belong to more than one cluster if it spans genres. Each cluster represents
+one genre tradition.
+
+STEP 2 — IDENTIFY ASSUMPTIONS:
+For each genre cluster, identify 2–4 thematic assumptions that the genre tradition takes
+for granted. These are the deep structural beliefs embedded in the genre — not plot tropes,
+but the worldview the genre assumes is true. Think about what the genre says about:
+- Whether truth is knowable
+- Whether justice is achievable
+- Whether order can be restored
+- What the relationship between individual and society is
+- What counts as a good ending
+
+STEP 3 — IDENTIFY TROPES:
+For each cluster, also identify 2–4 dominant narrative tropes (common story devices,
+character types, or structural patterns). These are the surface-level expressions of
+the deeper assumptions.
+
+STEP 4 — FIND CONTRADICTIONS:
+Compare assumptions across clusters. Identify 2–5 pairs of assumptions that directly
+contradict each other — where one genre takes something for granted that another genre
+treats as impossible or irrelevant. For each contradiction:
+- Name the two opposing assumptions
+- Frame the contradiction as a creative question: what does a story need to answer or
+  explore if it wants to inhabit both assumptions simultaneously?
+- Assign an intensity score (0.0–1.0): how fundamentally do the assumptions conflict?
+  A score near 1.0 means the genres have incompatible worldviews. Near 0.0 means
+  they differ only in surface style.
+- Identify 2–4 clichéd resolutions: the predictable, tropey approaches a lazy or
+  unimaginative writer would default to when resolving this particular tension. These
+  must be SPECIFIC and RECOGNIZABLE — not vague platitudes like &quot;the hero saves the day&quot;,
+  but concrete narrative moves like &quot;a lone detective rebuilds justice single-handedly
+  through sheer determination.&quot; The more specific the cliché, the more useful it is as
+  an exclusion for downstream agents.
+
+STEP 5 — GENERATE SEEDS:
+Generate between 3 and {max_seeds} narrative seeds — concrete 2–3 sentence story
+kernels, each of which emerges from one or more tensions. Each seed should:
+- Describe a specific protagonist, situation, or premise (not a vague theme)
+- Incorporate any provided narrative context tokens (settings, time periods, character
+  archetypes) where they fit naturally
+- Lean into the identified tones if provided
+- Reference which tension IDs it draws from
+
+EXAMPLES OF GOOD THEMATIC ASSUMPTIONS:
+- mystery: &quot;Truth is always recoverable if enough evidence is gathered&quot;
+- post_apocalyptic: &quot;Institutional systems of knowledge-keeping have collapsed&quot;
+- romance: &quot;Emotional connection between two people can redeem a broken world&quot;
+- horror: &quot;The universe is fundamentally indifferent or hostile to human wellbeing&quot;
+
+EXAMPLES OF GOOD THEMATIC TENSIONS (including clichéd resolutions):
+Given mystery vs. post_apocalyptic:
+- assumption_a: &quot;Truth is always recoverable if enough evidence is gathered&quot;
+- assumption_b: &quot;Physical records, witnesses, and institutions no longer exist&quot;
+- creative_question: &quot;What does investigation mean when the infrastructure of truth-gathering has collapsed?&quot;
+- intensity: 0.9
+- cliched_resolutions:
+  - &quot;A lone detective rebuilds justice single-handedly through sheer determination&quot;
+  - &quot;A hidden bunker contains preserved records that make the case trivially solvable&quot;
+  - &quot;The investigation reveals the apocalypse was caused by a conspiracy that can be &#x27;solved&#x27; like a normal case&quot;
+
+Given romance vs. horror:
+- assumption_a: &quot;Emotional connection between two people can redeem a broken world&quot;
+- assumption_b: &quot;The universe is fundamentally indifferent or hostile to human wellbeing&quot;
+- creative_question: &quot;Can love constitute a meaningful act of resistance against a cosmos that does not care?&quot;
+- intensity: 0.75
+- cliched_resolutions:
+  - &quot;Love literally defeats the monster or supernatural threat&quot;
+  - &quot;The power of their bond creates a magical protective barrier&quot;
+  - &quot;One character sacrifices themselves and is resurrected by love&quot;
+
+SINGLE-GENRE INPUTS:
+If all books fall into one genre cluster, identify internal tensions within that tradition —
+contradictions between the genre&#x27;s idealistic assumptions and its darker subgenre expressions,
+or between what the genre promises (e.g., justice restored) and what its best works actually
+deliver. Frame these as questions about the genre&#x27;s own limits.
+
+RESPONSE FORMAT:
+Return ONLY a JSON object. No preamble, no commentary, no markdown fences.
+
+{
+  &quot;genre_clusters&quot;: [
+    {
+      &quot;genre&quot;: &quot;&lt;snake_case genre name&gt;&quot;,
+      &quot;books&quot;: [&quot;&lt;title&gt;&quot;, ...],
+      &quot;thematic_assumptions&quot;: [&quot;&lt;assumption&gt;&quot;, ...],
+      &quot;dominant_tropes&quot;: [&quot;&lt;trope&gt;&quot;, ...]
+    }
+  ],
+  &quot;tensions&quot;: [
+    {
+      &quot;tension_id&quot;: &quot;T1&quot;,
+      &quot;cluster_a&quot;: &quot;&lt;genre&gt;&quot;,
+      &quot;assumption_a&quot;: &quot;&lt;assumption from cluster A&gt;&quot;,
+      &quot;cluster_b&quot;: &quot;&lt;genre&gt;&quot;,
+      &quot;assumption_b&quot;: &quot;&lt;opposing assumption from cluster B&gt;&quot;,
+      &quot;creative_question&quot;: &quot;&lt;the generative question&gt;&quot;,
+      &quot;intensity&quot;: &lt;0.0–1.0&gt;,
+      &quot;cliched_resolutions&quot;: [&quot;&lt;specific clichéd resolution&gt;&quot;, ...]
+    }
+  ],
+  &quot;narrative_seeds&quot;: [
+    {
+      &quot;seed_id&quot;: &quot;S1&quot;,
+      &quot;concept&quot;: &quot;&lt;2–3 sentence story kernel&gt;&quot;,
+      &quot;tensions_used&quot;: [&quot;T1&quot;, ...],
+      &quot;tonal_direction&quot;: [&quot;&lt;tone&gt;&quot;, ...],
+      &quot;narrative_context_used&quot;: [&quot;&lt;token&gt;&quot;, ...]
+    }
+  ]
+}
+</pre><h4>User Prompt</h4><pre>USER PROMPT: &quot;a romance book&quot;
+
+GENRES IDENTIFIED: [&#x27;romance&#x27;]
+SUBGENRES: []
+USER TONES: []
+NARRATIVE CONTEXT TOKENS: []
+
+RANKED BOOKS (title, authors, source_genres, rank):
+[{&quot;title&quot;:&quot;It Ends With Us&quot;,&quot;authors&quot;:[&quot;Colleen Hoover&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:1},{&quot;title&quot;:&quot;Um casamento arranjado&quot;,&quot;authors&quot;:[&quot;Zana Kheiron&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:2},{&quot;title&quot;:&quot;Pride and Prejudice&quot;,&quot;authors&quot;:[&quot;Jane Austen&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:3},{&quot;title&quot;:&quot;Guess How Much I Love You&quot;,&quot;authors&quot;:[&quot;Sam McBratney&quot;,&quot;Anita Jeram&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:4},{&quot;title&quot;:&quot;Le Comte de Monte Cristo&quot;,&quot;authors&quot;:[&quot;Alexandre Dumas&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:5},{&quot;title&quot;:&quot;Dork Diaries 7&quot;,&quot;authors&quot;:[&quot;Rachel Renée Russell&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:6},{&quot;title&quot;:&quot;The Selection (The Selection #1)&quot;,&quot;authors&quot;:[&quot;Kiera Cass&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:7},{&quot;title&quot;:&quot;Moby Dick&quot;,&quot;authors&quot;:[&quot;Herman Melville&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:8},{&quot;title&quot;:&quot;House of Hades&quot;,&quot;authors&quot;:[&quot;Rick Riordan&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:9},{&quot;title&quot;:&quot;A Midsummer Night&#x27;s Dream&quot;,&quot;authors&quot;:[&quot;William Shakespeare&quot;],&quot;source_genres&quot;:[&quot;romance&quot;],&quot;rank&quot;:10}]
+
+Generate a ThemePack with up to 5 narrative seeds.
+Follow the method in the system prompt exactly. Return only the JSON object.
+</pre><h4>Response</h4><pre>{
+  &quot;genre_clusters&quot;: [
+    {
+      &quot;genre&quot;: &quot;contemporary_romance&quot;,
+      &quot;books&quot;: [&quot;It Ends With Us&quot;, &quot;Um casamento arranjado&quot;],
+      &quot;thematic_assumptions&quot;: [
+        &quot;Love is the most transformative force in a person&#x27;s life, capable of reshaping identity and circumstance&quot;,
+        &quot;Authentic emotional connection requires confronting and overcoming personal trauma or social constraint&quot;,
+        &quot;A good ending means the protagonist chooses herself — love that diminishes the self is not true love&quot;,
+        &quot;Vulnerability between two people is the primary site of moral and emotional growth&quot;
+      ],
+      &quot;dominant_tropes&quot;: [
+        &quot;The arranged or socially pressured relationship that becomes genuine&quot;,
+        &quot;The protagonist torn between safety and passion, or between two versions of herself&quot;,
+        &quot;Love as a mirror that forces self-reckoning&quot;,
+        &quot;The difficult ending that rejects fairy-tale resolution in favor of hard-won self-respect&quot;
+      ]
+    },
+    {
+      &quot;genre&quot;: &quot;classic_literary_romance&quot;,
+      &quot;books&quot;: [&quot;Pride and Prejudice&quot;, &quot;Le Comte de Monte Cristo&quot;, &quot;Moby Dick&quot;, &quot;A Midsummer Night&#x27;s Dream&quot;],
+      &quot;thematic_assumptions&quot;: [
+        &quot;Society&#x27;s structures — class, reputation, law, fate — are real forces that love must negotiate, not simply overcome&quot;,
+        &quot;Self-knowledge is achieved through ordeal, misreading, or obsession, not through direct introspection&quot;,
+        &quot;Justice and romantic fulfillment are intertwined: the world must be set right for love to be possible&quot;,
+        &quot;Desire can be irrational, destructive, or cosmically comic — and this is as true as its redemptive power&quot;
+      ],
+      &quot;dominant_tropes&quot;: [
+        &quot;The misunderstanding or false first impression that must be laboriously corrected&quot;,
+        &quot;The obsessive quest that consumes or destroys the quester&quot;,
+        &quot;Magical or social interference that scrambles desire and identity&quot;,
+        &quot;The long separation and return as proof of love&#x27;s durability&quot;
+      ]
+    },
+    {
+      &quot;genre&quot;: &quot;young_adult_romance&quot;,
+      &quot;books&quot;: [&quot;Dork Diaries 7&quot;, &quot;The Selection (The Selection #1)&quot;, &quot;House of Hades&quot;, &quot;Guess How Much I Love You&quot;],
+      &quot;thematic_assumptions&quot;: [
+        &quot;Love is discovered through identity formation — you must become yourself before you can truly love another&quot;,
+        &quot;The world&#x27;s unfairness (social hierarchies, competitions, impossible odds) can be transcended by the right partnership&quot;,
+        &quot;Emotional bonds are proven through loyalty under external threat, not through internal psychological work&quot;,
+        &quot;A good ending preserves both the relationship and the protagonist&#x27;s sense of self and belonging&quot;
+      ],
+      &quot;dominant_tropes&quot;: [
+        &quot;The competition or selection process that doubles as a romantic crucible&quot;,
+        &quot;The loyal partner who fights alongside the protagonist against an external antagonist&quot;,
+        &quot;The awkward self-doubting protagonist who is secretly extraordinary&quot;,
+        &quot;Declarations of love measured against sacrifice or physical danger&quot;
+      ]
+    }
+  ],
+  &quot;tensions&quot;: [
+    {
+      &quot;tension_id&quot;: &quot;T1&quot;,
+      &quot;cluster_a&quot;: &quot;contemporary_romance&quot;,
+      &quot;assumption_a&quot;: &quot;A good ending means the protagonist chooses herself — love that diminishes the self is not true love&quot;,
+      &quot;cluster_b&quot;: &quot;classic_literary_romance&quot;,
+      &quot;assumption_b&quot;: &quot;Justice and romantic fulfillment are intertwined: the world must be set right for love to be possible&quot;,
+      &quot;creative_question&quot;: &quot;What happens when setting the world right requires a protagonist to subsume herself into a larger cause — can self-sacrifice and self-determination coexist as the condition of love?&quot;,
+      &quot;intensity&quot;: 0.78,
+      &quot;cliched_resolutions&quot;: [
+        &quot;The protagonist sacrifices herself for justice but is rewarded with love anyway, as if the universe is compensating her&quot;,
+        &quot;She chooses herself and the social injustice conveniently resolves in the background without her involvement&quot;,
+        &quot;A male love interest fixes the systemic problem so she never has to choose between self and world&quot;,
+        &quot;The ending reframes her self-erasure as empowerment through a single defiant speech&quot;
+      ]
+    },
+    {
+      &quot;tension_id&quot;: &quot;T2&quot;,
+      &quot;cluster_a&quot;: &quot;contemporary_romance&quot;,
+      &quot;assumption_a&quot;: &quot;Vulnerability between two people is the primary site of moral and emotional growth&quot;,
+      &quot;cluster_b&quot;: &quot;classic_literary_romance&quot;,
+      &quot;assumption_b&quot;: &quot;Desire can be irrational, destructive, or cosmically comic — and this is as true as its redemptive power&quot;,
+      &quot;creative_question&quot;: &quot;If desire is fundamentally irrational and potentially ruinous, can the therapeutic model of vulnerability and mutual growth survive contact with love&#x27;s darker, ungovernable energies?&quot;,
+      &quot;intensity&quot;: 0.72,
+      &quot;cliched_resolutions&quot;: [
+        &quot;The irrational obsessive love interest is &#x27;healed&#x27; through the protagonist&#x27;s patient emotional labor&quot;,
+        &quot;Destructive desire is revealed to be a symptom of childhood trauma, which therapy resolves by the final chapter&quot;,
+        &quot;The story treats the dark desire as a villain-coded rival relationship while the healthy vulnerability wins by default&quot;,
+        &quot;A dramatic crisis forces the obsessive character to choose growth, which he does instantly and completely&quot;
+      ]
+    },
+    {
+      &quot;tension_id&quot;: &quot;T3&quot;,
+      &quot;cluster_a&quot;: &quot;young_adult_romance&quot;,
+      &quot;assumption_a&quot;: &quot;The world&#x27;s unfairness can be transcended by the right partnership&quot;,
+      &quot;cluster_b&quot;: &quot;classic_literary_romance&quot;,
+      &quot;assumption_b&quot;: &quot;Society&#x27;s structures — class, reputation, law, fate — are real forces that love must negotiate, not simply overcome&quot;,
+      &quot;creative_question&quot;: &quot;When structural inequality is not a backdrop to be escaped but a living system that reshapes the lovers from within, what does &#x27;transcendence&#x27; actually look like — and is it honest?&quot;,
+      &quot;intensity&quot;: 0.85,
+      &quot;cliched_resolutions&quot;: [
+        &quot;The couple&#x27;s love inspires a revolution that dismantles the unjust system entirely by the epilogue&quot;,
+        &quot;A secret royal lineage or hidden status is revealed, making the class barrier retroactively illegitimate&quot;,
+        &quot;The lovers simply flee to a frontier or exile where the old rules don&#x27;t apply&quot;,
+        &quot;The antagonist enforcing the social structure has a change of heart after witnessing the couple&#x27;s devotion&quot;
+      ]
+    },
+    {
+      &quot;tension_id&quot;: &quot;T4&quot;,
+      &quot;cluster_a&quot;: &quot;young_adult_romance&quot;,
+      &quot;assumption_a&quot;: &quot;Emotional bonds are proven through loyalty under external threat, not through internal psychological work&quot;,
+      &quot;cluster_b&quot;: &quot;contemporary_romance&quot;,
+      &quot;assumption_b&quot;: &quot;Authentic emotional connection requires confronting and overcoming personal trauma or social constraint&quot;,
+      &quot;creative_question&quot;: &quot;Can a love forged entirely in the crucible of external danger be trusted when the danger ends — and what does a relationship look like when the monster is inside rather than outside?&quot;,
+      &quot;intensity&quot;: 0.68,
+      &quot;cliched_resolutions&quot;: [
+        &quot;The couple faces one final external threat after the main conflict, which re-proves their bond and closes the story before internal reckoning is needed&quot;,
+        &quot;The internal trauma is revealed in a single backstory monologue and immediately accepted by the partner, resolving it without consequence&quot;,
+        &quot;The external adventure is reframed as a metaphor for internal healing, collapsing the distinction entirely&quot;,
+        &quot;A time-skip epilogue shows them &#x27;happy&#x27; without dramatizing how they navigated the psychological aftermath&quot;
+      ]
+    },
+    {
+      &quot;tension_id&quot;: &quot;T5&quot;,
+      &quot;cluster_a&quot;: &quot;classic_literary_romance&quot;,
+      &quot;assumption_a&quot;: &quot;Self-knowledge is achieved through ordeal, misreading, or obsession — not through direct introspection&quot;,
+      &quot;cluster_b&quot;: &quot;young_adult_romance&quot;,
+      &quot;assumption_b&quot;: &quot;Love is discovered through identity formation — you must become yourself before you can truly love another&quot;,
+      &quot;creative_question&quot;: &quot;What if the self that must be formed before love is possible is only legible through the distortions of misreading and obsession — what if becoming yourself requires first being catastrophically wrong about yourself?&quot;,
+      &quot;intensity&quot;: 0.6,
+      &quot;cliched_resolutions&quot;: [
+        &quot;A wise mentor character explains the protagonist&#x27;s true self to her, bypassing both ordeal and genuine self-discovery&quot;,
+        &quot;The protagonist&#x27;s identity crisis is resolved by the love interest simply telling her she&#x27;s wonderful&quot;,
+        &quot;A makeover or achievement montage stands in for the internal process of self-formation&quot;,
+        &quot;The misreading is treated as a cute quirk rather than a structurally necessary error, corrected with minimal consequence&quot;
+      ]
+    }
+  ],
+  &quot;narrative_seeds&quot;: [
+    {
+      &quot;seed_id&quot;: &quot;S1&quot;,
+      &quot;concept&quot;: &quot;A woman who built her entire sense of self around surviving an abusive marriage finally escapes — only to find herself appointed, against her will, as the public face of a landmark domestic violence legal case that could change the law but will consume the private healing she has just begun. The case demands she perform her trauma for institutional justice while every therapist, ally, and well-meaning friend insists that speaking out is the same as getting better. She must decide whether the world being set right and her own self being set right are the same project — or whether they are, at this moment in her life, incompatible.&quot;,
+      &quot;tensions_used&quot;: [&quot;T1&quot;, &quot;T2&quot;],
+      &quot;tonal_direction&quot;: [&quot;unflinching&quot;, &quot;psychologically interior&quot;, &quot;morally unresolved&quot;],
+      &quot;narrative_context_used&quot;: []
+    },
+    {
+      &quot;seed_id&quot;: &quot;S2&quot;,
+      &quot;concept&quot;: &quot;In a rigidly stratified city-state where marriage determines guild membership and therefore survival, two apprentices from enemy guilds are paired in a state-mandated &#x27;compatibility trial&#x27; designed to fail — a bureaucratic tool for consolidating power, not making matches. As they discover genuine feeling, they also discover that the system has anticipated and weaponized exactly this outcome: their love is the trap, not the escape. The story refuses the revolution and the secret lineage; instead it asks what two people owe each other when the honest answer to &#x27;can we be together&#x27; is &#x27;not without cost to everyone around us.&#x27;&quot;,
+      &quot;tensions_used&quot;: [&quot;T3&quot;, &quot;T1&quot;],
+      &quot;tonal_direction&quot;: [&quot;structurally bleak&quot;, &quot;intimate&quot;, &quot;politically grounded&quot;],
+      &quot;narrative_context_used&quot;: []
+    },
+    {
+      &quot;seed_id&quot;: &quot;S3&quot;,
+      &quot;concept&quot;: &quot;Two soldiers who fell in love during an impossible campaign return home to find that the version of each other they bonded with — forged under fire, stripped of ordinary personality — no longer exists in peacetime. The loyalty they proved a hundred times over has no grammar for the quieter, stranger, more embarrassing people they actually are. The novel is a love story about two people who must grieve the selves they were in order to meet the selves they have become, uncertain whether those new selves will want each other.&quot;,
+      &quot;tensions_used&quot;: [&quot;T4&quot;, &quot;T5&quot;],
+      &quot;tonal_direction&quot;: [&quot;elegiac&quot;, &quot;unsentimental&quot;, &quot;quietly devastating&quot;],
+      &quot;narrative_context_used&quot;: []
+    },
+    {
+      &quot;seed_id&quot;: &quot;S4&quot;,
+      &quot;concept&quot;: &quot;A woman who has spent a decade methodically misreading every relationship — constructing elaborate, wrong theories about what people want and who she is to them — meets someone who is also, for entirely different reasons, catastrophically wrong about himself. Neither of them is in a position to offer the other clarity. The novel tracks their circling approach to each other not as a comedy of errors to be resolved but as a genuine epistemological problem: what does it mean to love someone when your instrument for knowing people is demonstrably broken, and so is theirs?&quot;,
+      &quot;tensions_used&quot;: [&quot;T5&quot;, &quot;T2&quot;],
+      &quot;tonal_direction&quot;: [&quot;wry&quot;, &quot;philosophically restless&quot;, &quot;tender&quot;],
+      &quot;narrative_context_used&quot;: []
+    },
+    {
+      &quot;seed_id&quot;: &quot;S5&quot;,
+      &quot;concept&quot;: &quot;A young woman enters a prestigious arranged-marriage selection process fully intending to game it — she has studied the system, mapped the power dynamics, and planned her exit. What she has not planned for is that the process itself, with its ordeals and humiliations and forced intimacies, begins to dismantle the carefully constructed self she brought into it. By the time she understands what she actually wants, she can no longer tell whether that desire is hers or whether the institution manufactured it — and the person she wants is asking her the same question about himself.&quot;,
+      &quot;tensions_used&quot;: [&quot;T3&quot;, &quot;T5&quot;, &quot;T4&quot;],
+      &quot;tonal_direction&quot;: [&quot;sharp&quot;, &quot;self-aware&quot;, &quot;emotionally destabilizing&quot;],
+      &quot;narrative_context_used&quot;: []
+    }
+  ]
+}</pre></details>
+  </section>
+</body>
+</html>

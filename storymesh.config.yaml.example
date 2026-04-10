@@ -52,6 +52,13 @@ agents:
     temperature: 1.0
     max_tokens: 4096
 
+  # To use OpenAI for any agent, set provider and model:
+  # proposal_draft:
+  #   provider: openai
+  #   model: gpt-4o
+  #   temperature: 0.7
+  #   max_tokens: 2048
+
 # ------
 # External API Clients
 # ------

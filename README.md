@@ -313,4 +313,5 @@ Useful files:
 - Implement `ProposalDraftAgent` to select and develop the best narrative seed into a full proposal
 - Activate rubric-based retry logic with real pass/fail signal
 - Implement final synopsis synthesis
-- Expand provider support beyond the current Anthropic implementation
+- ~~Expand provider support beyond the current Anthropic implementation~~
+- OpenAI (`gpt-4o-mini` default) now supported; configure via `provider: openai` in `storymesh.config.yaml`
