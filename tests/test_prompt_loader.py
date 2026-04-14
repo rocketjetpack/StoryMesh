@@ -202,3 +202,91 @@ class TestLoadGenreNormalizerPrompt:
         assert "science_fiction" in result
         assert "gritty" in result
         assert "about a rebellion in 2085" in result
+
+
+# ---------------------------------------------------------------------------
+# Integration: load the real proposal_draft_generate.yaml
+# ---------------------------------------------------------------------------
+
+
+class TestProposalDraftGeneratePrompt:
+    def test_load_prompt_succeeds(self) -> None:
+        """Verify proposal_draft_generate.yaml loads without error."""
+        pt = load_prompt("proposal_draft_generate")
+        assert pt is not None
+
+    def test_system_prompt_non_empty(self) -> None:
+        pt = load_prompt("proposal_draft_generate")
+        assert pt.system.strip() != ""
+
+    def test_user_template_has_required_placeholders(self) -> None:
+        pt = load_prompt("proposal_draft_generate")
+        required = {
+            "candidate_index",
+            "total_candidates",
+            "alternate_angle_note",
+            "user_prompt",
+            "normalized_genres",
+            "user_tones",
+            "narrative_context",
+            "assigned_seed",
+            "additional_seeds",
+            "tensions",
+            "genre_clusters",
+        }
+        for placeholder in required:
+            assert f"{{{placeholder}}}" in pt._user_template, (
+                f"Missing placeholder: {{{placeholder}}}"
+            )
+
+    def test_format_user_with_valid_data(self) -> None:
+        pt = load_prompt("proposal_draft_generate")
+        result = pt.format_user(
+            candidate_index=1,
+            total_candidates=3,
+            alternate_angle_note="",
+            user_prompt="dark post-apocalyptic mystery",
+            normalized_genres=["mystery", "post_apocalyptic"],
+            user_tones=["dark"],
+            narrative_context=["flooded city"],
+            assigned_seed='{"seed_id": "S1", "concept": "A detective..."}',
+            additional_seeds="[]",
+            tensions="[]",
+            genre_clusters="[]",
+        )
+        assert "dark post-apocalyptic mystery" in result
+        assert "candidate 1 of 3" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# Integration: load the real proposal_draft_select.yaml
+# ---------------------------------------------------------------------------
+
+
+class TestProposalDraftSelectPrompt:
+    def test_load_prompt_succeeds(self) -> None:
+        """Verify proposal_draft_select.yaml loads without error."""
+        pt = load_prompt("proposal_draft_select")
+        assert pt is not None
+
+    def test_system_prompt_non_empty(self) -> None:
+        pt = load_prompt("proposal_draft_select")
+        assert pt.system.strip() != ""
+
+    def test_user_template_has_required_placeholders(self) -> None:
+        pt = load_prompt("proposal_draft_select")
+        required = {"user_prompt", "user_tones", "tensions", "candidates"}
+        for placeholder in required:
+            assert f"{{{placeholder}}}" in pt._user_template, (
+                f"Missing placeholder: {{{placeholder}}}"
+            )
+
+    def test_format_user_with_valid_data(self) -> None:
+        pt = load_prompt("proposal_draft_select")
+        result = pt.format_user(
+            user_prompt="dark post-apocalyptic mystery",
+            user_tones=["dark"],
+            tensions="[]",
+            candidates="[]",
+        )
+        assert "dark post-apocalyptic mystery" in result

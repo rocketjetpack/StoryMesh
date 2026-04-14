@@ -1,8 +1,8 @@
 # StoryMesh
 
-StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, a deterministic book ranking stage with optional LLM re-ranking and MMR diversity selection, a creative theme extraction stage, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
+StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, a deterministic book ranking stage with optional LLM re-ranking and MMR diversity selection, a creative theme extraction stage, a multi-sample proposal drafting stage, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
 
-The later creative stages (proposal drafting, rubric judging, synopsis writing) are scaffolded but not implemented yet. Today, a full `generate` run executes stages 0–3, persists artifacts, and returns a placeholder synopsis while stages 4–6 remain stubs.
+The final creative stages (rubric judging, synopsis writing) are scaffolded but not implemented yet. Today, a full `generate` run executes stages 0–4, persists artifacts, and returns a placeholder synopsis while stages 5–6 remain stubs.
 
 ## Current Status
 
@@ -14,14 +14,14 @@ Implemented:
 - `BookFetcherAgent` backed by the Open Library Search API with disk cache, deduplication, and configurable `max_books` cap
 - `BookRankerAgent` with deterministic weighted composite scoring (genre overlap, reader engagement, rating quality, rating volume), optional LLM re-ranking by narrative potential, and MMR diversity selection to ensure the shortlist covers the thematic space
 - `ThemeExtractorAgent` — the creative engine of the pipeline. Identifies the thematic assumptions each genre tradition takes for granted, finds contradictions between traditions, frames them as creative questions, and generates concrete narrative seeds for the downstream proposal stage
+- `ProposalDraftAgent` with multi-sample seed-steering and self-selection for creative proposal generation. Generates N candidate proposals from different narrative seeds at elevated temperature, then uses a low-temperature critic call to select the strongest one
 - LLM provider registry for extensible provider support
 - Rubric retry loop topology (conditional edge wired; noop placeholder always passes)
 - Rich-formatted CLI output with per-stage timing and artifact paths
-- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, book ranking, genre normalization, theme extraction, LLM registry, and artifacts
+- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, book ranking, genre normalization, theme extraction, proposal drafting, LLM registry, and artifacts
 
 Not implemented yet:
 
-- `ProposalDraftAgent`
 - `RubricJudgeAgent`
 - `SynopsisWriterAgent`
 
@@ -31,8 +31,9 @@ Current runtime behavior:
 2. Fetch matching books from Open Library.
 3. Rank books by composite score with MMR diversity selection (deterministic; optionally refined by LLM).
 4. Extract thematic tensions, genre clusters, and narrative seeds (LLM — requires API key).
-5. Pass through placeholder nodes for stages 4 to 6.
-6. Return a `GenerationResult` with a placeholder `final_synopsis`.
+5. Generate N candidate story proposals from different seeds, then select the strongest via a critic call (LLM — requires API key).
+6. Pass through placeholder nodes for stages 5 to 6.
+7. Return a `GenerationResult` with a placeholder `final_synopsis`.
 
 ## Architecture
 
@@ -51,7 +52,7 @@ START
       └── FAIL → proposal_draft (max 2 retries)
 ```
 
-Stages 0, 1, and 2 currently perform real work. Stages 3 to 6 are registered as no-op placeholders. The rubric retry loop is wired via a conditional edge; the noop rubric judge always passes so the pipeline runs linearly until the real agent is implemented.
+Stages 0–4 currently perform real work. Stages 5–6 are registered as no-op placeholders. The rubric retry loop is wired via a conditional edge; the noop rubric judge always passes so the pipeline runs linearly until the real agent is implemented.
 
 ### Stage 0: GenreNormalizerAgent
 
@@ -116,11 +117,26 @@ Output (the ThemePack) contains:
 
 Uses `claude-sonnet-4-6` at temperature 0.6 — more capable than classification agents, with enough creative latitude to produce novel tensions while still generating valid structured JSON.
 
-### Stages 4 to 6
+### Stage 4: ProposalDraftAgent
+
+Status: implemented
+
+Develops narrative seeds into fully realised story proposals using a **multi-sample with self-selection** architecture:
+
+1. **Generate N candidates** (default 3) — each candidate is assigned a different narrative seed and calls the LLM independently at elevated temperature (1.2). Each call is fully stateless; divergence is enforced at the prompt level via seed-steering, candidate indexing, and an anti-overlap instruction
+2. **Select the strongest** — a separate low-temperature (0.2) critic call evaluates all valid candidates against the thematic tensions, checking for cliché violations, thematic depth, specificity, tonal coherence, and internal conflict mirroring
+
+Output contains the selected `StoryProposal`, all candidate proposals (for artifact inspection), a `SelectionRationale` with the critic's reasoning, and a debug dict with per-run metadata (temperatures, seed assignments, call counts).
+
+If all candidate calls fail to parse, a `RuntimeError` is raised so the pipeline handles it gracefully. If only one candidate survives, it is selected without a critic call. If the critic call fails, candidate 0 is selected as a fallback.
+
+Uses `claude-sonnet-4-6` for both drafting (temperature 1.2) and selection (temperature 0.2).
+
+### Stages 5 to 6
 
 Status: scaffolded only
 
-The state fields, graph nodes, and versioning hooks exist, but the runtime logic for proposal drafting, rubric evaluation, and synopsis synthesis has not been implemented yet.
+The state fields, graph nodes, and versioning hooks exist, but the runtime logic for rubric evaluation and synopsis synthesis has not been implemented yet.
 
 ## Requirements
 
@@ -213,8 +229,8 @@ Example output:
  genre_normalizer        ✓ done    0.03s    ~/.storymesh/runs/abc.../genre_normalizer_output.json
  book_fetcher            ✓ done    1.24s    ~/.storymesh/runs/abc.../book_fetcher_output.json
  book_ranker             ✓ done    0.01s    ~/.storymesh/runs/abc.../book_ranker_output.json
- theme_extractor         ○ noop    0.00s    —
- proposal_draft          ○ noop    0.00s    —
+ theme_extractor         ✓ done    3.21s    ~/.storymesh/runs/abc.../theme_extractor_output.json
+ proposal_draft          ✓ done    8.74s    ~/.storymesh/runs/abc.../proposal_draft_output.json
  rubric_judge            ○ noop    0.00s    —
  synopsis_writer         ○ noop    0.00s    —
  ────────────────────────────────────────────────────────────────────────
@@ -304,13 +320,14 @@ Useful files:
 
 ## Known Gaps
 
-- The graph includes placeholder nodes for stages 4 to 6; the final synopsis is a placeholder until `SynopsisWriterAgent` is implemented.
+- The graph includes placeholder nodes for stages 5 to 6; the final synopsis is a placeholder until `SynopsisWriterAgent` is implemented.
 - The rubric retry loop topology is wired but the routing function always passes (noop placeholder).
-- `ThemeExtractorAgent` requires a configured API key; without one, stage 3 runs as a noop and the ThemePack is not produced.
+- `ThemeExtractorAgent` and `ProposalDraftAgent` both require a configured API key; without one, those stages run as noops.
+- `ProposalDraftAgent` relies on `ThemeExtractorAgentOutput` being present; if Stage 3 runs as a noop, Stage 4 also runs as a noop.
 
 ## Roadmap
 
-- Implement `ProposalDraftAgent` to select and develop the best narrative seed into a full proposal
+- ~~Implement `ProposalDraftAgent` to select and develop the best narrative seed into a full proposal~~
 - Activate rubric-based retry logic with real pass/fail signal
 - Implement final synopsis synthesis
 - ~~Expand provider support beyond the current Anthropic implementation~~

@@ -50,8 +50,11 @@ agents:
   proposal_draft:
     provider: anthropic
     model: claude-sonnet-4-6
-    temperature: 1.0
+    temperature: 1.2
     max_tokens: 4096
+    num_candidates: 3
+    selection_temperature: 0.2
+    selection_max_tokens: 2048
 
   # To use OpenAI for any agent, set provider and model:
   # proposal_draft:

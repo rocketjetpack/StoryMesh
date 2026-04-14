@@ -21,16 +21,24 @@ import pytest
 from storymesh.agents.book_ranker.agent import BookRankerAgent
 from storymesh.agents.genre_normalizer.agent import GenreNormalizerAgent
 from storymesh.agents.genre_normalizer.loader import MappingStore
+from storymesh.agents.proposal_draft.agent import ProposalDraftAgent
 from storymesh.agents.theme_extractor.agent import ThemeExtractorAgent
 from storymesh.llm.base import FakeLLMClient
 from storymesh.orchestration.nodes.book_ranker import make_book_ranker_node
 from storymesh.orchestration.nodes.genre_normalizer import make_genre_normalizer_node
+from storymesh.orchestration.nodes.proposal_draft import make_proposal_draft_node
 from storymesh.orchestration.nodes.theme_extractor import make_theme_extractor_node
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.book_fetcher import BookFetcherAgentOutput, BookRecord
 from storymesh.schemas.book_ranker import BookRankerAgentOutput, RankedBookSummary
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
-from storymesh.schemas.theme_extractor import ThemeExtractorAgentOutput
+from storymesh.schemas.proposal_draft import ProposalDraftAgentOutput
+from storymesh.schemas.theme_extractor import (
+    GenreCluster,
+    NarrativeSeed,
+    ThematicTension,
+    ThemeExtractorAgentOutput,
+)
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -584,3 +592,172 @@ class TestGenreNormalizerRoute:
         result = node(state)
 
         assert set(result.keys()) == {"genre_normalizer_output", "errors"}
+
+
+# ── TestProposalDraftNode ──────────────────────────────────────────────────────
+
+
+_PROPOSAL_PLOT_ARC = (
+    "Act 1: Mara Voss finds a body arranged with deliberate symbolism in the flooded "
+    "district. Act 2: She must rebuild the infrastructure of investigation from scratch. "
+    "Act 3: She convenes a community tribunal that delivers a verdict she must enforce alone."
+)
+
+
+def _make_theme_extractor_output_for_proposal() -> ThemeExtractorAgentOutput:
+    cluster = GenreCluster(
+        genre="mystery",
+        books=["The Big Sleep"],
+        thematic_assumptions=["Truth is recoverable through investigation"],
+    )
+    tension = ThematicTension(
+        tension_id="T1",
+        cluster_a="mystery",
+        assumption_a="Truth is recoverable",
+        cluster_b="post_apocalyptic",
+        assumption_b="Records and institutions no longer exist",
+        creative_question="What does investigation mean without infrastructure?",
+        intensity=0.9,
+        cliched_resolutions=["A lone detective rebuilds justice through sheer determination"],
+    )
+    seed = NarrativeSeed(
+        seed_id="S1",
+        concept="A scavenger detective reinvents investigation in a collapsed city.",
+        tensions_used=["T1"],
+    )
+    return ThemeExtractorAgentOutput(
+        genre_clusters=[cluster],
+        tensions=[tension],
+        narrative_seeds=[seed],
+        user_tones_carried=["dark"],
+    )
+
+
+def _valid_proposal_json_for_node() -> str:
+    return json.dumps({
+        "seed_id": "S1",
+        "title": "The Last Inquest",
+        "protagonist": (
+            "Mara Voss — former homicide detective whose faith in due process "
+            "survived the collapse even as the process itself did not."
+        ),
+        "setting": (
+            "A flooded mid-21st-century city-state where municipal records "
+            "were lost in the first year of collapse."
+        ),
+        "plot_arc": _PROPOSAL_PLOT_ARC,
+        "thematic_thesis": (
+            "Justice does not require institutions to be meaningful, "
+            "but meaning without institutions cannot produce justice."
+        ),
+        "key_scenes": [
+            "Mara finds the arranged body and recognises the signature.",
+            "She convenes a community tribunal with no legal authority.",
+        ],
+        "tensions_addressed": ["T1"],
+        "tone": ["dark"],
+        "genre_blend": ["mystery", "post_apocalyptic"],
+    })
+
+
+def _make_proposal_agent(num_candidates: int = 1) -> ProposalDraftAgent:
+    """Build a ProposalDraftAgent with enough fake responses to complete a run."""
+    proposals = [_valid_proposal_json_for_node() for _ in range(num_candidates)]
+    rationale = json.dumps({
+        "selected_index": 0,
+        "rationale": "Only one valid candidate; selected by default.",
+        "cliche_violations": {},
+        "runner_up_index": None,
+    })
+    client = FakeLLMClient(responses=proposals + ([rationale] if num_candidates > 1 else []))
+    return ProposalDraftAgent(
+        llm_client=client,
+        num_candidates=num_candidates,
+    )
+
+
+class TestProposalDraftNode:
+    """Tests for the make_proposal_draft_node factory and resulting node function."""
+
+    def _base_state(self) -> StoryMeshState:
+        return {
+            "user_prompt": "dark post-apocalyptic mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "genre_normalizer_output": _make_genre_normalizer_output(),
+            "theme_extractor_output": _make_theme_extractor_output_for_proposal(),
+        }
+
+    def test_returns_proposal_draft_output_type(self) -> None:
+        """The node must return a ProposalDraftAgentOutput under the correct key."""
+        node = make_proposal_draft_node(_make_proposal_agent())
+        result = node(self._base_state())
+        assert "proposal_draft_output" in result
+        assert isinstance(result["proposal_draft_output"], ProposalDraftAgentOutput)
+
+    def test_only_returns_own_key(self) -> None:
+        """The node must return a partial state dict with exactly one key."""
+        node = make_proposal_draft_node(_make_proposal_agent())
+        result = node(self._base_state())
+        assert set(result.keys()) == {"proposal_draft_output"}
+
+    def test_missing_theme_extractor_output_raises(self) -> None:
+        """RuntimeError when theme_extractor_output is None."""
+        node = make_proposal_draft_node(_make_proposal_agent())
+        state = self._base_state()
+        state["theme_extractor_output"] = None
+        with pytest.raises(RuntimeError, match="theme_extractor_output.*None"):
+            node(state)  # type: ignore[arg-type]
+
+    def test_missing_genre_normalizer_output_raises(self) -> None:
+        """RuntimeError when genre_normalizer_output is None."""
+        node = make_proposal_draft_node(_make_proposal_agent())
+        state = self._base_state()
+        state["genre_normalizer_output"] = None
+        with pytest.raises(RuntimeError, match="genre_normalizer_output.*None"):
+            node(state)  # type: ignore[arg-type]
+
+    def test_assembles_input_from_multiple_stages(self) -> None:
+        """Input must carry narrative_seeds from theme_extractor and narrative_context
+        from genre_normalizer."""
+        captured_inputs: list[object] = []
+
+        class _RecordingAgent(ProposalDraftAgent):
+            def run(self, input_data: object) -> ProposalDraftAgentOutput:  # type: ignore[override]
+                captured_inputs.append(input_data)
+                return super().run(input_data)  # type: ignore[arg-type]
+
+        client = FakeLLMClient(responses=[_valid_proposal_json_for_node()])
+        agent = _RecordingAgent(llm_client=client, num_candidates=1)
+        node = make_proposal_draft_node(agent)
+        node(self._base_state())
+
+        assert len(captured_inputs) == 1
+        inp = captured_inputs[0]
+        assert hasattr(inp, "narrative_seeds")
+        assert hasattr(inp, "narrative_context")
+        assert hasattr(inp, "user_tones")
+
+    def test_output_key_is_proposal_draft_output(self) -> None:
+        """The returned dict key must be exactly 'proposal_draft_output'."""
+        node = make_proposal_draft_node(_make_proposal_agent())
+        result = node(self._base_state())
+        assert "proposal_draft_output" in result
+
+    def test_current_run_id_set_during_execution(self) -> None:
+        """ContextVar current_run_id must be set to state['run_id'] during agent.run()."""
+        from storymesh.llm.base import current_run_id as _crid
+
+        observed_run_ids: list[str] = []
+
+        class _ObservingAgent(ProposalDraftAgent):
+            def run(self, input_data: object) -> ProposalDraftAgentOutput:  # type: ignore[override]
+                observed_run_ids.append(_crid.get())
+                return super().run(input_data)  # type: ignore[arg-type]
+
+        client = FakeLLMClient(responses=[_valid_proposal_json_for_node()])
+        agent = _ObservingAgent(llm_client=client, num_candidates=1)
+        node = make_proposal_draft_node(agent)
+        node(self._base_state())
+
+        assert observed_run_ids == ["abc123"]

@@ -34,7 +34,6 @@ from storymesh.orchestration.state import StoryMeshState
 logger = logging.getLogger(__name__)
 
 # Future node imports (uncomment as agents are implemented):
-# from storymesh.orchestration.nodes.proposal_draft import make_proposal_draft_node
 # from storymesh.orchestration.nodes.rubric_judge import make_rubric_judge_node
 # from storymesh.orchestration.nodes.synopsis_writer import make_synopsis_writer_node
 
@@ -206,7 +205,7 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
               └── FAIL → proposal_draft (max 2 retries)
 
     Notes:
-    - Stages 3–6 are noop placeholders until their agents are implemented.
+    - Stages 5–6 are noop placeholders until their agents are implemented.
     - The rubric retry loop is wired via ``_rubric_route``; the noop always
       passes so the pipeline progresses linearly until real agents are added.
     - Checkpointer: pass ``checkpointer=MemorySaver()`` to ``compile()``
@@ -293,6 +292,35 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
             theme_agent, artifact_store=artifact_store
         )
 
+    # ── Stage 4: ProposalDraftAgent ───────────────────────────────────────
+    from storymesh.agents.proposal_draft.agent import ProposalDraftAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.proposal_draft import (  # noqa: PLC0415
+        make_proposal_draft_node,
+    )
+
+    proposal_cfg = get_agent_config("proposal_draft")
+    proposal_llm = _build_llm_client(
+        proposal_cfg, agent_name="proposal_draft", artifact_store=artifact_store
+    )
+
+    if proposal_llm is None:
+        logger.warning(
+            "ProposalDraftAgent: no LLM client available — stage 4 will run as noop."
+        )
+        proposal_draft_node: Any = _noop_node
+    else:
+        proposal_agent = ProposalDraftAgent(
+            llm_client=proposal_llm,
+            temperature=proposal_cfg.get("temperature", 1.2),
+            max_tokens=proposal_cfg.get("max_tokens", 4096),
+            num_candidates=proposal_cfg.get("num_candidates", 3),
+            selection_temperature=proposal_cfg.get("selection_temperature", 0.2),
+            selection_max_tokens=proposal_cfg.get("selection_max_tokens", 2048),
+        )
+        proposal_draft_node = make_proposal_draft_node(
+            proposal_agent, artifact_store=artifact_store
+        )
+
     # ── Build the graph ────────────────────────────────────────────────────
     graph: Any = StateGraph(StoryMeshState)
 
@@ -300,7 +328,7 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     graph.add_node("book_fetcher", book_fetcher_node)
     graph.add_node("book_ranker", book_ranker_node)
     graph.add_node("theme_extractor", theme_extractor_node)
-    graph.add_node("proposal_draft", _noop_node)    # Stage 4 — placeholder (LLM)
+    graph.add_node("proposal_draft", proposal_draft_node)
     graph.add_node("rubric_judge", _noop_node)      # Stage 5 — placeholder (LLM, conditional)
     graph.add_node("synopsis_writer", _noop_node)   # Stage 6 — placeholder (LLM)
 

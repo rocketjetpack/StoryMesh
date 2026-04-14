@@ -1,7 +1,7 @@
 GENRE_CONSTRAINT_SCHEMA_VERSION = "3.1"
 BOOK_FETCHER_SCHEMA_VERSION = "1.2"
 BOOK_RANKER_SCHEMA_VERSION = "1.1"
-PROPOSAL_SCHEMA_VERSION = "1.0"
+PROPOSAL_SCHEMA_VERSION = "1.1"
 THEMEPACK_SCHEMA_VERSION = "1.1"
 
 SCHEMA_VERSIONS: dict[str, str] = {
@@ -44,3 +44,7 @@ SCHEMA_VERSIONS: dict[str, str] = {
 #             (source_genres Jaccard, diversity_weight param) with select_diverse()
 #             (Open Library subject-tag Jaccard, mmr_lambda + mmr_candidates params).
 #             Debug dict now nests MMR metadata under a "mmr" key.
+# 2026-04-14: Increment Proposal schema to 1.1. Introduced full schema:
+#             ProposalDraftAgentInput, StoryProposal, SelectionRationale,
+#             ProposalDraftAgentOutput. Multi-sample architecture with
+#             seed-steering and self-selection.

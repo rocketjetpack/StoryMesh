@@ -5,7 +5,7 @@ node in the graph. Each node receives the full state and returns a partial
 dict containing only the keys it updates — LangGraph merges these back in
 automatically.
 
-Fields for stages 3–6 are typed as ``object | None`` until those agents are
+Fields for stages 5–6 are typed as ``object | None`` until those agents are
 implemented and their schemas are added to storymesh.schemas. Tighten each
 field's type annotation as the corresponding schema is introduced.
 """
@@ -17,6 +17,7 @@ from typing import TypedDict
 from storymesh.schemas.book_fetcher import BookFetcherAgentOutput
 from storymesh.schemas.book_ranker import BookRankerAgentOutput
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
+from storymesh.schemas.proposal_draft import ProposalDraftAgentOutput
 from storymesh.schemas.theme_extractor import ThemeExtractorAgentOutput
 
 
@@ -52,8 +53,7 @@ class StoryMeshState(TypedDict, total=False):
     theme_extractor_output: ThemeExtractorAgentOutput | None
 
     # ── Stage 4: ProposalDraftAgent (LLM) ─────────────────────────────────
-    # TODO: Replace object with ProposalDraftOutput once implemented.
-    proposal_draft_output: object | None
+    proposal_draft_output: ProposalDraftAgentOutput | None
 
     # ── Stage 5: RubricJudgeAgent (LLM, conditional retry edge) ───────────
     # TODO: Replace object with RubricResult once implemented.
