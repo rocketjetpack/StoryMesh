@@ -147,7 +147,7 @@ Optional extras:
 
 - `storymesh[anthropic]`
 - `storymesh[openai]`
-- `storymesh[gemini]`
+- `storymesh[gemini]` *(dependency declared; LLM client not yet implemented)*
 - `storymesh[langsmith]`
 - `storymesh[dev]`
 - `storymesh[all-providers]`
@@ -220,7 +220,7 @@ Example output:
 
 ```
 ╭──────────────────────────────────────────────────────────────╮
-│ StoryMesh v0.6.0  Run abc123def456                           │
+│ StoryMesh v0.7.0  Run abc123def456                           │
 │ Input: "dark post-apocalyptic detective mystery"             │
 ╰──────────────────────────────────────────────────────────────╯
 
@@ -256,6 +256,24 @@ Inspect resolved config:
 storymesh show-config
 storymesh show-agent-config genre_normalizer
 storymesh show-agent-config proposal_draft
+```
+
+Inspect a past run stage-by-stage:
+
+```bash
+storymesh inspect-run                          # most recent run
+storymesh inspect-run <run_id>                 # specific run
+storymesh inspect-run <run_id> --llm all       # include full LLM prompts and responses
+storymesh inspect-run <run_id> --html out.html # export a self-contained HTML report
+```
+
+Purge caches and run data:
+
+```bash
+storymesh purge-cache                # purge both stage and API response caches
+storymesh purge-cache --stages-only  # stage artifact cache only
+storymesh purge-cache --api-only     # Open Library API response cache only
+storymesh purge-runs                 # delete all per-run artifact directories
 ```
 
 ### Python API
