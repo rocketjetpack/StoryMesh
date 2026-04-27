@@ -296,3 +296,335 @@ def test_generate_outputs_synopsis() -> None:  # noqa: ANN201
     assert "testrun123" in result.output
     assert "genre_normalizer" in result.output
     assert "book_fetcher" in result.output
+
+
+def test_generate_reports_existing_artifacts(tmp_path: Path) -> None:
+    """When run_dir contains stage artifacts, generate marks stages as done
+    and prints the artifact directory footer."""
+    import orjson
+
+    run_dir = tmp_path / "run_with_art"
+    run_dir.mkdir()
+    (run_dir / "genre_normalizer_output.json").write_bytes(orjson.dumps({"ok": True}))
+
+    mock_result = MagicMock()
+    mock_result.final_synopsis = "Synopsis body."
+    mock_result.metadata = {
+        "user_prompt": "dark fantasy",
+        "run_id": "run_with_art",
+        "pipeline_version": "0.6.0",
+        "stage_timings": {"genre_normalizer": 0.02},
+        "run_dir": str(run_dir),
+    }
+
+    with patch("storymesh.cli.generate_synopsis", return_value=mock_result):
+        result = runner.invoke(app, ["generate", "dark fantasy"])
+
+    assert result.exit_code == 0
+    # "✓ done" status line should appear because the artifact exists.
+    assert "done" in result.output
+    # Footer "Artifacts saved to:" only prints when the run_dir exists.
+    assert "Artifacts saved to" in result.output
+    assert str(run_dir) in result.output
+
+
+# ---------------------------------------------------------------------------
+# show-config / show-agent-config
+# ---------------------------------------------------------------------------
+
+
+def test_show_config_outputs_yaml(tmp_path: Path) -> None:
+    """show-config prints the resolved config as YAML with the file path."""
+    cfg_path = tmp_path / "storymesh.config.yaml"
+
+    with (
+        patch("storymesh.config.find_config_file", return_value=cfg_path),
+        patch(
+            "storymesh.config.get_config",
+            return_value={"agents": {"default": {"model": "claude-haiku-4-5"}}},
+        ),
+    ):
+        result = runner.invoke(app, ["show-config"])
+
+    assert result.exit_code == 0
+    assert str(cfg_path) in result.output
+    # YAML-formatted content must appear.
+    assert "agents" in result.output
+    assert "model: claude-haiku-4-5" in result.output
+
+
+def test_show_agent_config_outputs_yaml() -> None:
+    """show-agent-config prints the resolved config for the named agent."""
+    resolved = {"model": "claude-haiku-4-5-20251001", "temperature": 0.2}
+
+    with patch("storymesh.config.get_agent_config", return_value=resolved):
+        result = runner.invoke(app, ["show-agent-config", "genre_normalizer"])
+
+    assert result.exit_code == 0
+    assert "genre_normalizer" in result.output
+    assert "claude-haiku-4-5-20251001" in result.output
+    assert "temperature: 0.2" in result.output
+
+
+# ---------------------------------------------------------------------------
+# inspect-run — exercise all Rich stage renderers
+# ---------------------------------------------------------------------------
+
+
+def _write_full_stage_run(tmp_path: Path, run_id: str) -> None:
+    """Write a run with every implemented stage populated.
+
+    This covers every ``_rich_*`` and ``_html_*`` renderer branch when the
+    resulting run is loaded via ``inspect-run``.
+    """
+    import orjson
+
+    run_dir = tmp_path / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    meta = {
+        "user_prompt": "a dark post-apocalyptic mystery",
+        "pipeline_version": "0.7.0",
+        "timestamp": "2026-04-15T00:00:00+00:00",
+        "run_id": run_id,
+        "stage_timings": {
+            "genre_normalizer": 0.2,
+            "book_fetcher": 1.0,
+            "book_ranker": 0.1,
+            "theme_extractor": 3.4,
+            "proposal_draft": 2.8,
+        },
+    }
+    (run_dir / "run_metadata.json").write_bytes(orjson.dumps(meta))
+
+    # genre_normalizer with tone_override + inferred genres.
+    (run_dir / "genre_normalizer_output.json").write_bytes(
+        orjson.dumps(
+            {
+                "raw_input": "a dark mystery",
+                "normalized_genres": ["mystery"],
+                "subgenres": ["noir"],
+                "user_tones": ["bleak"],
+                "tone_override": True,
+                "override_note": "User 'bleak' overrides default 'mysterious'.",
+                "narrative_context": ["flooded city"],
+                "inferred_genres": [
+                    {"canonical_genre": "post_apocalyptic", "confidence": 0.6},
+                ],
+                "debug": {},
+                "schema_version": "3.1",
+            }
+        )
+    )
+
+    # book_fetcher.
+    (run_dir / "book_fetcher_output.json").write_bytes(
+        orjson.dumps(
+            {
+                "books": [
+                    {
+                        "work_key": "/works/OL1W",
+                        "title": "The Drowned Archive",
+                        "authors": ["Alice Rivers"],
+                        "first_publish_year": 2021,
+                        "source_genres": ["mystery"],
+                    },
+                    {
+                        "work_key": "/works/OL2W",
+                        "title": "Silent Quorum",
+                        "authors": ["Bay Kline"],
+                        "first_publish_year": 2019,
+                        "source_genres": ["mystery"],
+                    },
+                ],
+                "queries_executed": ["mystery", "post apocalyptic"],
+            }
+        )
+    )
+
+    # book_ranker.
+    (run_dir / "book_ranker_output.json").write_bytes(
+        orjson.dumps(
+            {
+                "ranked_books": [
+                    {
+                        "book": {
+                            "work_key": "/works/OL1W",
+                            "title": "The Drowned Archive",
+                            "authors": ["Alice Rivers"],
+                            "source_genres": ["mystery"],
+                        },
+                        "rank": 1,
+                        "composite_score": 0.87,
+                        "score_breakdown": {
+                            "genre_overlap": 0.9,
+                            "reader_engagement": 0.75,
+                        },
+                    }
+                ],
+                "ranked_summaries": [],
+                "dropped_count": 2,
+                "llm_reranked": False,
+                "debug": {},
+            }
+        )
+    )
+
+    # theme_extractor.
+    (run_dir / "theme_extractor_output.json").write_bytes(
+        orjson.dumps(
+            {
+                "genre_clusters": [
+                    {
+                        "genre": "mystery",
+                        "books": ["The Drowned Archive"],
+                        "thematic_assumptions": ["Truth is recoverable"],
+                        "dominant_tropes": [],
+                    }
+                ],
+                "tensions": [
+                    {
+                        "tension_id": "T1",
+                        "cluster_a": "mystery",
+                        "assumption_a": "Truth is recoverable",
+                        "cluster_b": "post_apocalyptic",
+                        "assumption_b": "Records no longer exist",
+                        "creative_question": (
+                            "What does investigation mean without infrastructure?"
+                        ),
+                        "intensity": 0.9,
+                        "cliched_resolutions": [
+                            "A lone detective rebuilds justice through determination",
+                        ],
+                    }
+                ],
+                "narrative_seeds": [
+                    {
+                        "seed_id": "S1",
+                        "concept": (
+                            "A scavenger detective reinvents investigation in a "
+                            "collapsed city."
+                        ),
+                        "tensions_used": ["T1"],
+                        "tonal_direction": [],
+                        "narrative_context_used": [],
+                    }
+                ],
+                "user_tones_carried": ["bleak"],
+            }
+        )
+    )
+
+    # proposal_draft (covers the new _rich_proposal_draft / _html_proposal_draft).
+    (run_dir / "proposal_draft_output.json").write_bytes(
+        orjson.dumps(
+            {
+                "proposal": {
+                    "seed_id": "S1",
+                    "title": "The Last Inquest",
+                    "protagonist": "Mara Voss, a former homicide detective.",
+                    "setting": "A flooded mid-21st-century city-state.",
+                    "plot_arc": "Act 1: the body. Act 2: rebuild investigation. Act 3: verdict.",
+                    "thematic_thesis": "Justice does not require institutions.",
+                    "key_scenes": [
+                        "Mara finds the arranged body.",
+                        "A community tribunal with no legal authority convenes.",
+                    ],
+                    "tensions_addressed": ["T1"],
+                    "tone": ["bleak"],
+                    "genre_blend": ["mystery", "post_apocalyptic"],
+                },
+                "selection_rationale": {
+                    "selected_index": 1,
+                    "rationale": "Candidate 1 hit the thematic question most directly.",
+                    # NOTE: the Pydantic schema types cliche_violations as
+                    # dict[str, list[str]], but both _rich_proposal_draft and
+                    # _html_proposal_draft pass the value through _as_list,
+                    # which yields [] for a dict and silently omits the
+                    # "Cliché violations" block. Supplying a raw list here
+                    # exercises the list-branch of the renderers directly.
+                    "cliche_violations": ["leans on the lone-savior trope"],
+                    "runner_up_index": 2,
+                },
+                "debug": {
+                    "num_candidates_requested": 3,
+                    "num_valid_candidates": 2,
+                    "num_parse_failures": 1,
+                    "draft_temperature": 0.9,
+                    "selection_temperature": 0.2,
+                    "total_llm_calls": 4,
+                },
+            }
+        )
+    )
+
+
+def test_inspect_run_renders_all_implemented_stages(tmp_path: Path) -> None:
+    """inspect-run triggers every implemented ``_rich_*`` stage renderer."""
+    _write_full_stage_run(tmp_path, "run_full")
+    from storymesh.core.artifacts import ArtifactStore as RealStore
+
+    real_store = RealStore(root=tmp_path)
+
+    with patch("storymesh.cli.ArtifactStore", return_value=real_store):
+        result = runner.invoke(app, ["inspect-run", "run_full"])
+
+    assert result.exit_code == 0
+    # Genre normalizer tone_override branch.
+    assert "Tone override" in result.output
+    assert "mysterious" in result.output
+    # Book fetcher top books.
+    assert "The Drowned Archive" in result.output
+    # Book ranker score line.
+    assert "overlap=0.900" in result.output
+    # Theme extractor content.
+    assert "Thematic Tensions" in result.output
+    assert "Narrative Seeds" in result.output
+    # Proposal draft content.
+    assert "The Last Inquest" in result.output
+    assert "Key scenes" in result.output
+    assert "Cliché violations" in result.output
+
+
+def test_inspect_run_llm_filter_with_no_matches(tmp_path: Path) -> None:
+    """--llm <agent> with no matching calls prints the 'no calls found' notice."""
+    _write_cli_run(tmp_path, "run_nomatch")
+    from storymesh.core.artifacts import ArtifactStore as RealStore
+
+    real_store = RealStore(root=tmp_path)
+
+    with patch("storymesh.cli.ArtifactStore", return_value=real_store):
+        result = runner.invoke(
+            app, ["inspect-run", "run_nomatch", "--llm", "no_such_agent"]
+        )
+
+    assert result.exit_code == 0
+    assert "No LLM calls found" in result.output
+
+
+def test_inspect_run_no_llm_calls_notice(tmp_path: Path) -> None:
+    """A run without an llm_calls.jsonl file shows the empty-summary notice."""
+    import orjson
+
+    run_dir = tmp_path / "runs" / "run_silent"
+    run_dir.mkdir(parents=True)
+    (run_dir / "run_metadata.json").write_bytes(
+        orjson.dumps(
+            {
+                "user_prompt": "p",
+                "pipeline_version": "0.6.0",
+                "timestamp": "2026-04-03T12:00:00+00:00",
+                "run_id": "run_silent",
+                "stage_timings": {},
+            }
+        )
+    )
+    from storymesh.core.artifacts import ArtifactStore as RealStore
+
+    real_store = RealStore(root=tmp_path)
+
+    with patch("storymesh.cli.ArtifactStore", return_value=real_store):
+        result = runner.invoke(app, ["inspect-run", "run_silent"])
+
+    assert result.exit_code == 0
+    assert "No LLM calls recorded" in result.output

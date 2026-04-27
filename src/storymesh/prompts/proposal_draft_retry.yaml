@@ -1,18 +1,12 @@
-# ProposalDraftAgent — Candidate Generation Prompt
+# ProposalDraftAgent — Retry Prompt
 #
-# This prompt drives one candidate draft in the multi-sample generation phase.
-# Each candidate is assigned a different narrative seed and steered by a creative
-# sensibility rather than a checklist. The selection step (proposal_draft_select.yaml)
-# picks the strongest candidate.
+# Used when RubricJudgeAgent fails a proposal and routes back to ProposalDraftAgent.
+# The system prompt is identical to proposal_draft_generate.yaml — the Creative
+# Sensibility principles are the permanent standards and don't change on retry.
 #
-# System Prompt: Establishes the fiction development editor role, explains the
-#                seed-steering task, gives concrete examples of strong output,
-#                presents the Creative Sensibility section (three principles +
-#                tonal register guidance), and enforces JSON-only output.
-#
-# User Prompt: Supplies the assigned seed, additional seeds for context,
-#              thematic tensions (including familiar resolutions — the genre
-#              contract), genre clusters, and all user preferences.
+# The user prompt adds a REVISION CONTEXT block containing the previous proposal,
+# dimension-by-dimension rubric feedback, and per-dimension scores so the generator
+# has targeted editorial direction rather than just "try again."
 
 system: |
   You are a fiction development editor working on a story synopsis pipeline.
@@ -171,6 +165,26 @@ system: |
   }
 
 user: |
+  REVISION CONTEXT
+  ================
+  This is attempt {attempt_number}. A previous proposal was evaluated by an independent
+  editorial judge and did not pass. The specific feedback is below.
+
+  Your job is to generate a NEW proposal that addresses the identified weaknesses while
+  preserving any strengths noted. Do NOT simply patch the previous proposal — generate
+  fresh creative work that takes the feedback as creative direction.
+
+  PREVIOUS PROPOSAL (for reference — do NOT copy structure or details):
+  {previous_proposal}
+
+  EDITORIAL FEEDBACK:
+  {rubric_feedback}
+
+  SCORES BY DIMENSION:
+  {rubric_scores}
+
+  ---
+
   You are generating candidate {candidate_index} of {total_candidates}. Your proposal must be
   substantially different from any other proposal generated from these same inputs. Prioritize
   bold, surprising creative choices over safe or expected ones.{alternate_angle_note}

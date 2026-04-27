@@ -455,6 +455,8 @@ def _html_stage_body(name: str, data: dict[str, Any]) -> str:
         return _html_book_ranker(data)
     if name == "theme_extractor":
         return _html_theme_extractor(data)
+    if name == "proposal_draft":
+        return _html_proposal_draft(data)
     # Generic fallback for future stages
     escaped = html.escape(str(data)[:2000])
     return f"<pre>{escaped}</pre>"
@@ -591,6 +593,76 @@ def _html_theme_extractor(data: dict[str, Any]) -> str:
         f"<h4>Genre Clusters</h4>{cluster_html}"
         f"<h4>Thematic Tensions</h4>{tension_html}"
         f"<h4>Narrative Seeds</h4>{seed_html}"
+    )
+
+
+def _html_proposal_draft(data: dict[str, Any]) -> str:
+    proposal = data.get("proposal", {})
+    if not isinstance(proposal, dict):
+        proposal = {}
+    rationale = data.get("selection_rationale", {})
+    if not isinstance(rationale, dict):
+        rationale = {}
+    debug = data.get("debug", {})
+    if not isinstance(debug, dict):
+        debug = {}
+
+    title = html.escape(str(proposal.get("title", "—")))
+    protagonist = html.escape(str(proposal.get("protagonist", "—")))
+    setting = html.escape(str(proposal.get("setting", "—")))
+    thematic_thesis = html.escape(str(proposal.get("thematic_thesis", "—")))
+    tone = html.escape(str(proposal.get("tone", "—")))
+    genre_blend = html.escape(
+        ", ".join(str(g) for g in _list(proposal.get("genre_blend"))) or "—"
+    )
+    plot_arc = html.escape(str(proposal.get("plot_arc", "—")))
+    key_scenes = _list(proposal.get("key_scenes"))
+    scenes_items = "".join(f"<li>{html.escape(str(s))}</li>" for s in key_scenes)
+    scenes_html = f"<ol>{scenes_items}</ol>" if scenes_items else "<p>—</p>"
+
+    sel_index = rationale.get("selected_index", "—")
+    n_valid = debug.get("num_valid_candidates", "—")
+    runner_up = rationale.get("runner_up_index")
+    runner_up_str = f", runner-up: {runner_up}" if runner_up is not None else ""
+    rationale_text = html.escape(str(rationale.get("rationale", "—")))
+    cliche_violations = _list(rationale.get("cliche_violations"))
+    cliche_html = ""
+    if cliche_violations:
+        items = "".join(f"<li>{html.escape(str(v))}</li>" for v in cliche_violations)
+        cliche_html = f"<h4>Cliché Violations</h4><ul>{items}</ul>"
+
+    n_requested = debug.get("num_candidates_requested", "—")
+    n_failures = debug.get("num_parse_failures", 0)
+    draft_temp = debug.get("draft_temperature", "—")
+    sel_temp = debug.get("selection_temperature", "—")
+    total_calls = debug.get("total_llm_calls", "—")
+
+    return (
+        f"<h4>Selected Proposal</h4>"
+        f"<dl>"
+        f"<dt>Title</dt><dd><strong>{title}</strong></dd>"
+        f"<dt>Protagonist</dt><dd>{protagonist}</dd>"
+        f"<dt>Setting</dt><dd>{setting}</dd>"
+        f"<dt>Tone</dt><dd>{tone}</dd>"
+        f"<dt>Genre blend</dt><dd>{genre_blend}</dd>"
+        f"<dt>Thematic thesis</dt><dd>{thematic_thesis}</dd>"
+        f"<dt>Plot arc</dt><dd>{plot_arc}</dd>"
+        f"</dl>"
+        f"<h4>Key Scenes</h4>{scenes_html}"
+        f"<h4>Selection Rationale</h4>"
+        f"<dl>"
+        f"<dt>Selected</dt><dd>candidate {sel_index} of {n_valid}{runner_up_str}</dd>"
+        f"<dt>Rationale</dt><dd>{rationale_text}</dd>"
+        f"</dl>"
+        f"{cliche_html}"
+        f"<h4>Debug</h4>"
+        f"<dl>"
+        f"<dt>Candidates requested / valid / failed</dt>"
+        f"<dd>{n_requested} / {n_valid} / {n_failures}</dd>"
+        f"<dt>Draft temperature</dt><dd>{draft_temp}</dd>"
+        f"<dt>Selection temperature</dt><dd>{sel_temp}</dd>"
+        f"<dt>Total LLM calls</dt><dd>{total_calls}</dd>"
+        f"</dl>"
     )
 
 

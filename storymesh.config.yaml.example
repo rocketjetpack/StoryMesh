@@ -55,6 +55,19 @@ agents:
     selection_temperature: 0.2
     selection_max_tokens: 2048
 
+  rubric_judge:
+    provider: openai          # Different provider than proposal_draft for independent evaluation
+    model: gpt-4o
+    temperature: 0.0          # Deterministic evaluation — same proposal should score the same
+    max_tokens: 4096
+    pass_threshold: 0.7       # Primary tuning knob: lower to relax, raise to tighten
+    # dimension_weights:      # Uncomment to override defaults
+    #   restraint: 0.25
+    #   convention_departure: 0.30
+    #   specificity: 0.20
+    #   protagonist_interiority: 0.15
+    #   user_intent_fidelity: 0.10
+
   # To use OpenAI for any agent, set provider and model:
   # proposal_draft:
   #   provider: openai

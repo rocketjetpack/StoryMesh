@@ -315,3 +315,297 @@ def test_generate_html_missing_stage_renders_without_error(tmp_path: Path) -> No
 
     assert "<!DOCTYPE html>" in html
     assert "Stage not yet run" in html
+
+
+# ---------------------------------------------------------------------------
+# Group D — stage-specific HTML body renderers
+# ---------------------------------------------------------------------------
+
+
+_BOOK_FETCHER_OUTPUT: dict[str, Any] = {
+    "books": [
+        {
+            "work_key": "/works/OL1W",
+            "title": "The Drowned Archive",
+            "authors": ["Alice Rivers", "Jun Tanaka"],
+            "first_publish_year": 2021,
+            "source_genres": ["mystery"],
+        },
+    ],
+    "queries_executed": ["mystery", "post apocalyptic"],
+}
+
+_BOOK_RANKER_OUTPUT: dict[str, Any] = {
+    "ranked_books": [
+        {
+            "book": {
+                "work_key": "/works/OL1W",
+                "title": "The Drowned Archive",
+                "authors": ["Alice Rivers"],
+                "source_genres": ["mystery"],
+            },
+            "rank": 1,
+            "composite_score": 0.873,
+            "score_breakdown": {
+                "genre_overlap": 0.9,
+                "reader_engagement": 0.75,
+            },
+        },
+    ],
+    "ranked_summaries": [],
+    "dropped_count": 2,
+    "llm_reranked": False,
+    "debug": {},
+}
+
+_THEME_EXTRACTOR_OUTPUT: dict[str, Any] = {
+    "genre_clusters": [
+        {
+            "genre": "mystery",
+            "books": ["The Drowned Archive"],
+            "thematic_assumptions": ["Truth is recoverable"],
+            "dominant_tropes": [],
+        }
+    ],
+    "tensions": [
+        {
+            "tension_id": "T1",
+            "cluster_a": "mystery",
+            "assumption_a": "Truth is recoverable",
+            "cluster_b": "post_apocalyptic",
+            "assumption_b": "Records no longer exist",
+            "creative_question": "What does investigation mean without infrastructure?",
+            "intensity": 0.9,
+            "cliched_resolutions": [],
+        }
+    ],
+    "narrative_seeds": [
+        {
+            "seed_id": "S1",
+            "concept": "A scavenger detective reinvents investigation.",
+            "tensions_used": ["T1"],
+            "tonal_direction": [],
+            "narrative_context_used": [],
+        }
+    ],
+    "user_tones_carried": ["bleak"],
+}
+
+_PROPOSAL_DRAFT_OUTPUT: dict[str, Any] = {
+    "proposal": {
+        "seed_id": "S1",
+        "title": "The Last Inquest",
+        "protagonist": "Mara Voss, a former detective.",
+        "setting": "A flooded city-state.",
+        "plot_arc": "Three-act reconstruction.",
+        "thematic_thesis": "Justice requires no institution.",
+        "key_scenes": ["Mara finds the body.", "Tribunal convenes."],
+        "tensions_addressed": ["T1"],
+        "tone": ["bleak"],
+        "genre_blend": ["mystery", "post_apocalyptic"],
+    },
+    "selection_rationale": {
+        "selected_index": 1,
+        "rationale": "Candidate 1 addressed the thematic question most directly.",
+        # See note in test_cli.py: the renderer passes this through _list, so
+        # supply a list here rather than the schema-typed dict[str, list[str]].
+        "cliche_violations": ["leans on the lone-savior trope"],
+        "runner_up_index": 2,
+    },
+    "debug": {
+        "num_candidates_requested": 3,
+        "num_valid_candidates": 2,
+        "num_parse_failures": 1,
+        "draft_temperature": 0.9,
+        "selection_temperature": 0.2,
+        "total_llm_calls": 4,
+    },
+}
+
+
+def test_generate_html_renders_book_fetcher_stage(tmp_path: Path) -> None:
+    """book_fetcher HTML body embeds queries, book title, authors, and year."""
+    _write_run(
+        tmp_path,
+        "run_bf",
+        metadata=_SAMPLE_METADATA,
+        stages={"book_fetcher": _BOOK_FETCHER_OUTPUT},
+    )
+    report = _make_inspector(tmp_path).load("run_bf")
+    html_out = _make_inspector(tmp_path).generate_html(report)
+
+    assert "The Drowned Archive" in html_out
+    assert "Alice Rivers" in html_out
+    assert "2021" in html_out
+    # Queries list should contain both executed subjects.
+    assert "post apocalyptic" in html_out
+
+
+def test_generate_html_renders_book_ranker_stage(tmp_path: Path) -> None:
+    """book_ranker HTML body embeds rank, title, score, and breakdown."""
+    _write_run(
+        tmp_path,
+        "run_br",
+        metadata=_SAMPLE_METADATA,
+        stages={"book_ranker": _BOOK_RANKER_OUTPUT},
+    )
+    report = _make_inspector(tmp_path).load("run_br")
+    html_out = _make_inspector(tmp_path).generate_html(report)
+
+    assert "The Drowned Archive" in html_out
+    # Composite score renders with three decimal places.
+    assert "0.873" in html_out
+    assert "0.900" in html_out  # genre_overlap
+    assert "0.750" in html_out  # reader_engagement
+
+
+def test_generate_html_renders_theme_extractor_stage(tmp_path: Path) -> None:
+    """theme_extractor HTML body embeds clusters, tensions, and seeds."""
+    _write_run(
+        tmp_path,
+        "run_te",
+        metadata=_SAMPLE_METADATA,
+        stages={"theme_extractor": _THEME_EXTRACTOR_OUTPUT},
+    )
+    report = _make_inspector(tmp_path).load("run_te")
+    html_out = _make_inspector(tmp_path).generate_html(report)
+
+    assert "Genre Clusters" in html_out
+    assert "Thematic Tensions" in html_out
+    assert "Narrative Seeds" in html_out
+    # IDs render in their sections.
+    assert "T1" in html_out
+    assert "S1" in html_out
+    # Intensity is formatted to two decimal places.
+    assert "0.90" in html_out
+
+
+def test_generate_html_renders_proposal_draft_stage(tmp_path: Path) -> None:
+    """proposal_draft HTML body embeds title, protagonist, rationale, and cliché block."""
+    _write_run(
+        tmp_path,
+        "run_pd",
+        metadata=_SAMPLE_METADATA,
+        stages={"proposal_draft": _PROPOSAL_DRAFT_OUTPUT},
+    )
+    report = _make_inspector(tmp_path).load("run_pd")
+    html_out = _make_inspector(tmp_path).generate_html(report)
+
+    assert "The Last Inquest" in html_out
+    assert "Mara Voss" in html_out
+    assert "Key Scenes" in html_out
+    # Runner-up reference surfaces in the selection block.
+    assert "runner-up: 2" in html_out
+    # Cliché violations block renders because we passed a non-empty list.
+    assert "Cliché Violations" in html_out
+
+
+def test_generate_html_renders_corrupt_stage(tmp_path: Path) -> None:
+    """A CORRUPT stage renders with the 'could not be parsed' fallback body."""
+    run_dir = _write_run(tmp_path, "run_corrupt", metadata=_SAMPLE_METADATA)
+    # Write an invalid JSON root (a list) — loader reports CORRUPT.
+    (run_dir / "proposal_draft_output.json").write_bytes(orjson.dumps([1, 2, 3]))
+
+    report = _make_inspector(tmp_path).load("run_corrupt")
+    assert report.stages["proposal_draft"].status == StageStatus.CORRUPT
+    html_out = _make_inspector(tmp_path).generate_html(report)
+
+    assert "could not be parsed" in html_out
+
+
+def test_generate_html_renders_rubric_judge_fallback(tmp_path: Path) -> None:
+    """The generic ``<pre>`` fallback renders for stages without a dedicated body."""
+    _write_run(
+        tmp_path,
+        "run_rubric",
+        metadata=_SAMPLE_METADATA,
+        stages={"rubric_judge": {"passed": True, "score": 0.9}},
+    )
+    report = _make_inspector(tmp_path).load("run_rubric")
+    html_out = _make_inspector(tmp_path).generate_html(report)
+
+    # The generic fallback escapes the dict and wraps it in <pre>.
+    assert "<pre>" in html_out
+    assert "passed" in html_out
+
+
+# ---------------------------------------------------------------------------
+# Group E — internal helpers
+# ---------------------------------------------------------------------------
+
+
+def test_as_float_returns_none_for_none() -> None:
+    """_as_float(None) returns None rather than raising."""
+    from storymesh.core.run_inspector import _as_float
+
+    assert _as_float(None) is None
+
+
+def test_as_float_returns_none_for_non_numeric() -> None:
+    """_as_float on a non-numeric string returns None."""
+    from storymesh.core.run_inspector import _as_float
+
+    assert _as_float("not a number") is None
+
+
+def test_as_float_converts_valid_numeric_string() -> None:
+    """_as_float('3.14') returns 3.14 as a float."""
+    from storymesh.core.run_inspector import _as_float
+
+    assert _as_float("3.14") == 3.14
+
+
+def test_load_llm_calls_handles_missing_latency_and_temperature(tmp_path: Path) -> None:
+    """LLM records with missing latency/temperature load with those fields as None."""
+    record = {
+        k: v
+        for k, v in _LLM_CALL_RECORD.items()
+        if k not in {"latency_ms", "temperature"}
+    }
+    _write_run(tmp_path, "run_sparse", metadata=_SAMPLE_METADATA, llm_records=[record])
+
+    report = _make_inspector(tmp_path).load("run_sparse")
+    assert len(report.llm_calls) == 1
+    assert report.llm_calls[0].latency_ms is None
+    assert report.llm_calls[0].temperature is None
+
+
+def test_load_llm_calls_skips_non_dict_lines(tmp_path: Path) -> None:
+    """A JSONL line whose root is not a dict is skipped with a warning."""
+    run_dir = _write_run(tmp_path, "run_notdict", metadata=_SAMPLE_METADATA)
+    (run_dir / "llm_calls.jsonl").write_bytes(
+        orjson.dumps([1, 2, 3]) + b"\n" + orjson.dumps(_LLM_CALL_RECORD) + b"\n"
+    )
+
+    report = _make_inspector(tmp_path).load("run_notdict")
+    assert len(report.llm_calls) == 1
+    assert report.llm_calls[0].agent == "genre_normalizer"
+
+
+def test_load_metadata_non_dict_returns_none(tmp_path: Path) -> None:
+    """run_metadata.json whose root is a list (not a dict) is rejected as None."""
+    run_dir = _write_run(tmp_path, "run_meta_bad")
+    (run_dir / "run_metadata.json").write_bytes(orjson.dumps([1, 2, 3]))
+
+    report = _make_inspector(tmp_path).load("run_meta_bad")
+    assert report.metadata is None
+
+
+def test_load_metadata_invalid_json_returns_none(tmp_path: Path) -> None:
+    """Unparseable run_metadata.json is treated as missing rather than raising."""
+    run_dir = _write_run(tmp_path, "run_meta_corrupt")
+    (run_dir / "run_metadata.json").write_bytes(b"not valid json {{{")
+
+    report = _make_inspector(tmp_path).load("run_meta_corrupt")
+    assert report.metadata is None
+
+
+def test_load_metadata_stage_timings_non_dict_ignored(tmp_path: Path) -> None:
+    """stage_timings that is not a dict falls back to {} instead of raising."""
+    bad_meta = dict(_SAMPLE_METADATA)
+    bad_meta["stage_timings"] = "not a dict"  # type: ignore[assignment]
+    _write_run(tmp_path, "run_st_bad", metadata=bad_meta)
+
+    report = _make_inspector(tmp_path).load("run_st_bad")
+    assert report.metadata is not None
+    assert report.metadata.stage_timings == {}

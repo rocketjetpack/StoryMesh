@@ -18,6 +18,7 @@ from storymesh.schemas.book_fetcher import BookFetcherAgentOutput
 from storymesh.schemas.book_ranker import BookRankerAgentOutput
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
 from storymesh.schemas.proposal_draft import ProposalDraftAgentOutput
+from storymesh.schemas.rubric_judge import RubricJudgeAgentOutput
 from storymesh.schemas.theme_extractor import ThemeExtractorAgentOutput
 
 
@@ -56,8 +57,7 @@ class StoryMeshState(TypedDict, total=False):
     proposal_draft_output: ProposalDraftAgentOutput | None
 
     # ── Stage 5: RubricJudgeAgent (LLM, conditional retry edge) ───────────
-    # TODO: Replace object with RubricResult once implemented.
-    rubric_judge_output: object | None
+    rubric_judge_output: RubricJudgeAgentOutput | None
 
     # ── Stage 6: SynopsisWriterAgent (LLM) ────────────────────────────────
     # TODO: Replace object with SynopsisWriterOutput once implemented.
@@ -66,6 +66,16 @@ class StoryMeshState(TypedDict, total=False):
     # ── Rubric retry tracking ──────────────────────────────────────────────
     rubric_retry_count: int
     """Number of times rubric_judge has routed back to proposal_draft. Starts at 0."""
+
+    # ── Attempt history (for SynopsisWriter synthesis) ─────────────────────
+    proposal_history: list[ProposalDraftAgentOutput]
+    """All proposal attempts in order. Appended by proposal_draft node on each run."""
+
+    rubric_history: list[RubricJudgeAgentOutput]
+    """All rubric evaluations in order. Appended by rubric_judge node on each run."""
+
+    best_proposal_index: int
+    """Index into proposal_history of the highest-scoring attempt across all rounds."""
 
     # ── Error tracking ─────────────────────────────────────────────────────
     errors: list[str]

@@ -34,7 +34,6 @@ from storymesh.orchestration.state import StoryMeshState
 logger = logging.getLogger(__name__)
 
 # Future node imports (uncomment as agents are implemented):
-# from storymesh.orchestration.nodes.rubric_judge import make_rubric_judge_node
 # from storymesh.orchestration.nodes.synopsis_writer import make_synopsis_writer_node
 
 
@@ -180,8 +179,8 @@ def _rubric_route(state: StoryMeshState) -> str:
     retry_count: int = state.get("rubric_retry_count", 0)
     rubric_output = state.get("rubric_judge_output")
 
-    # None means the noop placeholder ran — treat as passed.
-    passed: bool = rubric_output is None or bool(getattr(rubric_output, "passed", True))
+    # None means the noop placeholder ran (no LLM key) — treat as passed.
+    passed: bool = rubric_output is None or bool(rubric_output.passed)
 
     if passed or retry_count >= MAX_RUBRIC_RETRIES:
         return "synopsis_writer"
@@ -321,6 +320,31 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
             proposal_agent, artifact_store=artifact_store
         )
 
+    # ── Stage 5: RubricJudgeAgent ─────────────────────────────────────────
+    from storymesh.agents.rubric_judge.agent import RubricJudgeAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.rubric_judge import (  # noqa: PLC0415
+        make_rubric_judge_node,
+    )
+
+    rubric_cfg = get_agent_config("rubric_judge")
+    rubric_llm = _build_llm_client(
+        rubric_cfg, agent_name="rubric_judge", artifact_store=artifact_store
+    )
+
+    if rubric_llm is None:
+        logger.warning(
+            "RubricJudgeAgent: no LLM client available — stage 5 will run as noop."
+        )
+        rubric_judge_node: Any = _noop_node
+    else:
+        rubric_agent = RubricJudgeAgent(
+            llm_client=rubric_llm,
+            temperature=rubric_cfg.get("temperature", 0.0),
+            max_tokens=rubric_cfg.get("max_tokens", 4096),
+            pass_threshold=rubric_cfg.get("pass_threshold", 0.7),
+        )
+        rubric_judge_node = make_rubric_judge_node(rubric_agent, artifact_store=artifact_store)
+
     # ── Build the graph ────────────────────────────────────────────────────
     graph: Any = StateGraph(StoryMeshState)
 
@@ -329,7 +353,7 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     graph.add_node("book_ranker", book_ranker_node)
     graph.add_node("theme_extractor", theme_extractor_node)
     graph.add_node("proposal_draft", proposal_draft_node)
-    graph.add_node("rubric_judge", _noop_node)      # Stage 5 — placeholder (LLM, conditional)
+    graph.add_node("rubric_judge", rubric_judge_node)
     graph.add_node("synopsis_writer", _noop_node)   # Stage 6 — placeholder (LLM)
 
     # ── Wire edges (linear) ────────────────────────────────────────────────

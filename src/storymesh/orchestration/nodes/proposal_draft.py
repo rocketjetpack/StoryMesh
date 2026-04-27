@@ -3,20 +3,59 @@
 Assembles ProposalDraftAgentInput from two upstream stages
 (ThemeExtractorAgentOutput and GenreNormalizerAgentOutput), runs the agent,
 persists the output artifact, and writes the result back into pipeline state.
+
+On retry (when rubric_judge_output is present and failed), the wrapper builds
+a RubricFeedback carrier from the evaluator's critique and passes it to the
+agent so the retry prompt receives targeted editorial direction.
 """
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from storymesh.agents.proposal_draft.agent import ProposalDraftAgent
+from storymesh.agents.proposal_draft.agent import ProposalDraftAgent, RubricFeedback
 from storymesh.llm.base import current_run_id
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.proposal_draft import ProposalDraftAgentInput
 
 if TYPE_CHECKING:
     from storymesh.core.artifacts import ArtifactStore
+
+
+def _format_feedback(rubric_output: Any) -> str:
+    """Format dimension-by-dimension rubric scores and feedback as readable text."""
+    lines: list[str] = []
+    dimensions = getattr(rubric_output, "dimensions", {})
+    for dim_name, dim_result in dimensions.items():
+        score = getattr(dim_result, "score", "N/A")
+        feedback = getattr(dim_result, "feedback", "")
+        ref = getattr(dim_result, "directive_ref", "")
+        lines.append(f"[{dim_name}] ({ref}) score={score}: {feedback}")
+    violations = getattr(rubric_output, "cliche_violations", [])
+    if violations:
+        lines.append("\nCLICHÉ VIOLATIONS DETECTED:")
+        for v in violations:
+            lines.append(f"  - {v}")
+    overall = getattr(rubric_output, "overall_feedback", "")
+    if overall:
+        lines.append(f"\nOVERALL: {overall}")
+    return "\n".join(lines)
+
+
+def _format_scores(rubric_output: Any) -> str:
+    """Format rubric scores as a compact summary."""
+    lines: list[str] = []
+    dimensions = getattr(rubric_output, "dimensions", {})
+    for dim_name, dim_result in dimensions.items():
+        score = getattr(dim_result, "score", "N/A")
+        lines.append(f"  {dim_name}: {score}")
+    composite = getattr(rubric_output, "composite_score", "N/A")
+    threshold = getattr(rubric_output, "pass_threshold", "N/A")
+    lines.append(f"  COMPOSITE: {composite}")
+    lines.append(f"  THRESHOLD: {threshold}")
+    return "\n".join(lines)
 
 
 def make_proposal_draft_node(
@@ -28,7 +67,7 @@ def make_proposal_draft_node(
     Assembles ``ProposalDraftAgentInput`` from ``theme_extractor_output`` and
     ``genre_normalizer_output``, runs the agent, persists the artifact (when an
     ``ArtifactStore`` is provided), and returns a partial state dict containing
-    only ``proposal_draft_output``. LangGraph merges this into the full state.
+    ``proposal_draft_output`` and, on retry, an incremented ``rubric_retry_count``.
 
     Args:
         agent: A fully constructed ``ProposalDraftAgent`` instance.
@@ -49,6 +88,7 @@ def make_proposal_draft_node(
 
         Returns:
             Partial state update dict with ``proposal_draft_output`` set.
+            On retry also sets ``rubric_retry_count`` incremented by 1.
 
         Raises:
             RuntimeError: If either upstream output is missing from state.
@@ -67,6 +107,30 @@ def make_proposal_draft_node(
             )
             raise RuntimeError(msg)
 
+        # Detect retry: rubric_judge ran and failed.
+        rubric_output = state.get("rubric_judge_output")
+        is_retry = (
+            rubric_output is not None
+            and hasattr(rubric_output, "passed")
+            and not rubric_output.passed
+        )
+
+        rubric_feedback: RubricFeedback | None = None
+        if is_retry:
+            prev_proposal_output = state.get("proposal_draft_output")
+            prev_proposal_json = (
+                json.dumps(prev_proposal_output.proposal.model_dump(), indent=2)
+                if prev_proposal_output is not None
+                else "{}"
+            )
+            attempt_number = state.get("rubric_retry_count", 0) + 2  # +1 for base, +1 for this retry
+            rubric_feedback = RubricFeedback(
+                previous_proposal_json=prev_proposal_json,
+                feedback_text=_format_feedback(rubric_output),
+                scores_text=_format_scores(rubric_output),
+                attempt_number=attempt_number,
+            )
+
         input_data = ProposalDraftAgentInput(
             narrative_seeds=theme_extractor_output.narrative_seeds,
             tensions=theme_extractor_output.tensions,
@@ -79,7 +143,7 @@ def make_proposal_draft_node(
 
         token = current_run_id.set(state.get("run_id", ""))
         try:
-            output = agent.run(input_data)
+            output = agent.run(input_data, rubric_feedback=rubric_feedback)
         finally:
             current_run_id.reset(token)
 
@@ -90,6 +154,15 @@ def make_proposal_draft_node(
                 artifact_store, state["run_id"], "proposal_draft", output
             )
 
-        return {"proposal_draft_output": output}
+        history: list[Any] = list(state.get("proposal_history") or [])
+        history.append(output)
+
+        result: dict[str, Any] = {
+            "proposal_draft_output": output,
+            "proposal_history": history,
+        }
+        if is_retry:
+            result["rubric_retry_count"] = state.get("rubric_retry_count", 0) + 1
+        return result
 
     return proposal_draft_node

@@ -3,6 +3,7 @@ BOOK_FETCHER_SCHEMA_VERSION = "1.2"
 BOOK_RANKER_SCHEMA_VERSION = "1.1"
 PROPOSAL_SCHEMA_VERSION = "1.1"
 THEMEPACK_SCHEMA_VERSION = "1.1"
+RUBRIC_SCHEMA_VERSION = "1.0"
 
 SCHEMA_VERSIONS: dict[str, str] = {
     "Genre Constraint": GENRE_CONSTRAINT_SCHEMA_VERSION,
@@ -10,6 +11,7 @@ SCHEMA_VERSIONS: dict[str, str] = {
     "Book Ranker": BOOK_RANKER_SCHEMA_VERSION,
     "Proposal": PROPOSAL_SCHEMA_VERSION,
     "Themepack": THEMEPACK_SCHEMA_VERSION,
+    "Rubric": RUBRIC_SCHEMA_VERSION,
 }
 
 # Version History
@@ -48,3 +50,7 @@ SCHEMA_VERSIONS: dict[str, str] = {
 #             ProposalDraftAgentInput, StoryProposal, SelectionRationale,
 #             ProposalDraftAgentOutput. Multi-sample architecture with
 #             seed-steering and self-selection.
+# 2026-04-24: Add Rubric schema 1.0. Introduces RubricJudgeAgentInput,
+#             DimensionResult, and RubricJudgeAgentOutput. Six-dimension
+#             craft quality rubric with cliché violation tracking and
+#             configurable pass threshold.

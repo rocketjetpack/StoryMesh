@@ -315,6 +315,8 @@ def _render_stage_panel(name: str, stage: StageInspection) -> None:
         content = _rich_book_ranker(data)
     elif name == "theme_extractor":
         content = _rich_theme_extractor(data)
+    elif name == "proposal_draft":
+        content = _rich_proposal_draft(data)
     else:
         content = "[dim](no detail renderer for this stage)[/dim]"
 
@@ -428,6 +430,82 @@ def _rich_theme_extractor(data: dict[str, Any]) -> str:
         concept = str(s.get("concept", ""))
         truncated = concept[:150] + "…" if len(concept) > 150 else concept
         lines.append(f"  {sid}: {truncated}")
+
+    return "\n".join(lines)
+
+
+def _rich_proposal_draft(data: dict[str, Any]) -> str:
+    """Format proposal_draft stage output for Rich."""
+    proposal = data.get("proposal", {})
+    if not isinstance(proposal, dict):
+        proposal = {}
+    rationale = data.get("selection_rationale", {})
+    if not isinstance(rationale, dict):
+        rationale = {}
+    debug = data.get("debug", {})
+    if not isinstance(debug, dict):
+        debug = {}
+
+    title = str(proposal.get("title", "—"))
+    protagonist = str(proposal.get("protagonist", "—"))
+    setting = str(proposal.get("setting", "—"))
+    tone = str(proposal.get("tone", "—"))
+    genre_blend = (
+        ", ".join(str(g) for g in _as_list(proposal.get("genre_blend"))) or "—"
+    )
+    thematic_thesis = str(proposal.get("thematic_thesis", "—"))
+    plot_arc = str(proposal.get("plot_arc", "—"))
+    key_scenes = _as_list(proposal.get("key_scenes"))
+
+    sel_index = rationale.get("selected_index", "—")
+    n_valid = debug.get("num_valid_candidates", "—")
+    runner_up = rationale.get("runner_up_index")
+    runner_up_str = f", runner-up: {runner_up}" if runner_up is not None else ""
+    rationale_text = str(rationale.get("rationale", "—"))
+    cliche_violations = _as_list(rationale.get("cliche_violations"))
+
+    n_requested = debug.get("num_candidates_requested", "—")
+    n_failures = debug.get("num_parse_failures", 0)
+    draft_temp = debug.get("draft_temperature", "—")
+    total_calls = debug.get("total_llm_calls", "—")
+
+    lines: list[str] = [
+        f"[bold]{title}[/bold]",
+        f"[bold]Protagonist:[/bold]      {protagonist}",
+        f"[bold]Setting:[/bold]          {setting}",
+        f"[bold]Tone:[/bold]             {tone}",
+        f"[bold]Genre blend:[/bold]      {genre_blend}",
+        f"[bold]Thematic thesis:[/bold]  {thematic_thesis}",
+        "",
+        "[bold]Plot arc:[/bold]",
+        f"  {plot_arc[:600] + '…' if len(plot_arc) > 600 else plot_arc}",
+    ]
+
+    if key_scenes:
+        lines.append("")
+        lines.append("[bold]Key scenes:[/bold]")
+        for i, scene in enumerate(key_scenes, 1):
+            s = str(scene)
+            lines.append(f"  {i}. {s[:120] + '…' if len(s) > 120 else s}")
+
+    rationale_truncated = (
+        rationale_text[:400] + "…" if len(rationale_text) > 400 else rationale_text
+    )
+    lines += [
+        "",
+        "[bold]Selection:[/bold]",
+        (
+            f"  Candidate {sel_index} of {n_valid}{runner_up_str} "
+            f"[dim](requested={n_requested}  failures={n_failures}  "
+            f"calls={total_calls}  temp={draft_temp})[/dim]"
+        ),
+        f"  {rationale_truncated}",
+    ]
+
+    if cliche_violations:
+        lines.append("  [yellow]Cliché violations:[/yellow]")
+        for v in cliche_violations:
+            lines.append(f"    • {v}")
 
     return "\n".join(lines)
 

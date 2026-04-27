@@ -140,3 +140,145 @@ def test_latency_ms_is_non_negative_integer() -> None:
 
     assert isinstance(records[0]["latency_ms"], int)
     assert records[0]["latency_ms"] >= 0
+
+
+# ---------------------------------------------------------------------------
+# complete_json non-dict JSON handling
+# ---------------------------------------------------------------------------
+
+
+def test_complete_json_retries_when_response_is_non_dict_json() -> None:
+    """Valid JSON that is not an object must retry, then accept a dict on retry."""
+    # Attempt 1: JSON array → triggers the non-dict retry path.
+    # Attempt 2: JSON object → accepted.
+    client = FakeLLMClient(["[1, 2, 3]", '{"key": "ok"}'])
+
+    result = client.complete_json(prompt="p", temperature=0.0, max_tokens=10)
+
+    assert result == {"key": "ok"}
+    assert client.call_count == 2
+
+
+def test_complete_json_raises_value_error_when_non_dict_json_exhausts_retries() -> None:
+    """After max_retries all non-dict JSON responses, complete_json raises ValueError."""
+    client = FakeLLMClient(["[1, 2]", '"just a string"'])
+
+    with pytest.raises(ValueError, match="Expected JSON object"):
+        client.complete_json(
+            prompt="p", temperature=0.0, max_tokens=10, max_retries=1
+        )
+
+    assert client.call_count == 2
+
+
+def test_complete_json_records_non_dict_retry_with_parse_success_false() -> None:
+    """Each non-dict attempt must be logged with parse_success=False."""
+    records: list[dict[str, Any]] = []
+    client = FakeLLMClient(
+        ["[1, 2]", '{"ok": true}'],
+        on_call=lambda run_id, rec: records.append(rec),
+    )
+
+    client.complete_json(prompt="p", temperature=0.0, max_tokens=10)
+
+    assert len(records) == 2
+    assert records[0]["parse_success"] is False
+    assert records[1]["parse_success"] is True
+
+
+# ---------------------------------------------------------------------------
+# Provider registry
+# ---------------------------------------------------------------------------
+
+
+def test_register_provider_rejects_different_class_for_same_name() -> None:
+    """Registering a *different* class under an existing name raises ValueError."""
+    from storymesh.llm.base import LLMClient, register_provider
+
+    class ProviderA(LLMClient):
+        def complete(
+            self,
+            prompt: str,
+            *,
+            system_prompt: str | None = None,
+            temperature: float,
+            max_tokens: int,
+        ) -> str:
+            return ""
+
+    class ProviderB(LLMClient):
+        def complete(
+            self,
+            prompt: str,
+            *,
+            system_prompt: str | None = None,
+            temperature: float,
+            max_tokens: int,
+        ) -> str:
+            return ""
+
+    register_provider("__test_collide__", ProviderA)
+    try:
+        with pytest.raises(ValueError, match="already registered"):
+            register_provider("__test_collide__", ProviderB)
+    finally:
+        # Clean up so later tests don't see this name.
+        from storymesh.llm.base import _PROVIDER_REGISTRY
+
+        _PROVIDER_REGISTRY.pop("__test_collide__", None)
+
+
+def test_register_provider_idempotent_for_same_class() -> None:
+    """Re-registering the *same* class under the same name must not raise."""
+    from storymesh.llm.base import LLMClient, register_provider
+
+    class ProviderIdem(LLMClient):
+        def complete(
+            self,
+            prompt: str,
+            *,
+            system_prompt: str | None = None,
+            temperature: float,
+            max_tokens: int,
+        ) -> str:
+            return ""
+
+    register_provider("__test_idem__", ProviderIdem)
+    try:
+        register_provider("__test_idem__", ProviderIdem)  # no raise
+    finally:
+        from storymesh.llm.base import _PROVIDER_REGISTRY
+
+        _PROVIDER_REGISTRY.pop("__test_idem__", None)
+
+
+def test_get_provider_class_unknown_name_raises_value_error() -> None:
+    """get_provider_class must raise with a list of registered providers."""
+    from storymesh.llm.base import get_provider_class
+
+    with pytest.raises(ValueError, match="Unknown LLM provider"):
+        get_provider_class("does_not_exist_anywhere")
+
+
+def test_get_provider_class_returns_registered_class() -> None:
+    """get_provider_class returns the previously registered class."""
+    from storymesh.llm.base import LLMClient, get_provider_class, register_provider
+
+    class ProviderGet(LLMClient):
+        def complete(
+            self,
+            prompt: str,
+            *,
+            system_prompt: str | None = None,
+            temperature: float,
+            max_tokens: int,
+        ) -> str:
+            return ""
+
+    register_provider("__test_get__", ProviderGet)
+    try:
+        assert get_provider_class("__test_get__") is ProviderGet
+    finally:
+        from storymesh.llm.base import _PROVIDER_REGISTRY
+
+        _PROVIDER_REGISTRY.pop("__test_get__", None)

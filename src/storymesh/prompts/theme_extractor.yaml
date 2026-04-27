@@ -52,12 +52,14 @@ system: |
   - Assign an intensity score (0.0–1.0): how fundamentally do the assumptions conflict?
     A score near 1.0 means the genres have incompatible worldviews. Near 0.0 means
     they differ only in surface style.
-  - Identify 2–4 clichéd resolutions: the predictable, tropey approaches a lazy or
-    unimaginative writer would default to when resolving this particular tension. These
-    must be SPECIFIC and RECOGNIZABLE — not vague platitudes like "the hero saves the day",
-    but concrete narrative moves like "a lone detective rebuilds justice single-handedly
-    through sheer determination." The more specific the cliché, the more useful it is as
-    an exclusion for downstream agents.
+  - Identify 2–4 familiar resolutions: the reliable, conventional narrative moves that
+    readers of this genre intersection expect. These are the genre contract — the patterns
+    that are cliché precisely because they work and readers enjoy them. They must be
+    SPECIFIC and RECOGNIZABLE — not vague platitudes like "the hero saves the day", but
+    concrete narrative moves like "a lone detective rebuilds justice single-handedly
+    through sheer determination." The more specific the pattern, the more useful it is
+    as a departure point for downstream agents — the story may follow these patterns for
+    most of its arc and then break from one at a structurally significant moment.
 
   STEP 5 — GENERATE SEEDS:
   Generate between 3 and {max_seeds} narrative seeds — concrete 2–3 sentence story

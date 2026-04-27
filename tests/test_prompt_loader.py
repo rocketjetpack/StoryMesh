@@ -290,3 +290,137 @@ class TestProposalDraftSelectPrompt:
             candidates="[]",
         )
         assert "dark post-apocalyptic mystery" in result
+
+
+# ---------------------------------------------------------------------------
+# Integration: load the real proposal_draft_retry.yaml
+# ---------------------------------------------------------------------------
+
+
+class TestProposalDraftRetryPrompt:
+    def test_load_prompt_succeeds(self) -> None:
+        """Verify proposal_draft_retry.yaml loads without error."""
+        pt = load_prompt("proposal_draft_retry")
+        assert pt is not None
+
+    def test_system_prompt_non_empty(self) -> None:
+        pt = load_prompt("proposal_draft_retry")
+        assert pt.system.strip() != ""
+
+    def test_system_prompt_matches_generate(self) -> None:
+        """Retry system prompt must be identical to generate system prompt."""
+        gen = load_prompt("proposal_draft_generate")
+        ret = load_prompt("proposal_draft_retry")
+        assert ret.system == gen.system
+
+    def test_user_template_has_standard_placeholders(self) -> None:
+        """All original generate-prompt placeholders must be present."""
+        pt = load_prompt("proposal_draft_retry")
+        standard = {
+            "candidate_index",
+            "total_candidates",
+            "alternate_angle_note",
+            "user_prompt",
+            "normalized_genres",
+            "user_tones",
+            "narrative_context",
+            "assigned_seed",
+            "additional_seeds",
+            "tensions",
+            "genre_clusters",
+        }
+        for placeholder in standard:
+            assert f"{{{placeholder}}}" in pt._user_template, (
+                f"Missing standard placeholder: {{{placeholder}}}"
+            )
+
+    def test_user_template_has_retry_placeholders(self) -> None:
+        """Retry-specific placeholders must be present."""
+        pt = load_prompt("proposal_draft_retry")
+        retry_specific = {"previous_proposal", "rubric_feedback", "rubric_scores", "attempt_number"}
+        for placeholder in retry_specific:
+            assert f"{{{placeholder}}}" in pt._user_template, (
+                f"Missing retry placeholder: {{{placeholder}}}"
+            )
+
+    def test_format_user_with_valid_retry_data(self) -> None:
+        pt = load_prompt("proposal_draft_retry")
+        result = pt.format_user(
+            attempt_number=2,
+            previous_proposal='{"title": "Old Title"}',
+            rubric_feedback="[tension_inhabitation] (score: 0.3): Tension was resolved.",
+            rubric_scores="  tension_inhabitation: 0.3\n  COMPOSITE: 0.45",
+            candidate_index=1,
+            total_candidates=3,
+            alternate_angle_note="",
+            user_prompt="dark post-apocalyptic mystery",
+            normalized_genres=["mystery", "post_apocalyptic"],
+            user_tones=["dark"],
+            narrative_context=["flooded city"],
+            assigned_seed='{"seed_id": "S1", "concept": "A detective..."}',
+            additional_seeds="[]",
+            tensions="[]",
+            genre_clusters="[]",
+        )
+        assert "attempt 2" in result.lower()
+        assert "dark post-apocalyptic mystery" in result
+        assert "Old Title" in result
+
+
+# ---------------------------------------------------------------------------
+# Integration: load the real rubric_judge.yaml
+# ---------------------------------------------------------------------------
+
+
+class TestRubricJudgePrompt:
+    def test_load_prompt_succeeds(self) -> None:
+        """Verify rubric_judge.yaml loads without error."""
+        pt = load_prompt("rubric_judge")
+        assert pt is not None
+
+    def test_system_prompt_non_empty(self) -> None:
+        pt = load_prompt("rubric_judge")
+        assert pt.system.strip() != ""
+
+    def test_system_prompt_contains_all_dimension_names(self) -> None:
+        pt = load_prompt("rubric_judge")
+        expected = [
+            "restraint",
+            "convention_departure",
+            "specificity",
+            "protagonist_interiority",
+            "user_intent_fidelity",
+        ]
+        for name in expected:
+            assert name in pt.system, f"Dimension '{name}' missing from system prompt"
+
+    def test_system_prompt_contains_principle_refs(self) -> None:
+        pt = load_prompt("rubric_judge")
+        for ref in [
+            "restraint",
+            "convention_departure",
+            "specificity",
+            "protagonist_interiority",
+            "user_intent_fidelity",
+        ]:
+            assert ref in pt.system, f"Principle ref '{ref}' not referenced in rubric system prompt"
+
+    def test_user_template_has_required_placeholders(self) -> None:
+        pt = load_prompt("rubric_judge")
+        required = {"user_prompt", "normalized_genres", "user_tones", "tensions", "proposal"}
+        for placeholder in required:
+            assert f"{{{placeholder}}}" in pt._user_template, (
+                f"Missing placeholder: {{{placeholder}}}"
+            )
+
+    def test_format_user_with_valid_data(self) -> None:
+        pt = load_prompt("rubric_judge")
+        result = pt.format_user(
+            user_prompt="dark post-apocalyptic mystery",
+            normalized_genres=["mystery", "post_apocalyptic"],
+            user_tones=["dark"],
+            tensions="[]",
+            proposal='{"title": "The Last Inquest"}',
+        )
+        assert "dark post-apocalyptic mystery" in result
+        assert "The Last Inquest" in result

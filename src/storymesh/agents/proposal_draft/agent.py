@@ -16,6 +16,7 @@ creative output that a single LLM call cannot achieve.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import Any
 
@@ -31,6 +32,22 @@ from storymesh.schemas.proposal_draft import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass(frozen=True)
+class RubricFeedback:
+    """Internal carrier for rubric feedback passed to ProposalDraftAgent on retry.
+
+    Not a persisted schema — used only as a bridge between the node wrapper
+    (which reads RubricJudgeAgentOutput from state) and the agent (which
+    formats the retry prompt).
+    """
+
+    previous_proposal_json: str
+    feedback_text: str
+    scores_text: str
+    attempt_number: int
+
 
 _ALTERNATE_ANGLE_NOTE = (
     "\nNOTE: This seed was already assigned to a previous candidate. "
@@ -86,16 +103,25 @@ class ProposalDraftAgent:
         self._selection_temperature = selection_temperature
         self._selection_max_tokens = selection_max_tokens
 
-        # Load both prompts eagerly so misconfiguration is caught at
+        # Load all prompts eagerly so misconfiguration is caught at
         # construction time, not mid-pipeline.
         self._generate_prompt = load_prompt("proposal_draft_generate")
         self._select_prompt = load_prompt("proposal_draft_select")
+        self._retry_prompt = load_prompt("proposal_draft_retry")
 
-    def run(self, input_data: ProposalDraftAgentInput) -> ProposalDraftAgentOutput:
+    def run(
+        self,
+        input_data: ProposalDraftAgentInput,
+        *,
+        rubric_feedback: RubricFeedback | None = None,
+    ) -> ProposalDraftAgentOutput:
         """Generate candidate proposals and select the strongest one.
 
         Args:
             input_data: Assembled input from multiple upstream pipeline stages.
+            rubric_feedback: When provided, uses the retry prompt template that
+                includes the evaluator's critique so the generator has targeted
+                creative direction. Pass None (default) for the initial attempt.
 
         Returns:
             A frozen ProposalDraftAgentOutput with the selected proposal,
@@ -106,12 +132,15 @@ class ProposalDraftAgent:
         """
         seeds = input_data.narrative_seeds
         num_candidates = self._num_candidates
+        is_retry = rubric_feedback is not None
+        active_prompt = self._retry_prompt if is_retry else self._generate_prompt
 
         logger.info(
-            "ProposalDraftAgent starting | seeds=%d candidates=%d temperature=%.1f",
+            "ProposalDraftAgent starting | seeds=%d candidates=%d temperature=%.1f retry=%s",
             len(seeds),
             num_candidates,
             self._temperature,
+            is_retry,
         )
 
         # Map candidate index → seed_id for debug output.
@@ -131,7 +160,7 @@ class ProposalDraftAgent:
             # so the model knows the seed is being reused and must diverge.
             alternate_angle_note = _ALTERNATE_ANGLE_NOTE if i >= len(seeds) else ""
 
-            user_prompt_text = self._generate_prompt.format_user(
+            format_kwargs: dict[str, Any] = dict(
                 candidate_index=i + 1,
                 total_candidates=num_candidates,
                 alternate_angle_note=alternate_angle_note,
@@ -150,11 +179,18 @@ class ProposalDraftAgent:
                     [c.model_dump() for c in input_data.genre_clusters]
                 ).decode(),
             )
+            if rubric_feedback is not None:
+                format_kwargs["previous_proposal"] = rubric_feedback.previous_proposal_json
+                format_kwargs["rubric_feedback"] = rubric_feedback.feedback_text
+                format_kwargs["rubric_scores"] = rubric_feedback.scores_text
+                format_kwargs["attempt_number"] = rubric_feedback.attempt_number
+
+            user_prompt_text = active_prompt.format_user(**format_kwargs)
 
             try:
                 response = self._llm_client.complete_json(
                     user_prompt_text,
-                    system_prompt=self._generate_prompt.system,
+                    system_prompt=active_prompt.system,
                     temperature=self._temperature,
                     max_tokens=self._max_tokens,
                 )
@@ -265,6 +301,8 @@ class ProposalDraftAgent:
             "selection_temperature": self._selection_temperature,
             "seed_assignments": seed_assignments,
             "total_llm_calls": total_llm_calls,
+            "is_retry": is_retry,
+            "attempt_number": rubric_feedback.attempt_number if rubric_feedback else 1,
         }
 
         return ProposalDraftAgentOutput(
