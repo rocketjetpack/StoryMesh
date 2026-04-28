@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import pytest
-
 from storymesh.agents.rubric_judge.agent import (
     DEFAULT_DIMENSION_WEIGHTS,
     RubricJudgeAgent,
@@ -17,7 +15,6 @@ from storymesh.schemas.rubric_judge import (
     RubricJudgeAgentInput,
     RubricJudgeAgentOutput,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -87,7 +84,11 @@ def _make_input(attempt_number: int = 1) -> RubricJudgeAgentInput:
     )
 
 
-def _dim_response(score: float, feedback: str = "Adequate evaluation of this dimension.", ref: str = "restraint") -> dict[str, Any]:
+def _dim_response(
+    score: float,
+    feedback: str = "Adequate evaluation of this dimension.",
+    ref: str = "restraint",
+) -> dict[str, Any]:
     return {"score": score, "feedback": feedback, "principle_ref": ref}
 
 
@@ -249,7 +250,7 @@ class TestTemperature:
         original_complete_json = FakeLLMClient.complete_json
 
         class _TrackingClient(FakeLLMClient):
-            def complete_json(self, *args: object, temperature: float = 0.0, **kwargs: object) -> dict[str, object]:  # type: ignore[override]
+            def complete_json(self, *args: object, temperature: float = 0.0, **kwargs: object) -> dict[str, object]:
                 calls.append(temperature)
                 return original_complete_json(self, *args, temperature=temperature, **kwargs)  # type: ignore[arg-type]
 

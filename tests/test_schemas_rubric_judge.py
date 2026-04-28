@@ -13,7 +13,6 @@ from storymesh.schemas.rubric_judge import (
 )
 from storymesh.versioning.schemas import RUBRIC_SCHEMA_VERSION
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -107,7 +106,7 @@ class TestDimensionResult:
     def test_frozen(self) -> None:
         dim = _valid_dimension()
         with pytest.raises((TypeError, ValidationError)):
-            dim.score = 0.5  # type: ignore[misc]
+            dim.score = 0.5
 
     def test_score_below_zero_rejected(self) -> None:
         with pytest.raises(ValidationError):
@@ -143,7 +142,7 @@ class TestRubricJudgeAgentOutput:
     def test_frozen(self) -> None:
         out = _valid_output()
         with pytest.raises((TypeError, ValidationError)):
-            out.passed = False  # type: ignore[misc]
+            out.passed = False
 
     def test_schema_version_matches_constant(self) -> None:
         out = _valid_output()
@@ -222,7 +221,7 @@ class TestRubricJudgeAgentInput:
             normalized_genres=["mystery"],
         )
         with pytest.raises((TypeError, ValidationError)):
-            inp.attempt_number = 2  # type: ignore[misc]
+            inp.attempt_number = 2
 
     def test_attempt_number_ge_one(self) -> None:
         with pytest.raises(ValidationError):
@@ -278,10 +277,10 @@ class TestRubricJudgeAgentInput:
 
 class TestExpectedDimensions:
     def test_all_five_dimensions_present(self) -> None:
-        assert EXPECTED_DIMENSIONS == {
+        assert {
             "restraint",
             "convention_departure",
             "specificity",
             "protagonist_interiority",
             "user_intent_fidelity",
-        }
+        } == EXPECTED_DIMENSIONS

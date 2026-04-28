@@ -22,9 +22,10 @@ from storymesh.schemas.proposal_draft import ProposalDraftAgentInput
 
 if TYPE_CHECKING:
     from storymesh.core.artifacts import ArtifactStore
+    from storymesh.schemas.rubric_judge import RubricJudgeAgentOutput
 
 
-def _format_feedback(rubric_output: Any) -> str:
+def _format_feedback(rubric_output: RubricJudgeAgentOutput) -> str:
     """Format dimension-by-dimension rubric scores and feedback as readable text."""
     lines: list[str] = []
     dimensions = getattr(rubric_output, "dimensions", {})
@@ -44,7 +45,7 @@ def _format_feedback(rubric_output: Any) -> str:
     return "\n".join(lines)
 
 
-def _format_scores(rubric_output: Any) -> str:
+def _format_scores(rubric_output: RubricJudgeAgentOutput) -> str:
     """Format rubric scores as a compact summary."""
     lines: list[str] = []
     dimensions = getattr(rubric_output, "dimensions", {})
@@ -117,6 +118,7 @@ def make_proposal_draft_node(
 
         rubric_feedback: RubricFeedback | None = None
         if is_retry:
+            assert rubric_output is not None
             prev_proposal_output = state.get("proposal_draft_output")
             prev_proposal_json = (
                 json.dumps(prev_proposal_output.proposal.model_dump(), indent=2)

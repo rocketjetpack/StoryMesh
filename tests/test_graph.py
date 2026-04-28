@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
 import orjson
@@ -40,6 +40,11 @@ from storymesh.schemas.theme_extractor import (
     ThematicTension,
     ThemeExtractorAgentOutput,
 )
+
+if TYPE_CHECKING:
+    from storymesh.agents.book_fetcher.agent import BookFetcherAgent
+    from storymesh.agents.rubric_judge.agent import RubricJudgeAgent
+    from storymesh.schemas.rubric_judge import RubricJudgeAgentOutput
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -152,7 +157,7 @@ class TestGenreNormalizerNode:
 
         assert isinstance(output, GenreNormalizerAgentOutput)
         with pytest.raises(Exception):  # noqa: B017
-            output.normalized_genres = []  # type: ignore[misc]
+            output.normalized_genres = []
 
 
 # ── TestBookFetcherNode ───────────────────────────────────────────────────────
@@ -194,7 +199,7 @@ class _StubOLClient:
 def _make_book_fetcher_agent(
     tmp_path: Path,
     client: _StubOLClient | None = None,
-) -> "BookFetcherAgent":
+) -> BookFetcherAgent:
     """Build a BookFetcherAgent isolated from config and disk cache side-effects."""
     from storymesh.agents.book_fetcher.agent import BookFetcherAgent  # noqa: PLC0415
 
@@ -203,7 +208,7 @@ def _make_book_fetcher_agent(
         return_value=tmp_path,
     ):
         return BookFetcherAgent(
-            client=client or _StubOLClient(),
+            client=client or _StubOLClient(),  # type: ignore[arg-type]
             cache_ttl=60,
             max_books=10,
             sort_strategies=["editions"],
@@ -278,7 +283,7 @@ class TestBookFetcherNode:
         }
 
         with pytest.raises(RuntimeError, match="genre_normalizer_output.*None"):
-            node(state)  # type: ignore[arg-type]
+            node(state)
 
     def test_validates_inferred_subjects_via_agent(self, tmp_path: Path) -> None:
         """Inferred genres must be probed with fetch_subject_info before being queried."""
@@ -356,11 +361,12 @@ class TestBookFetcherNode:
         """ContextVar current_run_id must be set to state['run_id'] during agent.run()."""
         from storymesh.agents.book_fetcher.agent import BookFetcherAgent  # noqa: PLC0415
         from storymesh.llm.base import current_run_id as _crid  # noqa: PLC0415
+        from storymesh.schemas.book_fetcher import BookFetcherAgentInput as _BFI  # noqa: PLC0415
 
         observed_run_ids: list[str] = []
 
         class _ObservingAgent(BookFetcherAgent):
-            def run(self, input_data: Any) -> BookFetcherAgentOutput:  # type: ignore[override]
+            def run(self, input_data: _BFI) -> BookFetcherAgentOutput:
                 observed_run_ids.append(_crid.get())
                 return super().run(input_data)
 
@@ -368,7 +374,7 @@ class TestBookFetcherNode:
             "storymesh.agents.book_fetcher.agent.get_cache_dir",
             return_value=tmp_path,
         ):
-            agent = _ObservingAgent(client=_StubOLClient())
+            agent = _ObservingAgent(client=_StubOLClient())  # type: ignore[arg-type]
 
         node = make_book_fetcher_node(agent)
         state: StoryMeshState = {
@@ -480,7 +486,7 @@ class TestBookRankerNode:
         }
 
         with pytest.raises(RuntimeError, match="book_fetcher_output.*None"):
-            node(state)  # type: ignore[arg-type]
+            node(state)
 
     def test_ranked_books_count_matches_input(self, tmp_path: Path) -> None:
         """Output ranked_books length must not exceed top_n (default 10)."""
@@ -625,7 +631,7 @@ class TestThemeExtractorNode:
         }
 
         with pytest.raises(RuntimeError, match="genre_normalizer_output.*None"):
-            node(state)  # type: ignore[arg-type]
+            node(state)
 
     def test_none_book_ranker_output_raises_runtime_error(self) -> None:
         """Node raises RuntimeError when book_ranker_output is None."""
@@ -639,14 +645,14 @@ class TestThemeExtractorNode:
         }
 
         with pytest.raises(RuntimeError, match="book_ranker_output.*None"):
-            node(state)  # type: ignore[arg-type]
+            node(state)
 
     def test_assembles_input_from_multiple_stages(self) -> None:
         """The assembled input carries data from both upstream outputs."""
         captured_inputs: list[object] = []
 
         class _RecordingAgent(ThemeExtractorAgent):
-            def run(self, input_data: object) -> ThemeExtractorAgentOutput:  # type: ignore[override]
+            def run(self, input_data: object) -> ThemeExtractorAgentOutput:
                 captured_inputs.append(input_data)
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -958,7 +964,7 @@ class TestProposalDraftNode:
         state = self._base_state()
         state["theme_extractor_output"] = None
         with pytest.raises(RuntimeError, match="theme_extractor_output.*None"):
-            node(state)  # type: ignore[arg-type]
+            node(state)
 
     def test_missing_genre_normalizer_output_raises(self) -> None:
         """RuntimeError when genre_normalizer_output is None."""
@@ -966,7 +972,7 @@ class TestProposalDraftNode:
         state = self._base_state()
         state["genre_normalizer_output"] = None
         with pytest.raises(RuntimeError, match="genre_normalizer_output.*None"):
-            node(state)  # type: ignore[arg-type]
+            node(state)
 
     def test_assembles_input_from_multiple_stages(self) -> None:
         """Input must carry narrative_seeds from theme_extractor and narrative_context
@@ -974,7 +980,7 @@ class TestProposalDraftNode:
         captured_inputs: list[object] = []
 
         class _RecordingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:  # type: ignore[override]
+            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
                 captured_inputs.append(input_data)
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1002,7 +1008,7 @@ class TestProposalDraftNode:
         observed_run_ids: list[str] = []
 
         class _ObservingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:  # type: ignore[override]
+            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
                 observed_run_ids.append(_crid.get())
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1053,11 +1059,11 @@ def _base_proposal_state() -> StoryMeshState:
     }
 
 
-def _proposal_draft_output_for_retry(state: StoryMeshState) -> Any:
+def _proposal_draft_output_for_retry(state: StoryMeshState) -> ProposalDraftAgentOutput:
     """Build a ProposalDraftAgentOutput for use as a prior attempt in retry tests."""
     from storymesh.schemas.proposal_draft import ProposalDraftAgentInput
-    theme_out = state["theme_extractor_output"]  # type: ignore[literal-required]
-    genre_out = state["genre_normalizer_output"]  # type: ignore[literal-required]
+    theme_out = state["theme_extractor_output"]
+    genre_out = state["genre_normalizer_output"]
     assert theme_out is not None
     assert genre_out is not None
     inp = ProposalDraftAgentInput(
@@ -1080,7 +1086,7 @@ class TestProposalDraftNodeRetry:
         received_feedback: list[object] = []
 
         class _CapturingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:  # type: ignore[override]
+            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
                 received_feedback.append(rubric_feedback)
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1096,16 +1102,16 @@ class TestProposalDraftNodeRetry:
         received_feedback: list[object] = []
 
         class _CapturingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:  # type: ignore[override]
+            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
                 received_feedback.append(rubric_feedback)
                 return super().run(input_data)  # type: ignore[arg-type]
 
         agent = _CapturingAgent(llm_client=FakeLLMClient([_valid_proposal_json_for_node()]), num_candidates=1)
         node = make_proposal_draft_node(agent)
         state = _base_proposal_state()
-        state["rubric_judge_output"] = _make_failed_rubric_output()  # type: ignore[assignment]
+        state["rubric_judge_output"] = _make_failed_rubric_output()  # type: ignore[typeddict-item]
         state["rubric_retry_count"] = 0
-        state["proposal_draft_output"] = _proposal_draft_output_for_retry(state)  # type: ignore[assignment]
+        state["proposal_draft_output"] = _proposal_draft_output_for_retry(state)
         node(state)
         assert len(received_feedback) == 1
         fb = received_feedback[0]
@@ -1118,9 +1124,9 @@ class TestProposalDraftNodeRetry:
         """On retry, the returned dict includes rubric_retry_count incremented by 1."""
         node = make_proposal_draft_node(_make_proposal_agent())
         state = _base_proposal_state()
-        state["rubric_judge_output"] = _make_failed_rubric_output()  # type: ignore[assignment]
+        state["rubric_judge_output"] = _make_failed_rubric_output()  # type: ignore[typeddict-item]
         state["rubric_retry_count"] = 0
-        state["proposal_draft_output"] = _proposal_draft_output_for_retry(state)  # type: ignore[assignment]
+        state["proposal_draft_output"] = _proposal_draft_output_for_retry(state)
         result = node(state)
         assert result["rubric_retry_count"] == 1
 
@@ -1129,14 +1135,14 @@ class TestProposalDraftNodeRetry:
         received_feedback: list[object] = []
 
         class _CapturingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:  # type: ignore[override]
+            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
                 received_feedback.append(rubric_feedback)
                 return super().run(input_data)  # type: ignore[arg-type]
 
         agent = _CapturingAgent(llm_client=FakeLLMClient([_valid_proposal_json_for_node()]), num_candidates=1)
         node = make_proposal_draft_node(agent)
         state = _base_proposal_state()
-        state["rubric_judge_output"] = _make_passed_rubric_output()  # type: ignore[assignment]
+        state["rubric_judge_output"] = _make_passed_rubric_output()  # type: ignore[typeddict-item]
         result = node(state)
         assert received_feedback == [None]
         assert "rubric_retry_count" not in result
@@ -1146,7 +1152,7 @@ class TestProposalDraftNodeRetry:
         received_feedback: list[object] = []
 
         class _CapturingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:  # type: ignore[override]
+            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
                 received_feedback.append(rubric_feedback)
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1162,7 +1168,7 @@ class TestProposalDraftNodeRetry:
 # ── TestRubricJudgeNode ────────────────────────────────────────────────────────
 
 
-def _make_rubric_agent(passed: bool = True) -> Any:
+def _make_rubric_agent(passed: bool = True) -> RubricJudgeAgent:
     """Build a RubricJudgeAgent backed by a FakeLLMClient."""
     import json as _json
 
@@ -1191,7 +1197,7 @@ def _make_rubric_agent(passed: bool = True) -> Any:
 def _state_with_proposal() -> StoryMeshState:
     """State with a proposal draft output present, ready for rubric evaluation."""
     state = _base_proposal_state()
-    state["proposal_draft_output"] = _proposal_draft_output_for_retry(state)  # type: ignore[assignment]
+    state["proposal_draft_output"] = _proposal_draft_output_for_retry(state)
     return state
 
 
@@ -1232,17 +1238,18 @@ class TestRubricJudgeNode:
         state = _state_with_proposal()
         state["theme_extractor_output"] = None
         with pytest.raises(RuntimeError, match="theme_extractor_output.*None"):
-            node(state)  # type: ignore[arg-type]
+            node(state)
 
 
 class TestRubricRouteWithRealOutputType:
     """Routing tests using actual RubricJudgeAgentOutput objects."""
 
-    def _make_output(self, passed: bool) -> Any:
+    def _make_output(self, passed: bool) -> RubricJudgeAgentOutput:
         import json as _json
 
         from storymesh.agents.rubric_judge.agent import RubricJudgeAgent
-        from storymesh.schemas.rubric_judge import EXPECTED_DIMENSIONS
+        from storymesh.schemas.proposal_draft import ProposalDraftAgentInput as _PDI  # noqa: PLC0415
+        from storymesh.schemas.rubric_judge import EXPECTED_DIMENSIONS, RubricJudgeAgentInput
 
         dims = {
             d: {
@@ -1259,20 +1266,20 @@ class TestRubricRouteWithRealOutputType:
         })
         from storymesh.llm.base import FakeLLMClient as _FLC
         agent = RubricJudgeAgent(llm_client=_FLC(responses=[resp]), pass_threshold=0.7)
-        from storymesh.schemas.rubric_judge import RubricJudgeAgentInput
+        theme_out = _make_theme_extractor_output_for_proposal()
         inp = RubricJudgeAgentInput(
             proposal=_make_proposal_agent().run(
-                __import__("storymesh.schemas.proposal_draft", fromlist=["ProposalDraftAgentInput"]).ProposalDraftAgentInput(
-                    narrative_seeds=_make_theme_extractor_output_for_proposal().narrative_seeds,
-                    tensions=_make_theme_extractor_output_for_proposal().tensions,
-                    genre_clusters=_make_theme_extractor_output_for_proposal().genre_clusters,
+                _PDI(
+                    narrative_seeds=theme_out.narrative_seeds,
+                    tensions=theme_out.tensions,
+                    genre_clusters=theme_out.genre_clusters,
                     normalized_genres=_make_genre_normalizer_output().normalized_genres,
                     user_tones=[],
                     narrative_context=[],
                     user_prompt="dark post-apocalyptic mystery",
                 )
             ).proposal,
-            tensions=_make_theme_extractor_output_for_proposal().tensions,
+            tensions=theme_out.tensions,
             user_prompt="dark post-apocalyptic mystery",
             normalized_genres=["mystery"],
         )
