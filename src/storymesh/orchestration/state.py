@@ -5,9 +5,9 @@ node in the graph. Each node receives the full state and returns a partial
 dict containing only the keys it updates — LangGraph merges these back in
 automatically.
 
-Fields for stages 5–6 are typed as ``object | None`` until those agents are
-implemented and their schemas are added to storymesh.schemas. Tighten each
-field's type annotation as the corresponding schema is introduced.
+All fields are optional (``total=False``) so nodes can return partial dicts.
+The pipeline populates ``user_prompt`` and ``pipeline_version`` before
+invocation; all other fields start as ``None`` and are filled as stages run.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from storymesh.schemas.cover_art import CoverArtAgentOutput
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
 from storymesh.schemas.proposal_draft import ProposalDraftAgentOutput
 from storymesh.schemas.rubric_judge import RubricJudgeAgentOutput
+from storymesh.schemas.story_writer import StoryWriterAgentOutput
 from storymesh.schemas.theme_extractor import ThemeExtractorAgentOutput
 
 
@@ -60,9 +61,8 @@ class StoryMeshState(TypedDict, total=False):
     # ── Stage 5: RubricJudgeAgent (LLM, conditional retry edge) ───────────
     rubric_judge_output: RubricJudgeAgentOutput | None
 
-    # ── Stage 6: SynopsisWriterAgent (LLM) ────────────────────────────────
-    # TODO: Replace object with SynopsisWriterOutput once implemented.
-    synopsis_writer_output: object | None
+    # ── Stage 6: StoryWriterAgent (LLM) ───────────────────────────────────
+    story_writer_output: StoryWriterAgentOutput | None
 
     # ── Stage 7: CoverArtAgent ─────────────────────────────────────────────
     cover_art_output: CoverArtAgentOutput | None

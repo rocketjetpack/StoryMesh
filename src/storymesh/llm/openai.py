@@ -7,6 +7,7 @@ from typing import Any
 
 import openai
 
+from storymesh.exceptions import LLMOutputTruncatedError
 from storymesh.llm.base import LLMCallLogger, LLMClient, _traceable, register_provider
 
 _DEFAULT_MODEL = "gpt-4o-mini"
@@ -100,6 +101,12 @@ class OpenAIClient(LLMClient):
             raise ValueError(
                 "OpenAI response choice contained a None content field. "
                 "This can occur when the model uses tool calls instead of a text response."
+            )
+
+        if response.choices[0].finish_reason == "length":
+            raise LLMOutputTruncatedError(
+                partial_response=content,
+                token_budget=max_tokens,
             )
 
         return content

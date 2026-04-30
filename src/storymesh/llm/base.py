@@ -13,6 +13,8 @@ from typing import Any
 
 import orjson
 
+from storymesh.exceptions import LLMOutputTruncatedError
+
 logger = logging.getLogger(__name__)
 
 # A callable that accepts (run_id, record) and writes it somewhere.
@@ -110,14 +112,40 @@ class LLMClient(ABC):
         ``_write_call_record()`` regardless of success or failure.
         """
 
+        effective_max_tokens = max_tokens
+
         for attempt in range(max_retries + 1):
             t0 = time.perf_counter()
-            raw = self.complete(
-                prompt,
-                system_prompt=system_prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
+            try:
+                raw = self.complete(
+                    prompt,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    max_tokens=effective_max_tokens,
+                )
+            except LLMOutputTruncatedError as exc:
+                latency_ms = round((time.perf_counter() - t0) * 1000)
+                logger.warning(
+                    "Response truncated at %d tokens (attempt %d/%d). "
+                    "Escalating budget to %d and retrying.",
+                    effective_max_tokens,
+                    attempt + 1,
+                    max_retries + 1,
+                    effective_max_tokens * 2,
+                )
+                self._write_call_record(
+                    system_prompt=system_prompt,
+                    user_prompt=prompt,
+                    raw_response=exc.partial_response,
+                    temperature=temperature,
+                    attempt=attempt + 1,
+                    latency_ms=latency_ms,
+                    parse_success=False,
+                )
+                if attempt < max_retries:
+                    effective_max_tokens *= 2
+                    continue
+                raise
             latency_ms = round((time.perf_counter() - t0) * 1000)
 
             cleaned = _strip_markdown_fences(raw.strip())
@@ -276,11 +304,21 @@ def get_provider_class(name: str) -> type[LLMClient]:
 
 
 class FakeLLMClient(LLMClient):
-    """This implementation exists solely for pytest testing of the base class without any implementation."""
+    """LLMClient stub for unit testing without a real API.
+
+    ``responses`` is a list of values consumed in order on each ``complete()``
+    call.  Each element may be:
+
+    - A ``str`` — returned as the raw completion text.
+    - An ``LLMOutputTruncatedError`` instance — raised to simulate a
+      token-budget truncation, allowing tests to exercise the budget
+      escalation path in ``complete_json()``.
+    - Any other ``Exception`` instance — raised as-is.
+    """
 
     def __init__(
         self,
-        responses: list[str],
+        responses: list[str | Exception],
         agent_name: str = "fake",
         on_call: LLMCallLogger | None = None,
     ) -> None:
@@ -298,4 +336,6 @@ class FakeLLMClient(LLMClient):
         ) -> str:
         response = self.responses[self.call_count]
         self.call_count += 1
+        if isinstance(response, Exception):
+            raise response
         return response

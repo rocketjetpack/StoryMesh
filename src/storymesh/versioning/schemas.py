@@ -5,6 +5,7 @@ PROPOSAL_SCHEMA_VERSION = "1.2"
 THEMEPACK_SCHEMA_VERSION = "1.1"
 RUBRIC_SCHEMA_VERSION = "1.0"
 COVER_ART_SCHEMA_VERSION = "1.1"
+STORY_WRITER_SCHEMA_VERSION = "1.0"
 
 SCHEMA_VERSIONS: dict[str, str] = {
     "Genre Constraint": GENRE_CONSTRAINT_SCHEMA_VERSION,
@@ -14,6 +15,7 @@ SCHEMA_VERSIONS: dict[str, str] = {
     "Themepack": THEMEPACK_SCHEMA_VERSION,
     "Rubric": RUBRIC_SCHEMA_VERSION,
     "Cover Art": COVER_ART_SCHEMA_VERSION,
+    "Story Writer": STORY_WRITER_SCHEMA_VERSION,
 }
 
 # Version History
@@ -67,3 +69,8 @@ SCHEMA_VERSIONS: dict[str, str] = {
 #             dall-e-3 to gpt-image-2. Removed image_style field (gpt-image-2 does
 #             not support a style parameter). Quality values updated from
 #             'standard'/'hd' to 'low'/'medium'/'high'/'auto'.
+# 2026-04-30: Add Story Writer schema 1.0. Introduces StoryWriterAgentInput,
+#             SceneOutline, and StoryWriterAgentOutput. Replaces the scaffolded
+#             SynopsisWriterAgent placeholder. Produces back_cover_summary,
+#             scene_list (6-10 SceneOutline objects), and full_draft prose
+#             separated by SCENE_BREAK delimiters for book assembly.

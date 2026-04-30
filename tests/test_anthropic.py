@@ -6,19 +6,26 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from storymesh.exceptions import LLMOutputTruncatedError
 from storymesh.llm.anthropic import _DEFAULT_MODEL, AnthropicClient
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _mock_response(text: str = "hello", block_type: str = "text", num_blocks: int = 1) -> MagicMock:
+def _mock_response(
+    text: str = "hello",
+    block_type: str = "text",
+    num_blocks: int = 1,
+    stop_reason: str = "end_turn",
+) -> MagicMock:
     """Build a mock Anthropic API response."""
     block = MagicMock()
     block.type = block_type
     block.text = text
     response = MagicMock()
     response.content = [block] * num_blocks
+    response.stop_reason = stop_reason
     return response
 
 
@@ -109,4 +116,26 @@ class TestComplete:
         client = AnthropicClient(api_key="sk-test")
         with pytest.raises(ValueError, match="Expected a text content block"):
             client.complete(prompt="hello", temperature=0.0, max_tokens=100)
+
+    @patch("storymesh.llm.anthropic.anthropic.Anthropic")
+    def test_truncated_response_raises_llm_output_truncated_error(
+        self, mock_anthropic: MagicMock
+    ) -> None:
+        mock_anthropic.return_value.messages.create.return_value = _mock_response(
+            text='{"incomplete":', stop_reason="max_tokens"
+        )
+        client = AnthropicClient(api_key="sk-test")
+        with pytest.raises(LLMOutputTruncatedError) as exc_info:
+            client.complete(prompt="hello", temperature=0.0, max_tokens=100)
+        assert exc_info.value.token_budget == 100
+        assert exc_info.value.partial_response == '{"incomplete":'
+
+    @patch("storymesh.llm.anthropic.anthropic.Anthropic")
+    def test_end_turn_does_not_raise_truncation(self, mock_anthropic: MagicMock) -> None:
+        mock_anthropic.return_value.messages.create.return_value = _mock_response(
+            text="complete response", stop_reason="end_turn"
+        )
+        client = AnthropicClient(api_key="sk-test")
+        result = client.complete(prompt="hello", temperature=0.0, max_tokens=100)
+        assert result == "complete response"
 

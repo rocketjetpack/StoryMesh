@@ -32,7 +32,7 @@ _STAGE_NAMES = [
     "theme_extractor",
     "proposal_draft",
     "rubric_judge",
-    "synopsis_writer",
+    "story_writer",
     "cover_art",           # Stage 7
 ]
 

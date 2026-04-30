@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from storymesh.exceptions import LLMOutputTruncatedError
 from storymesh.llm.base import get_provider_class
 from storymesh.llm.openai import _DEFAULT_MODEL, OpenAIClient
 
@@ -14,12 +15,13 @@ from storymesh.llm.openai import _DEFAULT_MODEL, OpenAIClient
 # ---------------------------------------------------------------------------
 
 
-def _mock_response(content: str = "hello") -> MagicMock:
+def _mock_response(content: str = "hello", finish_reason: str = "stop") -> MagicMock:
     """Build a mock OpenAI chat completions response."""
     message = MagicMock()
     message.content = content
     choice = MagicMock()
     choice.message = message
+    choice.finish_reason = finish_reason
     response = MagicMock()
     response.choices = [choice]
     return response
@@ -114,6 +116,30 @@ class TestComplete:
         client = OpenAIClient(api_key="sk-test")
         with pytest.raises(ValueError, match="None content"):
             client.complete(prompt="hello", temperature=0.0, max_tokens=100)
+
+    @patch("storymesh.llm.openai.openai.OpenAI")
+    def test_truncated_response_raises_llm_output_truncated_error(
+        self, mock_openai: MagicMock
+    ) -> None:
+        mock_openai.return_value.chat.completions.create.return_value = _mock_response(
+            content='{"incomplete":', finish_reason="length"
+        )
+        client = OpenAIClient(api_key="sk-test")
+        with pytest.raises(LLMOutputTruncatedError) as exc_info:
+            client.complete(prompt="hello", temperature=0.0, max_tokens=100)
+        assert exc_info.value.token_budget == 100
+        assert exc_info.value.partial_response == '{"incomplete":'
+
+    @patch("storymesh.llm.openai.openai.OpenAI")
+    def test_stop_finish_reason_does_not_raise_truncation(
+        self, mock_openai: MagicMock
+    ) -> None:
+        mock_openai.return_value.chat.completions.create.return_value = _mock_response(
+            content="complete response", finish_reason="stop"
+        )
+        client = OpenAIClient(api_key="sk-test")
+        result = client.complete(prompt="hello", temperature=0.0, max_tokens=100)
+        assert result == "complete response"
 
 
 # ---------------------------------------------------------------------------

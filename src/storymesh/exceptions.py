@@ -20,3 +20,23 @@ class GenreResolutionError(StoryMeshError):
 
 class RunNotFoundError(StoryMeshError):
     """Raised when a requested run ID does not exist in the runs directory."""
+
+
+class LLMOutputTruncatedError(StoryMeshError):
+    """Raised when the LLM stops because the max_tokens budget was reached.
+
+    Carries the partial response text and the budget that was exhausted so
+    that ``complete_json()`` can escalate the budget and retry automatically.
+
+    Attributes:
+        partial_response: The incomplete text returned before truncation.
+        token_budget: The ``max_tokens`` value that proved insufficient.
+    """
+
+    def __init__(self, *, partial_response: str, token_budget: int) -> None:
+        super().__init__(
+            f"LLM output truncated at {token_budget} tokens. "
+            "Retry with a larger max_tokens budget."
+        )
+        self.partial_response = partial_response
+        self.token_budget = token_budget

@@ -32,7 +32,7 @@ _STAGE_NAMES: tuple[str, ...] = (
     "theme_extractor",
     "proposal_draft",
     "rubric_judge",
-    "synopsis_writer",
+    "story_writer",
 )
 
 

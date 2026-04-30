@@ -35,7 +35,7 @@ from storymesh.orchestration.state import StoryMeshState
 logger = logging.getLogger(__name__)
 
 # Future node imports (uncomment as agents are implemented):
-# from storymesh.orchestration.nodes.synopsis_writer import make_synopsis_writer_node
+# (story_writer is imported lazily inside build_graph below)
 
 
 # Maps provider names to the environment variable names that hold their API keys.
@@ -230,7 +230,7 @@ def _rubric_route(state: StoryMeshState) -> str:
     """Conditional routing function after rubric_judge.
 
     Routes to ``'proposal_draft'`` when the rubric fails and the retry
-    budget has not been exhausted, otherwise routes to ``'synopsis_writer'``.
+    budget has not been exhausted, otherwise routes to ``'story_writer'``.
 
     The real ``RubricJudgeAgent`` should:
 
@@ -254,7 +254,7 @@ def _rubric_route(state: StoryMeshState) -> str:
     passed: bool = rubric_output is None or bool(rubric_output.passed)
 
     if passed or retry_count >= MAX_RUBRIC_RETRIES:
-        return "synopsis_writer"
+        return "story_writer"
     return "proposal_draft"
 
 
@@ -271,13 +271,13 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
           → proposal_draft
           → rubric_judge
           → [conditional]
-              ├── PASS → synopsis_writer → cover_art → END
+              ├── PASS → story_writer → cover_art → END
               └── FAIL → proposal_draft (max 2 retries)
 
     Notes:
-    - Stage 6 (synopsis_writer) is a noop placeholder until its agent is implemented.
-    - The rubric retry loop is wired via ``_rubric_route``; the noop always
-      passes so the pipeline progresses linearly until real agents are added.
+    - The rubric retry loop is wired via ``_rubric_route``; without an LLM key
+      the rubric node runs as noop and always passes.
+    - Agents without API keys degrade gracefully to noop nodes.
     - Checkpointer: pass ``checkpointer=MemorySaver()`` to ``compile()``
       when HITL or run-persistence is needed.
 
@@ -416,6 +416,35 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
         )
         rubric_judge_node = make_rubric_judge_node(rubric_agent, artifact_store=artifact_store)
 
+    # ── Stage 6: StoryWriterAgent ─────────────────────────────────────────
+    from storymesh.agents.story_writer.agent import StoryWriterAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.story_writer import (  # noqa: PLC0415
+        make_story_writer_node,
+    )
+
+    story_cfg = get_agent_config("story_writer")
+    story_llm = _build_llm_client(
+        story_cfg, agent_name="story_writer", artifact_store=artifact_store
+    )
+
+    if story_llm is None:
+        logger.warning(
+            "StoryWriterAgent: no LLM client available — stage 6 will run as noop."
+        )
+        story_writer_node: Any = _noop_node
+    else:
+        story_agent = StoryWriterAgent(
+            llm_client=story_llm,
+            outline_temperature=story_cfg.get("outline_temperature", 0.5),
+            draft_temperature=story_cfg.get("draft_temperature", 0.8),
+            summary_temperature=story_cfg.get("summary_temperature", 0.4),
+            outline_max_tokens=story_cfg.get("outline_max_tokens", 4096),
+            draft_max_tokens=story_cfg.get("draft_max_tokens", 8000),
+            summary_max_tokens=story_cfg.get("summary_max_tokens", 1024),
+            target_words=story_cfg.get("target_words", 3000),
+        )
+        story_writer_node = make_story_writer_node(story_agent, artifact_store=artifact_store)
+
     # ── Stage 7: CoverArtAgent ────────────────────────────────────────────
     from storymesh.agents.cover_art.agent import CoverArtAgent  # noqa: PLC0415
     from storymesh.orchestration.nodes.cover_art import make_cover_art_node  # noqa: PLC0415
@@ -443,8 +472,8 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     graph.add_node("theme_extractor", theme_extractor_node)
     graph.add_node("proposal_draft", proposal_draft_node)
     graph.add_node("rubric_judge", rubric_judge_node)
-    graph.add_node("synopsis_writer", _noop_node)   # Stage 6 — placeholder (LLM)
-    graph.add_node("cover_art", cover_art_node)     # Stage 7
+    graph.add_node("story_writer", story_writer_node)  # Stage 6
+    graph.add_node("cover_art", cover_art_node)      # Stage 7
 
     # ── Wire edges (linear) ────────────────────────────────────────────────
     graph.add_edge(START, "genre_normalizer")
@@ -461,11 +490,11 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
         "rubric_judge",
         _rubric_route,
         {
-            "synopsis_writer": "synopsis_writer",
+            "story_writer": "story_writer",
             "proposal_draft": "proposal_draft",
         },
     )
-    graph.add_edge("synopsis_writer", "cover_art")
+    graph.add_edge("story_writer", "cover_art")
     graph.add_edge("cover_art", END)
 
     return graph.compile()

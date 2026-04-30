@@ -7,6 +7,7 @@ from typing import Any
 
 import anthropic
 
+from storymesh.exceptions import LLMOutputTruncatedError
 from storymesh.llm.base import LLMCallLogger, LLMClient, _traceable, register_provider
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
@@ -65,6 +66,12 @@ class AnthropicClient(LLMClient):
         if block.type != "text":
             raise ValueError(
                 f"Expected a text content block from Anthropic but got {block.type} instead!"
+            )
+
+        if response.stop_reason == "max_tokens":
+            raise LLMOutputTruncatedError(
+                partial_response=str(block.text),
+                token_budget=max_tokens,
             )
 
         return str(block.text)

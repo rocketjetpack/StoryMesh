@@ -77,7 +77,7 @@ class StoryMeshPipeline:
             "theme_extractor_output": None,
             "proposal_draft_output": None,
             "rubric_judge_output": None,
-            "synopsis_writer_output": None,
+            "story_writer_output": None,
             "cover_art_output": None,
             "errors": [],
         }
@@ -132,18 +132,18 @@ class StoryMeshPipeline:
                 metadata=base_metadata,
             )
 
-        # TODO: When SynopsisWriterAgent is implemented, replace this block with:
-        #   synopsis_out = final_state.get("synopsis_writer_output")
-        #   final_synopsis = synopsis_out.final_synopsis
-        final_synopsis = (
-            f"Placeholder synopsis for '{user_prompt}'. "
-            "SynopsisWriterAgent is not yet implemented."
-        )
+        story_writer_output = final_state.get("story_writer_output")
+        if story_writer_output is not None:
+            final_synopsis = story_writer_output.back_cover_summary
+        else:
+            # StoryWriterAgent ran as noop (no LLM key configured).
+            final_synopsis = (
+                f"Placeholder synopsis for '{user_prompt}'. "
+                "StoryWriterAgent is not yet implemented."
+            )
 
         return GenerationResult(
             final_synopsis=final_synopsis,
-            scores={},
-            similarity_risk={},
             metadata=base_metadata,
         )
 

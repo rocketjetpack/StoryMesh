@@ -183,7 +183,7 @@ class TestGenerateHappyPath:
     def test_synopsis_placeholder_includes_user_prompt(
         self, tmp_store: ArtifactStore
     ) -> None:
-        """Until SynopsisWriterAgent is implemented, the placeholder echoes the prompt."""
+        """Until StoryWriterAgent is implemented, the placeholder echoes the prompt."""
         pipeline, _ = _make_pipeline(
             tmp_store,
             [{"genre_normalizer": {"genre_normalizer_output": _make_genre_output()}}],
@@ -191,7 +191,7 @@ class TestGenerateHappyPath:
         result = pipeline.generate("a dark mystery")
 
         assert "a dark mystery" in result.final_synopsis
-        assert "SynopsisWriterAgent is not yet implemented" in result.final_synopsis
+        assert "StoryWriterAgent is not yet implemented" in result.final_synopsis
 
     def test_metadata_includes_run_id_and_version(
         self, tmp_store: ArtifactStore
@@ -277,7 +277,7 @@ class TestGenerateHappyPath:
             "theme_extractor_output",
             "proposal_draft_output",
             "rubric_judge_output",
-            "synopsis_writer_output",
+            "story_writer_output",
             "errors",
         ):
             assert key in initial_state, f"missing initial state key: {key}"

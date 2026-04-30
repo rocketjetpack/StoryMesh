@@ -38,7 +38,7 @@ class GenreNormalizerAgent:
             fuzzy_threshold: float = 0.85,
             llm_client: LLMClient | None = None,
             temperature: float = 0.0,
-            max_tokens: int = 1024
+            max_tokens: int = 2048
         ) -> None:
         """
         Initialize the agent.

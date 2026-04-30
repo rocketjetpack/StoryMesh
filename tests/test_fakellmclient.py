@@ -5,6 +5,7 @@ from typing import Any
 import orjson
 import pytest
 
+from storymesh.exceptions import LLMOutputTruncatedError
 from storymesh.llm.base import FakeLLMClient, current_run_id
 
 
@@ -184,6 +185,59 @@ def test_complete_json_records_non_dict_retry_with_parse_success_false() -> None
     assert len(records) == 2
     assert records[0]["parse_success"] is False
     assert records[1]["parse_success"] is True
+
+
+# ---------------------------------------------------------------------------
+# Budget escalation — LLMOutputTruncatedError handling
+# ---------------------------------------------------------------------------
+
+
+def test_complete_json_escalates_budget_on_truncation() -> None:
+    """complete_json retries with doubled max_tokens when complete() is truncated."""
+    truncation = LLMOutputTruncatedError(partial_response='{"incomplete":', token_budget=100)
+    client = FakeLLMClient([truncation, '{"key": "value"}'])
+
+    result = client.complete_json(prompt="test", temperature=0.0, max_tokens=100)
+
+    assert result == {"key": "value"}
+    assert client.call_count == 2
+
+
+def test_complete_json_raises_truncation_when_budget_exhausted() -> None:
+    """complete_json re-raises LLMOutputTruncatedError after max_retries with no budget left."""
+    truncation = LLMOutputTruncatedError(partial_response='{"incomplete":', token_budget=100)
+    client = FakeLLMClient([truncation])
+
+    with pytest.raises(LLMOutputTruncatedError):
+        client.complete_json(prompt="test", temperature=0.0, max_tokens=100, max_retries=0)
+
+    assert client.call_count == 1
+
+
+def test_complete_json_records_truncated_attempt() -> None:
+    """The partial response from a truncated attempt is recorded in the call log."""
+    records: list[dict[str, Any]] = []
+    truncation = LLMOutputTruncatedError(partial_response='{"incomplete":', token_budget=100)
+    client = FakeLLMClient(
+        [truncation, '{"key": "value"}'],
+        on_call=lambda run_id, rec: records.append(rec),
+    )
+
+    client.complete_json(prompt="test", temperature=0.0, max_tokens=100)
+
+    assert len(records) == 2
+    assert records[0]["parse_success"] is False
+    assert records[0]["raw_response"] == '{"incomplete":'
+    assert records[1]["parse_success"] is True
+
+
+def test_fake_llm_client_raises_exception_instances() -> None:
+    """FakeLLMClient raises any Exception instance found in its responses list."""
+    err = LLMOutputTruncatedError(partial_response="partial", token_budget=50)
+    client = FakeLLMClient([err])
+
+    with pytest.raises(LLMOutputTruncatedError):
+        client.complete(prompt="test", temperature=0.0, max_tokens=50)
 
 
 # ---------------------------------------------------------------------------

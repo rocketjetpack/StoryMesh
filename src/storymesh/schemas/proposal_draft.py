@@ -142,11 +142,11 @@ class StoryProposal(BaseModel):
     image_prompt: str = Field(
         min_length=30,
         description=(
-            "A DALL-E 3-ready image generation prompt for the book cover. "
-            "Describes the dominant visual (a scene, object, or atmosphere from "
-            "the story world — not a named character portrait), art style, mood, "
-            "color palette, and period or setting details. Contains no character "
-            "names, text, or readable symbols."
+            "An image generation prompt for the book cover (consumed by CoverArtAgent "
+            "via gpt-image-1). Describes the dominant visual (a scene, object, or "
+            "atmosphere from the story world — not a named character portrait), art "
+            "style, mood, color palette, and period or setting details. Contains no "
+            "character names, text, or readable symbols."
         ),
     )
 

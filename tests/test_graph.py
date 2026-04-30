@@ -711,7 +711,7 @@ class TestStoryMeshState:
             "theme_extractor_output": None,
             "proposal_draft_output": None,
             "rubric_judge_output": None,
-            "synopsis_writer_output": None,
+            "story_writer_output": None,
             "cover_art_output": None,
             "errors": [],
         }
@@ -742,7 +742,7 @@ class TestRubricRetryTopology:
         from storymesh.orchestration.graph import _rubric_route
 
         state: StoryMeshState = {"rubric_retry_count": 0, "rubric_judge_output": None}
-        assert _rubric_route(state) == "synopsis_writer"
+        assert _rubric_route(state) == "story_writer"
 
     def test_routes_to_proposal_draft_when_failed_and_retries_remain(self) -> None:
         """A failed rubric with retries remaining routes back to proposal_draft."""
@@ -768,7 +768,7 @@ class TestRubricRetryTopology:
             "rubric_retry_count": MAX_RUBRIC_RETRIES,
             "rubric_judge_output": _FailResult(),  # type: ignore[typeddict-item]
         }
-        assert _rubric_route(state) == "synopsis_writer"
+        assert _rubric_route(state) == "story_writer"
 
     def test_routes_to_synopsis_writer_when_passed(self) -> None:
         """A passing rubric result routes to synopsis_writer regardless of retry count."""
@@ -781,7 +781,7 @@ class TestRubricRetryTopology:
             "rubric_retry_count": 1,
             "rubric_judge_output": _PassResult(),  # type: ignore[typeddict-item]
         }
-        assert _rubric_route(state) == "synopsis_writer"
+        assert _rubric_route(state) == "story_writer"
 
     def test_compiled_graph_accepts_conditional_edge(self) -> None:
         """build_graph() must compile without errors with the conditional rubric edge."""
@@ -1301,7 +1301,7 @@ class TestRubricRouteWithRealOutputType:
             "rubric_retry_count": 0,
             "rubric_judge_output": self._make_output(passed=True),
         }
-        assert _rubric_route(state) == "synopsis_writer"
+        assert _rubric_route(state) == "story_writer"
 
     def test_failed_output_routes_to_proposal_draft(self) -> None:
         from storymesh.orchestration.graph import _rubric_route
@@ -1319,7 +1319,7 @@ class TestRubricRouteWithRealOutputType:
             "rubric_retry_count": MAX_RUBRIC_RETRIES,
             "rubric_judge_output": self._make_output(passed=False),
         }
-        assert _rubric_route(state) == "synopsis_writer"
+        assert _rubric_route(state) == "story_writer"
 
 
 # ── TestCoverArtNodeWrapper ────────────────────────────────────────────────────
