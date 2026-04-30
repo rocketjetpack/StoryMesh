@@ -120,6 +120,21 @@ class ArtifactStore:
 
         self.save_run_file(run_hash, "run_metadata.json", data)
 
+    def save_run_binary(self, run_id: str, filename: str, data: bytes) -> None:
+        """Write raw bytes to a file within a run directory.
+
+        Used for non-JSON artifacts such as the cover art PNG. The run
+        directory is created if it does not already exist.
+
+        Args:
+            run_id: Unique run identifier (matches the run directory name).
+            filename: Name of the file to write (e.g. 'cover_art.png').
+            data: Raw bytes to write.
+        """
+        run_dir = self.runs_dir / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / filename).write_bytes(data)
+
     def load_run_file(self, run_id: str, filename: str) -> bytes | None:
         """Return raw bytes from a file within a run directory, or None if absent.
 

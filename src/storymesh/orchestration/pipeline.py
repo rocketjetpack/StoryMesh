@@ -16,7 +16,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from storymesh.core.artifacts import ArtifactStore
+import orjson
+
+from storymesh.core.artifacts import ArtifactStore, persist_node_output
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.result import GenerationResult
 from storymesh.versioning.package import __version__ as storymesh_version
@@ -76,6 +78,7 @@ class StoryMeshPipeline:
             "proposal_draft_output": None,
             "rubric_judge_output": None,
             "synopsis_writer_output": None,
+            "cover_art_output": None,
             "errors": [],
         }
 
@@ -143,3 +146,99 @@ class StoryMeshPipeline:
             similarity_risk={},
             metadata=base_metadata,
         )
+
+
+def regenerate_cover_art(run_id: str | None = None) -> str:
+    """Re-run CoverArtAgent for a previous pipeline run.
+
+    Loads ``proposal_draft_output.json`` from the run directory, regenerates
+    the cover image using the current ``storymesh.config.yaml`` settings, and
+    overwrites ``cover_art.png`` and ``cover_art_output.json`` in the same run
+    directory.
+
+    Args:
+        run_id: Run to regenerate for. Pass ``None`` (default) to target the
+            most recent run.
+
+    Returns:
+        Absolute path to the regenerated ``cover_art.png``.
+
+    Raises:
+        RuntimeError: If no runs exist, or if ``proposal_draft_output.json`` is
+            missing from the requested run.
+        ValueError: If the cover art agent cannot be configured (no API key or
+            unknown image provider).
+    """
+    from storymesh.agents.cover_art.agent import CoverArtAgent  # noqa: PLC0415
+    from storymesh.config import get_agent_config  # noqa: PLC0415
+    from storymesh.orchestration.graph import _build_image_client  # noqa: PLC0415
+    from storymesh.schemas.cover_art import CoverArtAgentInput, CoverArtAgentOutput  # noqa: PLC0415
+    from storymesh.schemas.proposal_draft import ProposalDraftAgentOutput  # noqa: PLC0415
+    from storymesh.versioning.schemas import COVER_ART_SCHEMA_VERSION  # noqa: PLC0415
+
+    store = ArtifactStore()
+
+    # Resolve run_id — default to the most recent run.
+    resolved_id: str
+    if run_id is None:
+        ids = store.list_run_ids()
+        if not ids:
+            raise RuntimeError("No runs found in the artifact store.")
+        resolved_id = ids[0]
+    else:
+        resolved_id = run_id
+
+    # Load and deserialise the proposal draft output.
+    raw = store.load_run_file(resolved_id, "proposal_draft_output.json")
+    if raw is None:
+        raise RuntimeError(
+            f"No proposal_draft_output.json found for run {resolved_id!r}. "
+            "The proposal draft stage must have completed before cover art can be regenerated."
+        )
+    proposal_draft_output = ProposalDraftAgentOutput.model_validate(orjson.loads(raw))
+
+    # Build the image client from current config.
+    cover_cfg = get_agent_config("cover_art")
+    image_client = _build_image_client(cover_cfg, agent_name="cover_art")
+    if image_client is None:
+        raise ValueError(
+            "Cannot build image client — OPENAI_API_KEY is not set or image_provider "
+            "is not configured in storymesh.config.yaml."
+        )
+
+    agent = CoverArtAgent(
+        image_client=image_client,
+        image_size=str(cover_cfg.get("image_size", "1024x1792")),
+        image_quality=str(cover_cfg.get("image_quality", "auto")),
+    )
+
+    proposal = proposal_draft_output.proposal
+    raw_result = agent.run(
+        CoverArtAgentInput(
+            image_prompt=proposal.image_prompt,
+            title=proposal.title,
+        )
+    )
+
+    # Persist — overwrite the previous PNG and JSON sidecar.
+    store.save_run_binary(resolved_id, "cover_art.png", raw_result.image_bytes)
+    image_path = str(store.runs_dir / resolved_id / "cover_art.png")
+
+    output = CoverArtAgentOutput(
+        image_path=image_path,
+        image_prompt=raw_result.image_prompt,
+        revised_prompt=raw_result.revised_prompt,
+        model=raw_result.model,
+        image_size=raw_result.image_size,
+        image_quality=raw_result.image_quality,
+        debug={
+            "title": proposal.title,
+            "latency_ms": raw_result.latency_ms,
+            "source_image_prompt": proposal.image_prompt,
+            "regenerated": True,
+        },
+        schema_version=COVER_ART_SCHEMA_VERSION,
+    )
+    persist_node_output(store, resolved_id, "cover_art", output)
+
+    return image_path

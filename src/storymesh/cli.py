@@ -33,6 +33,7 @@ _STAGE_NAMES = [
     "proposal_draft",
     "rubric_judge",
     "synopsis_writer",
+    "cover_art",           # Stage 7
 ]
 
 
@@ -94,6 +95,41 @@ def generate(
 
     if run_dir != Path("") and run_dir.exists():
         console.print(f"Artifacts saved to: [dim]{run_dir}[/dim]")
+
+
+_RERUN_SUPPORTED_STAGES = {"cover_art"}
+
+
+@app.command()
+def rerun(
+    stage: str = typer.Argument(
+        ...,
+        help="Pipeline stage to re-run (currently only 'cover_art' is supported).",
+    ),
+    run_id: str | None = typer.Argument(
+        None,
+        help="Run ID to target. Omit to use the most recent run.",
+    ),
+) -> None:
+    """Re-run a single pipeline stage for a previous run."""
+    if stage not in _RERUN_SUPPORTED_STAGES:
+        supported = ", ".join(sorted(_RERUN_SUPPORTED_STAGES))
+        console.print(
+            f"[bold red]Error:[/bold red] Stage {stage!r} does not support rerun. "
+            f"Supported stages: {supported}"
+        )
+        raise typer.Exit(code=1)
+
+    if stage == "cover_art":
+        from storymesh import regenerate_cover_art  # noqa: PLC0415
+
+        try:
+            image_path = regenerate_cover_art(run_id)
+        except (RuntimeError, ValueError) as exc:
+            console.print(f"[bold red]Error:[/bold red] {exc}")
+            raise typer.Exit(code=1) from exc
+
+        console.print(f"[green]Cover art regenerated:[/green] {image_path}")
 
 
 @app.command()

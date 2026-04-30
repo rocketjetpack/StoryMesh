@@ -88,6 +88,11 @@ def _proposal(**overrides: object) -> dict:
         "tensions_addressed": ["T1"],
         "tone": ["dark", "cerebral"],
         "genre_blend": ["mystery", "post_apocalyptic"],
+        "image_prompt": (
+            "A rain-slicked street in a flooded cityscape at dusk, a lone figure "
+            "silhouetted against the pale ruins of a collapsed civic tower. "
+            "Gritty noir ink wash style, muted greys and a single amber light source."
+        ),
     }
     return {**defaults, **overrides}
 
@@ -162,6 +167,16 @@ class TestStoryProposal:
     def test_genre_blend_min_length(self) -> None:
         with pytest.raises(ValidationError):
             StoryProposal(**_proposal(genre_blend=[]))
+
+    def test_image_prompt_required(self) -> None:
+        data = _proposal()
+        del data["image_prompt"]
+        with pytest.raises(ValidationError):
+            StoryProposal(**data)
+
+    def test_image_prompt_min_length(self) -> None:
+        with pytest.raises(ValidationError):
+            StoryProposal(**_proposal(image_prompt="Too short prompt."))
 
 
 # ---------------------------------------------------------------------------

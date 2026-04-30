@@ -41,6 +41,37 @@ system: |
   it explores. It is not a moral lesson ("crime doesn't pay") or a summary of the plot. It is
   the answer the story gives to the creative question posed by the tension.
 
+  STEP 4 — WRITE A COVER IMAGE PROMPT:
+  The image_prompt field drives DALL-E 3 to generate the art layer of a book cover.
+  Title and byline are composited in post-processing — do NOT include any text.
+
+  Think like a cover designer, not a scene illustrator:
+  - 2-4 sentences
+  - Open with "Flat 2D cover art, filling the entire canvas." — this prevents
+    the model from rendering a 3D book object or photograph
+  - Describe one dominant visual element strong enough to read as a silhouette at
+    thumbnail size (a figure, object, landscape, or symbolic composition)
+  - Name the art style explicitly (e.g., "gritty ink wash," "painterly oil," "flat
+    graphic design," "ethereal watercolour," "stark photorealism")
+  - Specify a tight colour palette of 2-4 colours — this is the most important cover
+    design decision; anchors genre and mood immediately
+  - Describe mood and atmosphere, not a story event
+  - Favour strong foreground/background separation over busy scenes
+  - Do NOT name characters, include any text or lettering, or reference story events
+
+  Genre mood reference (starting point, not a rule):
+  - Noir / crime: ink wash or linocut — charcoal, slate, amber accent
+  - Post-apocalyptic: muted desaturated palette, lone figure, crumbling geometry
+  - Fantasy / mythic: painterly, rich texture — deep jewel tones or twilight golds
+  - Horror / dark: single harsh light source, deep shadows — desaturated + one accent
+  - Literary / quiet: sparse graphic or washed watercolour — grey, cream, one muted hue
+
+  Example (dark post-apocalyptic detective):
+  "Flat 2D cover art, filling the entire canvas. A lone figure in a long coat stands
+  at the edge of a flooded urban plaza, reflected in still black water, crumbling towers
+  behind. Gritty ink wash style. Palette: charcoal, ash grey, single amber accent.
+  Mood: isolation and the ghost of institutions."
+
   EXAMPLES OF STRONG OUTPUT:
 
   Good plot_arc (specific, scene-driven):
@@ -167,7 +198,8 @@ system: |
     ],
     "tensions_addressed": ["<tension_id>"],
     "tone": ["<tone word>"],
-    "genre_blend": ["<genre name>"]
+    "genre_blend": ["<genre name>"],
+    "image_prompt": "<flat cover art prompt — open with 'Flat 2D cover art, filling the entire canvas.', dominant visual, art style, tight colour palette (2-4 colours), mood — no character names, no text or lettering, no story events>"
   }
 
 user: |

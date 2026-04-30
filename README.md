@@ -1,8 +1,8 @@
 # StoryMesh
 
-StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, a deterministic book ranking stage with optional LLM re-ranking and MMR diversity selection, a creative theme extraction stage, a multi-sample proposal drafting stage with Craft Directives, a cross-provider rubric evaluation stage with retry loop, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
+StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, a deterministic book ranking stage with optional LLM re-ranking and MMR diversity selection, a creative theme extraction stage, a multi-sample proposal drafting stage with Craft Directives, a cross-provider rubric evaluation stage with retry loop, a gpt-image-2 cover art generation stage with Pillow text compositing, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
 
-The final creative stage (synopsis writing) is scaffolded but not implemented yet. Today, a full `generate` run executes stages 0–5, including real rubric evaluation and up to 2 retries, persists artifacts, and returns a placeholder synopsis while stage 6 remains a stub.
+The final creative stage (synopsis writing) is scaffolded but not implemented yet. Today, a full `generate` run executes stages 0–7, including real rubric evaluation and up to 2 retries, cover art generation via gpt-image-2 (when `OPENAI_API_KEY` is set), persists artifacts, and returns a placeholder synopsis while stage 6 remains a stub.
 
 ## Current Status
 
@@ -16,10 +16,12 @@ Implemented:
 - `ThemeExtractorAgent` — the creative engine of the pipeline. Identifies the thematic assumptions each genre tradition takes for granted, finds contradictions between traditions, frames them as creative questions, and generates concrete narrative seeds for the downstream proposal stage
 - `ProposalDraftAgent` with multi-sample seed-steering and self-selection for creative proposal generation. Generates N candidate proposals from different narrative seeds at elevated temperature, then uses a low-temperature critic call to select the strongest one
 - `RubricJudgeAgent` with 6-dimension craft quality rubric, cross-provider evaluation (OpenAI evaluating Anthropic output), cliché violation detection, composite scoring with configurable pass threshold, and actionable structured feedback for the retry loop
+- `CoverArtAgent` — generates a cover image via gpt-image-2 using the `image_prompt` embedded in the selected `StoryProposal`. Title and byline are composited onto the image using Pillow. PNG saved to the run directory. Runs as a noop if `OPENAI_API_KEY` is absent
 - LLM provider registry for extensible provider support
+- ImageClient provider registry mirroring the LLM registry for extensible image generation backend support
 - Rubric retry loop: conditional edge wired; real pass/fail signal from RubricJudgeAgent; failing proposals trigger a targeted retry with RubricFeedback injected into the prompt (max 2 retries)
 - Rich-formatted CLI output with per-stage timing and artifact paths
-- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, book ranking, genre normalization, theme extraction, proposal drafting, rubric evaluation, LLM registry, and artifacts
+- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, book ranking, genre normalization, theme extraction, proposal drafting, rubric evaluation, cover art generation, LLM registry, image registry, and artifacts
 
 Not implemented yet:
 
@@ -33,7 +35,8 @@ Current runtime behavior:
 4. Extract thematic tensions, genre clusters, and narrative seeds (LLM — requires API key).
 5. Generate N candidate story proposals from different seeds, then select the strongest via a critic call (LLM — requires API key).
 6. Evaluate the selected proposal against a 6-dimension craft quality rubric (LLM — cross-provider; requires API key). If the proposal fails the pass threshold, inject structured feedback and retry Stage 5 (up to 2 retries).
-7. Return a `GenerationResult` with a placeholder `final_synopsis` (SynopsisWriterAgent not yet implemented).
+7. Produce a placeholder `final_synopsis` (SynopsisWriterAgent not yet implemented).
+8. Generate a cover image via gpt-image-2 using the `image_prompt` from the selected `StoryProposal`. Title and byline text are composited onto the raw PNG using Pillow. The final image is saved to the run directory as `cover_art.png`. Runs as a noop if `OPENAI_API_KEY` is absent.
 
 ## Architecture
 
@@ -48,11 +51,11 @@ START
   → proposal_draft
   → rubric_judge
   → [conditional]
-      ├── PASS → synopsis_writer → END
+      ├── PASS → synopsis_writer → cover_art → END
       └── FAIL → proposal_draft (max 2 retries)
 ```
 
-Stages 0–5 currently perform real work. Stage 6 is registered as a no-op placeholder. The rubric retry loop is wired via a conditional edge; a failing rubric score triggers re-entry into `proposal_draft` with targeted feedback injected into the prompt.
+Stages 0–5 and 7 currently perform real work. Stage 6 (`synopsis_writer`) is registered as a no-op placeholder. The rubric retry loop is wired via a conditional edge; a failing rubric score triggers re-entry into `proposal_draft` with targeted feedback injected into the prompt.
 
 ### Stage 0: GenreNormalizerAgent
 
@@ -155,6 +158,25 @@ Status: scaffolded only
 
 The state fields, graph node, and versioning hooks exist, but synopsis synthesis has not been implemented yet.
 
+### Stage 7: CoverArtAgent
+
+Status: implemented
+
+Generates a cover image for the selected `StoryProposal` using the gpt-image-2 model via the OpenAI Images API.
+
+The `image_prompt` is authored by `ProposalDraftAgent` (Stage 4) as part of each candidate proposal and carried through to the winning proposal. It describes the intended mood, composition, and visual style as flat 2D cover art — framed explicitly to prevent the model from generating a 3D book-object photograph.
+
+Before the prompt reaches the API, `CoverArtAgent` appends a flat-canvas enforcement suffix that instructs the model to produce art filling the entire canvas with no book object, no perspective frame, and no text or lettering. Title and byline ("A StoryMesh Production") are composited onto the raw PNG programmatically via Pillow, giving reliable typography independent of the model's text rendering. If Pillow is not installed or the image cannot be decoded, the raw PNG is returned unchanged.
+
+Configuration options (all in the `cover_art:` agent block of `storymesh.config.yaml`):
+
+- `image_provider`: image generation backend (default `openai`)
+- `image_model`: model identifier (default `gpt-image-2`)
+- `image_size`: any resolution satisfying gpt-image-2 constraints; portrait `1024x1792` is the default for book covers
+- `image_quality`: `auto`, `low`, `medium`, or `high` (default `auto`)
+
+The PNG is written to `<run_dir>/cover_art.png` using `b64_json` response format to avoid a second HTTP round-trip. A JSON sidecar (`cover_art_output.json`) is also persisted with prompt metadata and model configuration. If `OPENAI_API_KEY` is absent or `image_provider` is unconfigured, the node runs as a noop and no image is generated.
+
 ## Requirements
 
 - Python 3.12+
@@ -216,7 +238,7 @@ Important behavior:
 Current committed config includes:
 
 - LLM defaults
-- `genre_normalizer`, `book_ranker`, `theme_extractor`, and `proposal_draft` agent overrides
+- `genre_normalizer`, `book_ranker`, `theme_extractor`, `proposal_draft`, and `cover_art` agent overrides
 - Open Library client settings including `max_books`
 - Cache and logging settings
 - Optional LangSmith project settings
@@ -237,7 +259,7 @@ Example output:
 
 ```
 ╭──────────────────────────────────────────────────────────────╮
-│ StoryMesh v0.7.0  Run abc123def456                           │
+│ StoryMesh v0.8.0  Run abc123def456                           │
 │ Input: "dark post-apocalyptic detective mystery"             │
 ╰──────────────────────────────────────────────────────────────╯
 
@@ -250,8 +272,9 @@ Example output:
  proposal_draft          ✓ done    8.74s    ~/.storymesh/runs/abc.../proposal_draft_output.json
  rubric_judge            ✓ done    4.12s    ~/.storymesh/runs/abc.../rubric_judge_output.json
  synopsis_writer         ○ noop    0.00s    —
+ cover_art               ✓ done    3.54s    ~/.storymesh/runs/abc.../cover_art_output.json
  ────────────────────────────────────────────────────────────────────────
-                         Total: 1.28s
+                         Total: 17.70s
 
 ╭─ Synopsis ───────────────────────────────────────────────────╮
 │ Placeholder synopsis for 'dark post-apocalyptic detective    │
@@ -282,6 +305,13 @@ storymesh inspect-run                          # most recent run
 storymesh inspect-run <run_id>                 # specific run
 storymesh inspect-run <run_id> --llm all       # include full LLM prompts and responses
 storymesh inspect-run <run_id> --html out.html # export a self-contained HTML report
+```
+
+Regenerate the cover art for a previous run without re-running the full pipeline:
+
+```bash
+storymesh rerun cover_art               # regenerate for the most recent run
+storymesh rerun cover_art <run_id>      # regenerate for a specific run
 ```
 
 Purge caches and run data:
@@ -359,11 +389,13 @@ Useful files:
 - `ThemeExtractorAgent`, `ProposalDraftAgent`, and `RubricJudgeAgent` all require a configured API key; without one, those stages run as noops.
 - `ProposalDraftAgent` relies on `ThemeExtractorAgentOutput` being present; if Stage 3 runs as a noop, Stage 4 also runs as a noop.
 - `RubricJudgeAgent` relies on `ProposalDraftAgentOutput` being present; if Stage 4 runs as a noop, Stage 5 also runs as a noop.
+- `CoverArtAgent` requires `OPENAI_API_KEY`; without one, Stage 7 runs as a noop and no cover image is generated.
 
 ## Roadmap
 
 - ~~Implement `ProposalDraftAgent` to select and develop the best narrative seed into a full proposal~~
 - ~~Activate rubric-based retry logic with real pass/fail signal~~
-- Implement final synopsis synthesis
+- ~~Implement `CoverArtAgent` for gpt-image-2 cover image generation from the proposal's image prompt~~
+- Implement final synopsis synthesis (`SynopsisWriterAgent`)
 - ~~Expand provider support beyond the current Anthropic implementation~~
-- OpenAI (`gpt-4o-mini` default) now supported; configure via `provider: openai` in `storymesh.config.yaml`
+- OpenAI (`gpt-4o-mini` default) now supported for text LLMs; configure via `provider: openai` in `storymesh.config.yaml`

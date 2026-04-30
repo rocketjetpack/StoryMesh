@@ -1,9 +1,10 @@
 GENRE_CONSTRAINT_SCHEMA_VERSION = "3.1"
 BOOK_FETCHER_SCHEMA_VERSION = "1.2"
 BOOK_RANKER_SCHEMA_VERSION = "1.1"
-PROPOSAL_SCHEMA_VERSION = "1.1"
+PROPOSAL_SCHEMA_VERSION = "1.2"
 THEMEPACK_SCHEMA_VERSION = "1.1"
 RUBRIC_SCHEMA_VERSION = "1.0"
+COVER_ART_SCHEMA_VERSION = "1.1"
 
 SCHEMA_VERSIONS: dict[str, str] = {
     "Genre Constraint": GENRE_CONSTRAINT_SCHEMA_VERSION,
@@ -12,6 +13,7 @@ SCHEMA_VERSIONS: dict[str, str] = {
     "Proposal": PROPOSAL_SCHEMA_VERSION,
     "Themepack": THEMEPACK_SCHEMA_VERSION,
     "Rubric": RUBRIC_SCHEMA_VERSION,
+    "Cover Art": COVER_ART_SCHEMA_VERSION,
 }
 
 # Version History
@@ -54,3 +56,14 @@ SCHEMA_VERSIONS: dict[str, str] = {
 #             DimensionResult, and RubricJudgeAgentOutput. Six-dimension
 #             craft quality rubric with cliché violation tracking and
 #             configurable pass threshold.
+# 2026-04-29: Increment Proposal schema to 1.2. Added image_prompt (str, min_length=30)
+#             to StoryProposal. ProposalDraftAgent generates this field alongside the
+#             narrative fields; CoverArtAgent consumes it directly. Breaking change —
+#             existing artifacts lack the field and will not deserialize.
+# 2026-04-29: Add Cover Art schema 1.0. Introduces CoverArtAgentInput and
+#             CoverArtAgentOutput. CoverArtAgent wraps DALL-E 3 image generation;
+#             image_path points to the PNG saved in the run artifact directory.
+# 2026-04-29: Increment Cover Art schema to 1.1. Switched image provider from
+#             dall-e-3 to gpt-image-2. Removed image_style field (gpt-image-2 does
+#             not support a style parameter). Quality values updated from
+#             'standard'/'hd' to 'low'/'medium'/'high'/'auto'.

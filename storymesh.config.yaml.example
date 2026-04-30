@@ -68,6 +68,12 @@ agents:
     #   protagonist_interiority: 0.15
     #   user_intent_fidelity: 0.10
 
+  cover_art:
+    image_provider: openai
+    image_model: gpt-image-2
+    image_size: "1024x1792"
+    image_quality: auto
+
   # To use OpenAI for any agent, set provider and model:
   # proposal_draft:
   #   provider: openai

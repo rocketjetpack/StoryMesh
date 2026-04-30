@@ -1,8 +1,8 @@
-from storymesh.orchestration.pipeline import StoryMeshPipeline
+from storymesh.orchestration.pipeline import StoryMeshPipeline, regenerate_cover_art
 from storymesh.schemas.result import GenerationResult
 from storymesh.versioning.package import __version__
 
-__all__ = ["generate_synopsis", "GenerationResult", "__version__"]
+__all__ = ["generate_synopsis", "regenerate_cover_art", "GenerationResult", "__version__"]
 
 def generate_synopsis(user_prompt: str) -> GenerationResult:
     """

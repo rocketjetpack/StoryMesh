@@ -43,7 +43,9 @@ from storymesh.schemas.theme_extractor import (
 
 if TYPE_CHECKING:
     from storymesh.agents.book_fetcher.agent import BookFetcherAgent
+    from storymesh.agents.cover_art.agent import CoverArtAgent
     from storymesh.agents.rubric_judge.agent import RubricJudgeAgent
+    from storymesh.llm.image_base import GeneratedImage
     from storymesh.schemas.rubric_judge import RubricJudgeAgentOutput
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -710,6 +712,7 @@ class TestStoryMeshState:
             "proposal_draft_output": None,
             "rubric_judge_output": None,
             "synopsis_writer_output": None,
+            "cover_art_output": None,
             "errors": [],
         }
         assert state["user_prompt"] == "cozy mystery"
@@ -717,6 +720,7 @@ class TestStoryMeshState:
         assert state["rubric_retry_count"] == 0
         assert state["errors"] == []
         assert state["genre_normalizer_output"] is None
+        assert state["cover_art_output"] is None
 
     def test_errors_field_accepts_list_of_strings(self) -> None:
         """The errors field must accept a list of strings."""
@@ -913,6 +917,11 @@ def _valid_proposal_json_for_node() -> str:
         "tensions_addressed": ["T1"],
         "tone": ["dark"],
         "genre_blend": ["mystery", "post_apocalyptic"],
+        "image_prompt": (
+            "A rain-slicked street in a flooded cityscape at dusk, a lone figure "
+            "silhouetted against the pale ruins of a collapsed civic tower. "
+            "Gritty noir ink wash style, muted greys and a single amber light source."
+        ),
     })
 
 
@@ -1311,3 +1320,134 @@ class TestRubricRouteWithRealOutputType:
             "rubric_judge_output": self._make_output(passed=False),
         }
         assert _rubric_route(state) == "synopsis_writer"
+
+
+# ── TestCoverArtNodeWrapper ────────────────────────────────────────────────────
+
+
+def _make_cover_art_proposal_draft_output() -> ProposalDraftAgentOutput:
+    """Build a ProposalDraftAgentOutput with image_prompt for node wrapper tests."""
+    from storymesh.schemas.proposal_draft import ProposalDraftAgentInput as _PDI
+
+    theme_out = _make_theme_extractor_output_for_proposal()
+    genre_out = _make_genre_normalizer_output()
+    inp = _PDI(
+        narrative_seeds=theme_out.narrative_seeds,
+        tensions=theme_out.tensions,
+        genre_clusters=theme_out.genre_clusters,
+        normalized_genres=genre_out.normalized_genres,
+        user_tones=[],
+        narrative_context=[],
+        user_prompt="dark post-apocalyptic mystery",
+    )
+    return _make_proposal_agent().run(inp)
+
+
+class _FakeImageClient:
+    """Minimal ImageClient stub for node wrapper tests — avoids importing the ABC."""
+
+    model = "fake-image-model"
+    agent_name = "fake"
+
+    def __init__(self, image_bytes: bytes = b"PNG") -> None:
+        self._image_bytes = image_bytes
+        self.calls: list[dict[str, object]] = []
+
+    def generate(
+        self, prompt: str, *, size: str, quality: str
+    ) -> GeneratedImage:
+        from storymesh.llm.image_base import GeneratedImage as _GI  # noqa: PLC0415
+
+        self.calls.append({"prompt": prompt, "size": size, "quality": quality})
+        return _GI(image_bytes=self._image_bytes, revised_prompt=None)
+
+
+def _make_cover_art_agent(image_bytes: bytes = b"PNG") -> CoverArtAgent:
+    from storymesh.agents.cover_art.agent import CoverArtAgent
+
+    return CoverArtAgent(image_client=_FakeImageClient(image_bytes=image_bytes))  # type: ignore[arg-type]
+
+
+class TestCoverArtNodeWrapper:
+    """Tests for the make_cover_art_node factory and resulting node function."""
+
+    def _base_state(self) -> StoryMeshState:
+        return {
+            "user_prompt": "dark post-apocalyptic mystery",
+            "pipeline_version": "test",
+            "run_id": "abc123",
+            "proposal_draft_output": _make_cover_art_proposal_draft_output(),
+        }
+
+    def test_noop_when_proposal_draft_output_absent(self) -> None:
+        """Returns {} when state has no proposal_draft_output."""
+        from storymesh.orchestration.nodes.cover_art import make_cover_art_node
+
+        node = make_cover_art_node(_make_cover_art_agent())
+        state: StoryMeshState = {"user_prompt": "test", "pipeline_version": "test"}
+        result = node(state)
+        assert result == {}
+
+    def test_output_key_is_cover_art_output(self) -> None:
+        from storymesh.orchestration.nodes.cover_art import make_cover_art_node
+
+        node = make_cover_art_node(_make_cover_art_agent())
+        result = node(self._base_state())
+        assert "cover_art_output" in result
+
+    def test_output_is_cover_art_agent_output_type(self) -> None:
+        from storymesh.orchestration.nodes.cover_art import make_cover_art_node
+        from storymesh.schemas.cover_art import CoverArtAgentOutput
+
+        node = make_cover_art_node(_make_cover_art_agent())
+        result = node(self._base_state())
+        assert isinstance(result["cover_art_output"], CoverArtAgentOutput)
+
+    def test_image_path_empty_without_artifact_store(self) -> None:
+        from storymesh.orchestration.nodes.cover_art import make_cover_art_node
+
+        node = make_cover_art_node(_make_cover_art_agent(), artifact_store=None)
+        result = node(self._base_state())
+        assert result["cover_art_output"].image_path == ""
+
+    def test_image_path_set_with_artifact_store(self, tmp_path: Path) -> None:
+        from storymesh.core.artifacts import ArtifactStore
+        from storymesh.orchestration.nodes.cover_art import make_cover_art_node
+
+        store = ArtifactStore(root=tmp_path)
+        node = make_cover_art_node(_make_cover_art_agent(), artifact_store=store)
+        result = node(self._base_state())
+        assert result["cover_art_output"].image_path != ""
+        assert "cover_art.png" in result["cover_art_output"].image_path
+
+    def test_png_written_to_artifact_store(self, tmp_path: Path) -> None:
+        from storymesh.core.artifacts import ArtifactStore
+        from storymesh.orchestration.nodes.cover_art import make_cover_art_node
+
+        store = ArtifactStore(root=tmp_path)
+        node = make_cover_art_node(_make_cover_art_agent(image_bytes=b"PNGDATA"), artifact_store=store)
+        node(self._base_state())
+
+        png_path = tmp_path / "runs" / "abc123" / "cover_art.png"
+        assert png_path.exists()
+        assert png_path.read_bytes() == b"PNGDATA"
+
+    def test_json_artifact_persisted(self, tmp_path: Path) -> None:
+        from storymesh.core.artifacts import ArtifactStore
+        from storymesh.orchestration.nodes.cover_art import make_cover_art_node
+
+        store = ArtifactStore(root=tmp_path)
+        node = make_cover_art_node(_make_cover_art_agent(), artifact_store=store)
+        node(self._base_state())
+
+        json_path = tmp_path / "runs" / "abc123" / "cover_art_output.json"
+        assert json_path.exists()
+
+    def test_debug_contains_title_and_latency(self) -> None:
+        from storymesh.orchestration.nodes.cover_art import make_cover_art_node
+
+        node = make_cover_art_node(_make_cover_art_agent())
+        result = node(self._base_state())
+        debug = result["cover_art_output"].debug
+        assert "title" in debug
+        assert "latency_ms" in debug

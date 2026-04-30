@@ -326,3 +326,40 @@ def test_list_run_ids_handles_absent_runs_dir(tmp_path: Path) -> None:
     store.runs_dir.rmdir()
 
     assert store.list_run_ids() == []
+
+
+# ---------------------------------------------------------------------------
+# ArtifactStore.save_run_binary
+# ---------------------------------------------------------------------------
+
+
+class TestArtifactStoreBinary:
+    def test_save_run_binary_writes_file(self, tmp_path: Path) -> None:
+        """File exists after call with the correct content."""
+        store = ArtifactStore(root=tmp_path)
+        data = b"\x89PNG\r\n\x1a\nfake_png_bytes"
+
+        store.save_run_binary("run_bin1", "cover_art.png", data)
+
+        written = tmp_path / "runs" / "run_bin1" / "cover_art.png"
+        assert written.exists()
+        assert written.read_bytes() == data
+
+    def test_save_run_binary_creates_run_dir(self, tmp_path: Path) -> None:
+        """Run directory is created if absent."""
+        store = ArtifactStore(root=tmp_path)
+        run_dir = tmp_path / "runs" / "brand_new_run"
+        assert not run_dir.exists()
+
+        store.save_run_binary("brand_new_run", "cover_art.png", b"PNG")
+
+        assert run_dir.exists()
+
+    def test_save_run_binary_overwrites(self, tmp_path: Path) -> None:
+        """Second call with the same filename replaces content."""
+        store = ArtifactStore(root=tmp_path)
+        store.save_run_binary("run_ow", "cover_art.png", b"first")
+        store.save_run_binary("run_ow", "cover_art.png", b"second")
+
+        written = tmp_path / "runs" / "run_ow" / "cover_art.png"
+        assert written.read_bytes() == b"second"

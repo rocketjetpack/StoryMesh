@@ -61,6 +61,11 @@ def _make_input(attempt_number: int = 1) -> RubricJudgeAgentInput:
         tensions_addressed=["T1"],
         tone=["dark", "cerebral"],
         genre_blend=["mystery", "post_apocalyptic"],
+        image_prompt=(
+            "A rain-slicked street in a flooded cityscape at dusk, a lone figure "
+            "silhouetted against pale ruins of a collapsed civic tower. "
+            "Gritty noir ink wash style, muted greys and a single amber light source."
+        ),
     )
 
     tension = ThematicTension(

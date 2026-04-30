@@ -28,6 +28,7 @@ from langgraph.graph import END, START, StateGraph
 from storymesh.config import get_agent_config
 from storymesh.core.artifacts import ArtifactStore
 from storymesh.llm.base import LLMClient
+from storymesh.llm.image_base import ImageClient
 from storymesh.orchestration.nodes.genre_normalizer import make_genre_normalizer_node
 from storymesh.orchestration.state import StoryMeshState
 
@@ -50,6 +51,16 @@ _PROVIDER_KEY_MAP: dict[str, str] = {
 _PROVIDER_MODULE_MAP: dict[str, str] = {
     "anthropic": "storymesh.llm.anthropic",
     "openai": "storymesh.llm.openai",
+}
+
+# Maps image provider names to the environment variable names for their API keys.
+_IMAGE_PROVIDER_KEY_MAP: dict[str, str] = {
+    "openai": "OPENAI_API_KEY",
+}
+
+# Maps image provider names to their implementing module.
+_IMAGE_PROVIDER_MODULE_MAP: dict[str, str] = {
+    "openai": "storymesh.llm.openai_image",
 }
 
 
@@ -118,6 +129,66 @@ def _build_llm_client(
     cls = get_provider_class(provider)
     on_call = artifact_store.log_llm_call if artifact_store is not None else None
     return cls(model=model, agent_name=agent_name, on_call=on_call)
+
+
+def _ensure_image_provider_imported(provider: str) -> None:
+    """Import the image provider module so its ``register_image_provider()`` call executes.
+
+    Args:
+        provider: Provider name string (e.g. ``'openai'``).
+    """
+    import importlib  # noqa: PLC0415
+
+    module_name = _IMAGE_PROVIDER_MODULE_MAP.get(provider)
+    if module_name:
+        try:
+            importlib.import_module(module_name)
+        except ImportError:
+            logger.warning(
+                "Image provider module '%s' could not be imported. "
+                "Install the corresponding extra: pip install storymesh[%s]",
+                module_name,
+                provider,
+            )
+
+
+def _build_image_client(
+    agent_cfg: dict[str, Any],
+    agent_name: str = "unknown",
+) -> ImageClient | None:
+    """Instantiate the correct ImageClient from an agent config dict.
+
+    Returns None with a warning if the required API key is not set.
+
+    Args:
+        agent_cfg: Resolved agent config dict from ``get_agent_config()``.
+        agent_name: Label used in log output.
+
+    Returns:
+        A concrete ``ImageClient`` instance, or ``None`` if the API key is absent.
+
+    Raises:
+        ValueError: If ``agent_cfg["image_provider"]`` is not registered.
+    """
+    from storymesh.llm.image_base import get_image_provider_class  # noqa: PLC0415
+
+    provider: str | None = agent_cfg.get("image_provider")
+    model: str | None = agent_cfg.get("image_model")
+
+    if provider is None:
+        return None
+
+    env_key = _IMAGE_PROVIDER_KEY_MAP.get(provider)
+    if env_key and not os.environ.get(env_key):
+        logger.warning(
+            "%s is not set — the cover_art stage will run as noop.",
+            env_key,
+        )
+        return None
+
+    _ensure_image_provider_imported(provider)
+    cls = get_image_provider_class(provider)
+    return cls(model=model, agent_name=agent_name)  # type: ignore[arg-type]
 
 
 MAX_RUBRIC_RETRIES: int = 2
@@ -200,11 +271,11 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
           → proposal_draft
           → rubric_judge
           → [conditional]
-              ├── PASS → synopsis_writer → END
+              ├── PASS → synopsis_writer → cover_art → END
               └── FAIL → proposal_draft (max 2 retries)
 
     Notes:
-    - Stages 5–6 are noop placeholders until their agents are implemented.
+    - Stage 6 (synopsis_writer) is a noop placeholder until its agent is implemented.
     - The rubric retry loop is wired via ``_rubric_route``; the noop always
       passes so the pipeline progresses linearly until real agents are added.
     - Checkpointer: pass ``checkpointer=MemorySaver()`` to ``compile()``
@@ -345,6 +416,24 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
         )
         rubric_judge_node = make_rubric_judge_node(rubric_agent, artifact_store=artifact_store)
 
+    # ── Stage 7: CoverArtAgent ────────────────────────────────────────────
+    from storymesh.agents.cover_art.agent import CoverArtAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.cover_art import make_cover_art_node  # noqa: PLC0415
+
+    cover_cfg = get_agent_config("cover_art")
+    cover_image_client = _build_image_client(cover_cfg, agent_name="cover_art")
+
+    if cover_image_client is None:
+        logger.warning("CoverArtAgent: no image client available — stage 7 will run as noop.")
+        cover_art_node: Any = _noop_node
+    else:
+        cover_agent = CoverArtAgent(
+            image_client=cover_image_client,
+            image_size=cover_cfg.get("image_size", "1024x1792"),
+            image_quality=cover_cfg.get("image_quality", "auto"),
+        )
+        cover_art_node = make_cover_art_node(cover_agent, artifact_store=artifact_store)
+
     # ── Build the graph ────────────────────────────────────────────────────
     graph: Any = StateGraph(StoryMeshState)
 
@@ -355,6 +444,7 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     graph.add_node("proposal_draft", proposal_draft_node)
     graph.add_node("rubric_judge", rubric_judge_node)
     graph.add_node("synopsis_writer", _noop_node)   # Stage 6 — placeholder (LLM)
+    graph.add_node("cover_art", cover_art_node)     # Stage 7
 
     # ── Wire edges (linear) ────────────────────────────────────────────────
     graph.add_edge(START, "genre_normalizer")
@@ -375,6 +465,7 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
             "proposal_draft": "proposal_draft",
         },
     )
-    graph.add_edge("synopsis_writer", END)
+    graph.add_edge("synopsis_writer", "cover_art")
+    graph.add_edge("cover_art", END)
 
     return graph.compile()

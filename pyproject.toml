@@ -25,12 +25,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-openai = ["openai>=2.24.0"]
+openai = ["openai>=2.24.0", "Pillow>=10.0"]
 anthropic = ["anthropic>=0.84.0"]
 gemini = ["google-generativeai>=0.8.6"]
 langsmith = ["langsmith>=0.1"]
 dev = ["pytest", "pytest-cov", "ruff", "mypy", "langsmith>=0.1"]
-all-providers = ["anthropic>=0.84.0", "openai>=2.24.0", "google-generativeai>=0.8.6"]
+all-providers = ["anthropic>=0.84.0", "openai>=2.24.0", "google-generativeai>=0.8.6", "Pillow>=10.0"]
 langgraph-studio = ["langgraph-cli[inmem]"]
 
 [project.scripts]

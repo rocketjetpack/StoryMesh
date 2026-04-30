@@ -16,6 +16,7 @@ from typing import TypedDict
 
 from storymesh.schemas.book_fetcher import BookFetcherAgentOutput
 from storymesh.schemas.book_ranker import BookRankerAgentOutput
+from storymesh.schemas.cover_art import CoverArtAgentOutput
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
 from storymesh.schemas.proposal_draft import ProposalDraftAgentOutput
 from storymesh.schemas.rubric_judge import RubricJudgeAgentOutput
@@ -62,6 +63,9 @@ class StoryMeshState(TypedDict, total=False):
     # ── Stage 6: SynopsisWriterAgent (LLM) ────────────────────────────────
     # TODO: Replace object with SynopsisWriterOutput once implemented.
     synopsis_writer_output: object | None
+
+    # ── Stage 7: CoverArtAgent ─────────────────────────────────────────────
+    cover_art_output: CoverArtAgentOutput | None
 
     # ── Rubric retry tracking ──────────────────────────────────────────────
     rubric_retry_count: int

@@ -10,7 +10,14 @@ from __future__ import annotations
 import pytest
 
 import storymesh.llm.base as _base_module
+import storymesh.llm.image_base as _image_base_module
 from storymesh.llm.base import LLMClient, get_provider_class, register_provider
+from storymesh.llm.image_base import (
+    GeneratedImage,
+    ImageClient,
+    get_image_provider_class,
+    register_image_provider,
+)
 
 # ---------------------------------------------------------------------------
 # Minimal concrete subclasses for testing (no real LLM calls)
@@ -147,3 +154,50 @@ class TestBuildLLMClient:
 
         with pytest.raises(ValueError, match="Unknown LLM provider"):
             _build_llm_client({"provider": "google", "model": "gemini-pro"})
+
+
+# ---------------------------------------------------------------------------
+# Image client registry
+# ---------------------------------------------------------------------------
+
+
+class _FakeImageClientA(ImageClient):
+    def generate(self, prompt: str, *, size: str, quality: str, style: str) -> GeneratedImage:
+        return GeneratedImage(image_bytes=b"PNG", revised_prompt=None)
+
+
+class _FakeImageClientB(ImageClient):
+    def generate(self, prompt: str, *, size: str, quality: str, style: str) -> GeneratedImage:
+        return GeneratedImage(image_bytes=b"PNG", revised_prompt=None)
+
+
+@pytest.fixture(autouse=True)
+def clean_image_registry() -> None:  # type: ignore[return]
+    """Snapshot and restore _IMAGE_REGISTRY around each test."""
+    snapshot = dict(_image_base_module._IMAGE_REGISTRY)
+    yield
+    _image_base_module._IMAGE_REGISTRY.clear()
+    _image_base_module._IMAGE_REGISTRY.update(snapshot)
+
+
+class TestImageRegistry:
+    def test_register_and_retrieve(self) -> None:
+        """Registered class is retrievable by name."""
+        register_image_provider("_test_img_a", _FakeImageClientA)
+        assert get_image_provider_class("_test_img_a") is _FakeImageClientA
+
+    def test_duplicate_registration_same_class_ok(self) -> None:
+        """Registering the same class twice under the same name does not raise."""
+        register_image_provider("_test_img_b", _FakeImageClientA)
+        register_image_provider("_test_img_b", _FakeImageClientA)  # idempotent
+
+    def test_duplicate_registration_different_class_raises(self) -> None:
+        """Registering a different class under an already-taken name raises ValueError."""
+        register_image_provider("_test_img_c", _FakeImageClientA)
+        with pytest.raises(ValueError, match="already registered"):
+            register_image_provider("_test_img_c", _FakeImageClientB)
+
+    def test_unknown_provider_raises(self) -> None:
+        """Requesting an unregistered provider raises ValueError with helpful message."""
+        with pytest.raises(ValueError, match="Unknown image provider"):
+            get_image_provider_class("_nonexistent_image_provider_xyz")

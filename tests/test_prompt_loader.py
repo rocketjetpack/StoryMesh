@@ -239,6 +239,14 @@ class TestProposalDraftGeneratePrompt:
                 f"Missing placeholder: {{{placeholder}}}"
             )
 
+    def test_schema_contains_image_prompt(self) -> None:
+        pt = load_prompt("proposal_draft_generate")
+        assert "image_prompt" in pt.system
+
+    def test_system_contains_step_4(self) -> None:
+        pt = load_prompt("proposal_draft_generate")
+        assert "STEP 4" in pt.system
+
     def test_format_user_with_valid_data(self) -> None:
         pt = load_prompt("proposal_draft_generate")
         result = pt.format_user(
@@ -342,6 +350,14 @@ class TestProposalDraftRetryPrompt:
             assert f"{{{placeholder}}}" in pt._user_template, (
                 f"Missing retry placeholder: {{{placeholder}}}"
             )
+
+    def test_schema_contains_image_prompt(self) -> None:
+        pt = load_prompt("proposal_draft_retry")
+        assert "image_prompt" in pt.system
+
+    def test_system_contains_step_4(self) -> None:
+        pt = load_prompt("proposal_draft_retry")
+        assert "STEP 4" in pt.system
 
     def test_format_user_with_valid_retry_data(self) -> None:
         pt = load_prompt("proposal_draft_retry")

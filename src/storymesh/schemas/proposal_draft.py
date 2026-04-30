@@ -139,6 +139,16 @@ class StoryProposal(BaseModel):
         min_length=1,
         description="Which genres from the input this proposal blends.",
     )
+    image_prompt: str = Field(
+        min_length=30,
+        description=(
+            "A DALL-E 3-ready image generation prompt for the book cover. "
+            "Describes the dominant visual (a scene, object, or atmosphere from "
+            "the story world — not a named character portrait), art style, mood, "
+            "color palette, and period or setting details. Contains no character "
+            "names, text, or readable symbols."
+        ),
+    )
 
 
 class SelectionRationale(BaseModel):
