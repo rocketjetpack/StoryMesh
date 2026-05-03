@@ -78,6 +78,7 @@ class ProposalDraftAgent:
         num_candidates: int = 3,
         selection_temperature: float = 0.2,
         selection_max_tokens: int = 2048,
+        revision_temperature: float = 0.5,
     ) -> None:
         """Construct the agent.
 
@@ -95,6 +96,9 @@ class ProposalDraftAgent:
                 call. Low value (default 0.2) produces consistent, analytical
                 evaluation rather than creative output.
             selection_max_tokens: Maximum tokens for the selection call.
+            revision_temperature: Sampling temperature for directed revision
+                calls. Lower than generation temperature (default 0.5) because
+                precision is the goal, not creative variance.
         """
         self._llm_client = llm_client
         self._temperature = temperature
@@ -102,26 +106,37 @@ class ProposalDraftAgent:
         self._num_candidates = num_candidates
         self._selection_temperature = selection_temperature
         self._selection_max_tokens = selection_max_tokens
+        self._revision_temperature = revision_temperature
 
         # Load all prompts eagerly so misconfiguration is caught at
         # construction time, not mid-pipeline.
         self._generate_prompt = load_prompt("proposal_draft_generate")
         self._select_prompt = load_prompt("proposal_draft_select")
         self._retry_prompt = load_prompt("proposal_draft_retry")
+        self._revise_prompt = load_prompt("proposal_draft_revise")
 
     def run(
         self,
         input_data: ProposalDraftAgentInput,
         *,
         rubric_feedback: RubricFeedback | None = None,
+        reader_feedback_text: str | None = None,
     ) -> ProposalDraftAgentOutput:
         """Generate candidate proposals and select the strongest one.
 
+        When both ``rubric_feedback`` and ``reader_feedback_text`` are provided,
+        switches to directed revision mode: a single targeted edit of the best
+        proposal seen so far at lower temperature, rather than generating fresh
+        candidates from seeds.
+
         Args:
             input_data: Assembled input from multiple upstream pipeline stages.
-            rubric_feedback: When provided, uses the retry prompt template that
-                includes the evaluator's critique so the generator has targeted
-                creative direction. Pass None (default) for the initial attempt.
+            rubric_feedback: When provided, includes the craft evaluator's
+                critique. Required for both retry and revision modes.
+                Pass None (default) for the initial attempt.
+            reader_feedback_text: When provided alongside rubric_feedback,
+                activates revision mode. Contains pre-formatted reader
+                perspective feedback from ProposalReaderAgent.
 
         Returns:
             A frozen ProposalDraftAgentOutput with the selected proposal,
@@ -130,9 +145,15 @@ class ProposalDraftAgent:
         Raises:
             RuntimeError: If all candidate proposals fail to parse.
         """
+        is_retry = rubric_feedback is not None
+        is_revision = is_retry and reader_feedback_text is not None
+
+        # ── Revision mode: single directed edit of the best proposal ─────────
+        if is_revision:
+            return self._run_revision(input_data, rubric_feedback, reader_feedback_text)  # type: ignore[arg-type]
+
         seeds = input_data.narrative_seeds
         num_candidates = self._num_candidates
-        is_retry = rubric_feedback is not None
         active_prompt = self._retry_prompt if is_retry else self._generate_prompt
 
         logger.info(
@@ -308,6 +329,99 @@ class ProposalDraftAgent:
         return ProposalDraftAgentOutput(
             proposal=selected,
             all_candidates=candidates,
+            selection_rationale=rationale,
+            debug=debug,
+        )
+
+    def _run_revision(
+        self,
+        input_data: ProposalDraftAgentInput,
+        rubric_feedback: RubricFeedback,
+        reader_feedback_text: str,
+    ) -> ProposalDraftAgentOutput:
+        """Perform a directed revision of the best-scoring proposal.
+
+        Single LLM call at reduced temperature. The model is asked to edit the
+        existing proposal rather than generate from scratch, addressing specific
+        weaknesses identified by both the craft evaluator and the reader.
+
+        Args:
+            input_data: Assembled input from upstream pipeline stages.
+            rubric_feedback: Craft evaluation including the best proposal JSON,
+                dimension feedback, and scores.
+            reader_feedback_text: Pre-formatted reader perspective feedback
+                from ProposalReaderAgent.
+
+        Returns:
+            A frozen ProposalDraftAgentOutput with the revised proposal.
+
+        Raises:
+            RuntimeError: If the revision call fails to parse.
+        """
+        logger.info(
+            "ProposalDraftAgent starting | mode=revision temperature=%.1f attempt=%d",
+            self._revision_temperature,
+            rubric_feedback.attempt_number,
+        )
+
+        tensions_json = orjson.dumps(
+            [t.model_dump() for t in input_data.tensions]
+        ).decode()
+
+        # Split reader feedback text back out into individual fields so the
+        # prompt template can position them independently.
+        # reader_feedback_text is structured as "field: value\n" lines by the node.
+        user_prompt_text = self._revise_prompt.format_user(
+            best_proposal=rubric_feedback.previous_proposal_json,
+            rubric_feedback=rubric_feedback.feedback_text,
+            rubric_scores=rubric_feedback.scores_text,
+            reader_feedback_block=reader_feedback_text,
+            user_prompt=input_data.user_prompt,
+            normalized_genres=input_data.normalized_genres,
+            user_tones=input_data.user_tones,
+            tensions=tensions_json,
+        )
+
+        try:
+            response = self._llm_client.complete_json(
+                user_prompt_text,
+                system_prompt=self._revise_prompt.system,
+                temperature=self._revision_temperature,
+                max_tokens=self._max_tokens,
+            )
+            revised = StoryProposal(**response)
+        except Exception as exc:
+            raise RuntimeError(
+                f"ProposalDraftAgent revision call failed: {exc}"
+            ) from exc
+
+        logger.info(
+            "ProposalDraftAgent complete | mode=revision selected=%r",
+            revised.title,
+        )
+
+        rationale = SelectionRationale(
+            selected_index=0,
+            rationale=(
+                f"Directed revision of best proposal (attempt {rubric_feedback.attempt_number}). "
+                "Single candidate — no selection step required."
+            ),
+        )
+        debug: dict[str, Any] = {
+            "num_candidates_requested": 1,
+            "num_valid_candidates": 1,
+            "num_parse_failures": 0,
+            "draft_temperature": self._revision_temperature,
+            "selection_temperature": None,
+            "seed_assignments": {},
+            "total_llm_calls": 1,
+            "is_retry": True,
+            "is_revision": True,
+            "attempt_number": rubric_feedback.attempt_number,
+        }
+        return ProposalDraftAgentOutput(
+            proposal=revised,
+            all_candidates=[revised],
             selection_rationale=rationale,
             debug=debug,
         )

@@ -149,6 +149,15 @@ class StoryProposal(BaseModel):
             "character names, text, or readable symbols."
         ),
     )
+    unknowns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional unresolved questions the story holds open — things the "
+            "protagonist cannot verify, things the world resists explaining, "
+            "ambiguities that persist after the story ends. Empty when the "
+            "story does not benefit from explicit unknowns."
+        ),
+    )
 
 
 class SelectionRationale(BaseModel):

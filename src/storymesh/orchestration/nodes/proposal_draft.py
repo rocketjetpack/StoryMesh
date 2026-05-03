@@ -32,16 +32,29 @@ def _format_feedback(rubric_output: RubricJudgeAgentOutput) -> str:
     for dim_name, dim_result in dimensions.items():
         score = getattr(dim_result, "score", "N/A")
         feedback = getattr(dim_result, "feedback", "")
-        ref = getattr(dim_result, "directive_ref", "")
+        ref = getattr(dim_result, "principle_ref", "")
         lines.append(f"[{dim_name}] ({ref}) score={score}: {feedback}")
-    violations = getattr(rubric_output, "cliche_violations", [])
-    if violations:
-        lines.append("\nCLICHÉ VIOLATIONS DETECTED:")
-        for v in violations:
-            lines.append(f"  - {v}")
+    creative_direction = getattr(rubric_output, "creative_direction", "")
+    if creative_direction:
+        lines.append(f"\nCREATIVE DIRECTION: {creative_direction}")
     overall = getattr(rubric_output, "overall_feedback", "")
     if overall:
         lines.append(f"\nOVERALL: {overall}")
+    return "\n".join(lines)
+
+
+def _format_reader_feedback(reader_output: object) -> str:
+    """Format ProposalReaderAgentOutput feedback fields as a readable text block."""
+    feedback = getattr(reader_output, "feedback", None)
+    if feedback is None:
+        return ""
+    lines = [
+        f"What engaged them:  {getattr(feedback, 'what_engaged_me', '')}",
+        f"What fell flat:     {getattr(feedback, 'what_fell_flat', '')}",
+        f"Protagonist gap:    {getattr(feedback, 'protagonist_gap', '')}",
+        f"Premise question:   {getattr(feedback, 'premise_question', '')}",
+        f"Reader direction:   {getattr(feedback, 'reader_direction', '')}",
+    ]
     return "\n".join(lines)
 
 
@@ -108,30 +121,41 @@ def make_proposal_draft_node(
             )
             raise RuntimeError(msg)
 
-        # Detect retry: rubric_judge ran and failed.
+        # Detect retry: rubric_judge has run (output is present). This covers
+        # both failed proposals AND passing proposals routed back by min_retries.
         rubric_output = state.get("rubric_judge_output")
-        is_retry = (
-            rubric_output is not None
-            and hasattr(rubric_output, "passed")
-            and not rubric_output.passed
-        )
+        is_retry = rubric_output is not None
 
         rubric_feedback: RubricFeedback | None = None
+        reader_feedback_text: str | None = None
         if is_retry:
             assert rubric_output is not None
-            prev_proposal_output = state.get("proposal_draft_output")
-            prev_proposal_json = (
-                json.dumps(prev_proposal_output.proposal.model_dump(), indent=2)
-                if prev_proposal_output is not None
-                else "{}"
-            )
+            # Use the best-scoring proposal rather than the most recent one —
+            # revision should improve what is already strongest.
+            proposal_history: list[Any] = list(state.get("proposal_history") or [])
+            best_idx: int = state.get("best_proposal_index", 0)
+            if proposal_history and 0 <= best_idx < len(proposal_history):
+                best_proposal_json = json.dumps(
+                    proposal_history[best_idx].proposal.model_dump(), indent=2
+                )
+            else:
+                prev_proposal_output = state.get("proposal_draft_output")
+                best_proposal_json = (
+                    json.dumps(prev_proposal_output.proposal.model_dump(), indent=2)
+                    if prev_proposal_output is not None
+                    else "{}"
+                )
             attempt_number = state.get("rubric_retry_count", 0) + 2  # +1 for base, +1 for this retry
             rubric_feedback = RubricFeedback(
-                previous_proposal_json=prev_proposal_json,
+                previous_proposal_json=best_proposal_json,
                 feedback_text=_format_feedback(rubric_output),
                 scores_text=_format_scores(rubric_output),
                 attempt_number=attempt_number,
             )
+            # Pass reader feedback when the proposal_reader node has run.
+            reader_output = state.get("proposal_reader_output")
+            if reader_output is not None:
+                reader_feedback_text = _format_reader_feedback(reader_output)
 
         input_data = ProposalDraftAgentInput(
             narrative_seeds=theme_extractor_output.narrative_seeds,
@@ -145,7 +169,11 @@ def make_proposal_draft_node(
 
         token = current_run_id.set(state.get("run_id", ""))
         try:
-            output = agent.run(input_data, rubric_feedback=rubric_feedback)
+            output = agent.run(
+                input_data,
+                rubric_feedback=rubric_feedback,
+                reader_feedback_text=reader_feedback_text,
+            )
         finally:
             current_run_id.reset(token)
 

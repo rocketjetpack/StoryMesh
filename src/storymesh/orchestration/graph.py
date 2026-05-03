@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -191,8 +192,8 @@ def _build_image_client(
     return cls(model=model, agent_name=agent_name)  # type: ignore[arg-type]
 
 
-MAX_RUBRIC_RETRIES: int = 2
-"""Maximum number of times rubric_judge may route back to proposal_draft."""
+_DEFAULT_MAX_RUBRIC_RETRIES: int = 2
+"""Default maximum number of times rubric_judge may route back to proposal_draft."""
 
 
 def _genre_normalizer_route(state: StoryMeshState) -> str:
@@ -226,39 +227,61 @@ def _noop_node(state: StoryMeshState) -> dict[str, Any]:
     return {}
 
 
-def _rubric_route(state: StoryMeshState) -> str:
-    """Conditional routing function after rubric_judge.
-
-    Routes to ``'proposal_draft'`` when the rubric fails and the retry
-    budget has not been exhausted, otherwise routes to ``'story_writer'``.
-
-    The real ``RubricJudgeAgent`` should:
-
-    * Set ``rubric_judge_output`` with a pass/fail signal accessible via
-      ``getattr(output, 'passed', True)``.
-    * Increment ``rubric_retry_count`` in its return dict when failing.
-
-    The noop placeholder leaves ``rubric_judge_output`` as ``None``, which
-    is treated as a pass so the pipeline always progresses normally.
+def _make_rubric_route(max_retries: int, min_retries: int = 0) -> Callable[[StoryMeshState], str]:
+    """Create a rubric routing function with a configurable retry budget.
 
     Args:
-        state: Current pipeline state.
+        max_retries: Maximum times rubric_judge may route back to proposal_draft.
+        min_retries: Minimum retries before a passing proposal can proceed.
+            When > 0, even passing proposals are routed back for revision
+            until ``retry_count >= min_retries``.
 
     Returns:
-        Name of the next node to execute.
+        A routing function suitable for ``add_conditional_edges``.
     """
-    retry_count: int = state.get("rubric_retry_count", 0)
-    rubric_output = state.get("rubric_judge_output")
 
-    # None means the noop placeholder ran (no LLM key) — treat as passed.
-    passed: bool = rubric_output is None or bool(rubric_output.passed)
+    def _rubric_route(state: StoryMeshState) -> str:
+        """Conditional routing function after rubric_judge.
 
-    if passed or retry_count >= MAX_RUBRIC_RETRIES:
-        return "story_writer"
-    return "proposal_draft"
+        Routes to ``'proposal_reader_feedback'`` (which feeds into
+        ``'proposal_draft'``) when:
+        - The minimum retry count has not been met (even if passed), OR
+        - The rubric failed and the max retry budget is not exhausted.
+
+        Otherwise routes to ``'story_writer'``.
+
+        Args:
+            state: Current pipeline state.
+
+        Returns:
+            Name of the next node to execute.
+        """
+        retry_count: int = state.get("rubric_retry_count", 0)
+        rubric_output = state.get("rubric_judge_output")
+
+        # None means the noop placeholder ran (no LLM key) — treat as passed.
+        passed: bool = rubric_output is None or bool(rubric_output.passed)
+
+        # Enforce minimum retries: even passing proposals must go through
+        # at least min_retries editorial revision cycles.
+        if retry_count < min_retries and retry_count < max_retries:
+            return "proposal_reader_feedback"
+
+        if passed or retry_count >= max_retries:
+            return "story_writer"
+        return "proposal_reader_feedback"
+
+    return _rubric_route
 
 
-def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: ANN401  # CompiledStateGraph generics not resolvable under mypy strict.
+def build_graph(
+    artifact_store: ArtifactStore | None = None,
+    *,
+    pass_threshold: int | None = None,
+    max_retries: int | None = None,
+    min_retries: int = 0,
+    skip_resonance_review: bool = True,
+) -> Any:  # noqa: ANN401  # CompiledStateGraph generics not resolvable under mypy strict.
     """Construct and compile the StoryMesh pipeline StateGraph.
 
     Stage topology::
@@ -271,24 +294,37 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
           → proposal_draft
           → rubric_judge
           → [conditional]
-              ├── PASS → story_writer → cover_art → END
-              └── FAIL → proposal_draft (max 2 retries)
+              ├── PASS → story_writer → resonance_reviewer → cover_art → book_assembler → END
+              └── FAIL / min_retries not met → proposal_draft (up to *max_retries*)
 
     Notes:
-    - The rubric retry loop is wired via ``_rubric_route``; without an LLM key
-      the rubric node runs as noop and always passes.
+    - The rubric retry loop is wired via ``_make_rubric_route``; without an
+      LLM key the rubric node runs as noop and always passes.
     - Agents without API keys degrade gracefully to noop nodes.
+    - The resonance reviewer is skipped (noop) when ``skip_resonance_review``
+      is True (default). Quality presets ``high`` and ``very_high`` set it
+      to False.
     - Checkpointer: pass ``checkpointer=MemorySaver()`` to ``compile()``
       when HITL or run-persistence is needed.
 
     Args:
         artifact_store: Optional store passed to node factories for per-node
             artifact persistence. Pass ``None`` to skip persistence.
+        pass_threshold: Override rubric pass threshold. When ``None`` the
+            value from ``storymesh.config.yaml`` (or the default of 6) is used.
+        max_retries: Override rubric retry budget. When ``None`` the module
+            default (``_DEFAULT_MAX_RUBRIC_RETRIES``) is used.
+        min_retries: Minimum editorial revision cycles before a passing
+            proposal can proceed. Default 0 (no mandatory retries).
+        skip_resonance_review: When True (default), the resonance reviewer
+            node passes through without making LLM calls. Set to False by
+            ``high`` and ``very_high`` quality presets.
 
     Returns:
         A compiled LangGraph StateGraph ready for ``.stream()`` or
         ``.invoke()``.
     """
+    resolved_max_retries = max_retries if max_retries is not None else _DEFAULT_MAX_RUBRIC_RETRIES
     # ── Stage 0: GenreNormalizerAgent ──────────────────────────────────────
     genre_cfg = get_agent_config("genre_normalizer")
     genre_llm = _build_llm_client(genre_cfg, agent_name="genre_normalizer", artifact_store=artifact_store)
@@ -386,9 +422,36 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
             num_candidates=proposal_cfg.get("num_candidates", 3),
             selection_temperature=proposal_cfg.get("selection_temperature", 0.2),
             selection_max_tokens=proposal_cfg.get("selection_max_tokens", 2048),
+            revision_temperature=proposal_cfg.get("revision_temperature", 0.5),
         )
         proposal_draft_node = make_proposal_draft_node(
             proposal_agent, artifact_store=artifact_store
+        )
+
+    # ── Stage 4.5: ProposalReaderAgent (retry path only) ──────────────────
+    from storymesh.agents.proposal_reader.agent import ProposalReaderAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.proposal_reader import (  # noqa: PLC0415
+        make_proposal_reader_node,
+    )
+
+    reader_cfg = get_agent_config("proposal_reader")
+    reader_llm = _build_llm_client(
+        reader_cfg, agent_name="proposal_reader", artifact_store=artifact_store
+    )
+
+    if reader_llm is None:
+        logger.warning(
+            "ProposalReaderAgent: no LLM client available — stage 4.5 will run as noop."
+        )
+        proposal_reader_node: Any = _noop_node
+    else:
+        reader_agent = ProposalReaderAgent(
+            llm_client=reader_llm,
+            temperature=reader_cfg.get("temperature", 0.4),
+            max_tokens=reader_cfg.get("max_tokens", 1024),
+        )
+        proposal_reader_node = make_proposal_reader_node(
+            reader_agent, artifact_store=artifact_store
         )
 
     # ── Stage 5: RubricJudgeAgent ─────────────────────────────────────────
@@ -408,11 +471,16 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
         )
         rubric_judge_node: Any = _noop_node
     else:
+        resolved_threshold = (
+            pass_threshold
+            if pass_threshold is not None
+            else rubric_cfg.get("pass_threshold", 6)
+        )
         rubric_agent = RubricJudgeAgent(
             llm_client=rubric_llm,
             temperature=rubric_cfg.get("temperature", 0.0),
             max_tokens=rubric_cfg.get("max_tokens", 4096),
-            pass_threshold=rubric_cfg.get("pass_threshold", 0.7),
+            pass_threshold=resolved_threshold,
         )
         rubric_judge_node = make_rubric_judge_node(rubric_agent, artifact_store=artifact_store)
 
@@ -445,6 +513,51 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
         )
         story_writer_node = make_story_writer_node(story_agent, artifact_store=artifact_store)
 
+    # ── Stage 6b: ResonanceReviewerAgent ─────────────────────────────────
+    from storymesh.agents.resonance_reviewer.agent import ResonanceReviewerAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.resonance_reviewer import (  # noqa: PLC0415
+        make_resonance_reviewer_node,
+    )
+
+    resonance_cfg = get_agent_config("resonance_reviewer")
+    review_llm = _build_llm_client(
+        {
+            "provider": resonance_cfg.get("review_provider"),
+            "model": resonance_cfg.get("review_model"),
+        },
+        agent_name="resonance_reviewer_review",
+        artifact_store=artifact_store,
+    )
+    revision_llm = _build_llm_client(
+        {
+            "provider": resonance_cfg.get("revision_provider"),
+            "model": resonance_cfg.get("revision_model"),
+        },
+        agent_name="resonance_reviewer_revision",
+        artifact_store=artifact_store,
+    )
+
+    if review_llm is None or revision_llm is None or skip_resonance_review:
+        if not skip_resonance_review:
+            logger.warning(
+                "ResonanceReviewerAgent: missing LLM client(s) — stage 6b will run as noop."
+            )
+        resonance_reviewer_node: Any = _noop_node
+    else:
+        resonance_agent = ResonanceReviewerAgent(
+            review_llm_client=review_llm,
+            revision_llm_client=revision_llm,
+            review_temperature=resonance_cfg.get("review_temperature", 0.4),
+            revision_temperature=resonance_cfg.get("revision_temperature", 0.7),
+            summary_temperature=resonance_cfg.get("summary_temperature", 0.4),
+            review_max_tokens=resonance_cfg.get("review_max_tokens", 4096),
+            revision_max_tokens=resonance_cfg.get("revision_max_tokens", 8000),
+            summary_max_tokens=resonance_cfg.get("summary_max_tokens", 1024),
+        )
+        resonance_reviewer_node = make_resonance_reviewer_node(
+            resonance_agent, artifact_store=artifact_store
+        )
+
     # ── Stage 7: CoverArtAgent ────────────────────────────────────────────
     from storymesh.agents.cover_art.agent import CoverArtAgent  # noqa: PLC0415
     from storymesh.orchestration.nodes.cover_art import make_cover_art_node  # noqa: PLC0415
@@ -463,6 +576,20 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
         )
         cover_art_node = make_cover_art_node(cover_agent, artifact_store=artifact_store)
 
+    # ── Stage 8: BookAssemblerAgent ───────────────────────────────────────
+    from storymesh.agents.book_assembler.agent import BookAssemblerAgent  # noqa: PLC0415
+    from storymesh.orchestration.nodes.book_assembler import (  # noqa: PLC0415
+        make_book_assembler_node,
+    )
+
+    assembler_cfg = get_agent_config("book_assembler")
+    assembler_agent = BookAssemblerAgent(
+        output_formats=assembler_cfg.get("output_formats", ["pdf", "epub"]),
+    )
+    book_assembler_node: Any = make_book_assembler_node(
+        assembler_agent, artifact_store=artifact_store
+    )
+
     # ── Build the graph ────────────────────────────────────────────────────
     graph: Any = StateGraph(StoryMeshState)
 
@@ -472,8 +599,11 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     graph.add_node("theme_extractor", theme_extractor_node)
     graph.add_node("proposal_draft", proposal_draft_node)
     graph.add_node("rubric_judge", rubric_judge_node)
-    graph.add_node("story_writer", story_writer_node)  # Stage 6
-    graph.add_node("cover_art", cover_art_node)      # Stage 7
+    graph.add_node("proposal_reader_feedback", proposal_reader_node)  # Stage 4.5
+    graph.add_node("story_writer", story_writer_node)            # Stage 6
+    graph.add_node("resonance_reviewer", resonance_reviewer_node)  # Stage 6b
+    graph.add_node("cover_art", cover_art_node)                    # Stage 7
+    graph.add_node("book_assembler", book_assembler_node)          # Stage 8
 
     # ── Wire edges (linear) ────────────────────────────────────────────────
     graph.add_edge(START, "genre_normalizer")
@@ -488,13 +618,16 @@ def build_graph(artifact_store: ArtifactStore | None = None) -> Any:  # noqa: AN
     graph.add_edge("proposal_draft", "rubric_judge")
     graph.add_conditional_edges(
         "rubric_judge",
-        _rubric_route,
+        _make_rubric_route(resolved_max_retries, min_retries=min_retries),
         {
             "story_writer": "story_writer",
-            "proposal_draft": "proposal_draft",
+            "proposal_reader_feedback": "proposal_reader_feedback",
         },
     )
-    graph.add_edge("story_writer", "cover_art")
-    graph.add_edge("cover_art", END)
+    graph.add_edge("proposal_reader_feedback", "proposal_draft")
+    graph.add_edge("story_writer", "resonance_reviewer")
+    graph.add_edge("resonance_reviewer", "cover_art")
+    graph.add_edge("cover_art", "book_assembler")
+    graph.add_edge("book_assembler", END)
 
     return graph.compile()

@@ -2,11 +2,13 @@
 
 Defines the input/output contracts for Stage 5 of the StoryMesh pipeline.
 RubricJudgeAgent evaluates a StoryProposal against a craft-quality rubric
-whose dimensions align with three creative principles: restraint, convention
-then departure, and specificity without performance.
+using three-tier scoring (0=fail, 1=acceptable, 2=strong) across five
+dimensions aligned with creative principles: story-serving restraint,
+story-serving choices, specificity with texture, protagonist interiority,
+and user intent fidelity.
 
-Pass/fail is determined by the agent in Python from the weighted composite
-score — the LLM returns only scores and feedback, keeping the decision
+Pass/fail is determined by the agent in Python from the sum of tier scores
+— the LLM returns only scores and feedback, keeping the decision
 deterministic and auditable.
 """
 
@@ -22,7 +24,7 @@ from storymesh.versioning.schemas import RUBRIC_SCHEMA_VERSION
 
 EXPECTED_DIMENSIONS: frozenset[str] = frozenset({
     "restraint",
-    "convention_departure",
+    "story_serving_choices",
     "specificity",
     "protagonist_interiority",
     "user_intent_fidelity",
@@ -74,14 +76,17 @@ class RubricJudgeAgentInput(BaseModel):
 
 
 class DimensionResult(BaseModel):
-    """Score and feedback for a single rubric dimension."""
+    """Score and feedback for a single rubric dimension.
+
+    Uses three-tier scoring: 0 (fail), 1 (acceptable), 2 (strong).
+    """
 
     model_config = {"frozen": True}
 
-    score: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Dimension score from 0.0 (fail) to 1.0 (excellent).",
+    score: int = Field(
+        ge=0,
+        le=2,
+        description="Dimension tier: 0 (fail), 1 (acceptable), 2 (strong).",
     )
     feedback: str = Field(
         min_length=10,
@@ -91,7 +96,7 @@ class DimensionResult(BaseModel):
         min_length=1,
         description=(
             "Which creative principle this dimension evaluates "
-            "(e.g., 'restraint', 'convention_departure', 'specificity')."
+            "(e.g., 'restraint', 'story_serving_choices', 'specificity')."
         ),
     )
 
@@ -99,9 +104,10 @@ class DimensionResult(BaseModel):
 class RubricJudgeAgentOutput(BaseModel):
     """Complete rubric evaluation of a story proposal.
 
-    The ``passed`` field and ``composite_score`` are computed by the agent in
-    Python from the LLM's per-dimension scores — the LLM does not determine
-    pass/fail. This keeps the decision deterministic and auditable.
+    Uses three-tier scoring (0/1/2) per dimension with a sum composite
+    (max 10). The ``passed`` field and ``composite_score`` are computed
+    by the agent in Python — the LLM does not determine pass/fail.
+    This keeps the decision deterministic and auditable.
     """
 
     model_config = {"frozen": True}
@@ -109,42 +115,44 @@ class RubricJudgeAgentOutput(BaseModel):
     passed: bool = Field(
         description="True when composite_score >= pass_threshold.",
     )
-    composite_score: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="Weighted average of dimension scores.",
+    composite_score: int = Field(
+        ge=0,
+        le=10,
+        description="Sum of all dimension tier scores (max 10).",
     )
-    pass_threshold: float = Field(
-        ge=0.0,
-        le=1.0,
+    pass_threshold: int = Field(
+        ge=0,
+        le=10,
         description="The threshold used for pass/fail determination.",
     )
     dimensions: dict[str, DimensionResult] = Field(
         min_length=1,
         description=(
             "Mapping of dimension name to score and feedback. "
-            "Expected keys: restraint, convention_departure, "
+            "Expected keys: restraint, story_serving_choices, "
             "specificity, protagonist_interiority, user_intent_fidelity."
         ),
     )
-    convention_departures: list[str] = Field(
-        default_factory=list,
+    creative_direction: str = Field(
+        default="",
         description=(
-            "Specific genre conventions the proposal follows and the "
-            "departure moment(s) identified, if any."
+            "One specific, actionable editorial instruction for how the proposal "
+            "should be revised. Names the element and describes the change. "
+            "Empty only on LLM failure."
         ),
     )
     overall_feedback: str = Field(
         min_length=10,
         description=(
-            "Holistic editorial assessment: strongest element, weakest element, "
-            "one specific suggestion for improvement."
+            "Holistic editorial assessment: strongest element (with quote), "
+            "weakest element (with quote), and whether the proposal explains "
+            "itself too much."
         ),
     )
     debug: dict[str, Any] = Field(
         default_factory=dict,
         description=(
-            "Evaluation metadata: weights_used, threshold, attempt_number, "
+            "Evaluation metadata: threshold, attempt_number, "
             "raw_scores, total_llm_calls."
         ),
     )

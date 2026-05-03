@@ -52,23 +52,24 @@ _NO_CRAFT_NOTES = ""
 def _format_craft_notes(rubric_output: RubricJudgeAgentOutput) -> str:
     """Format rubric dimension feedback into actionable craft notes.
 
-    Only includes dimensions scoring below 0.75 — the ones that actually
-    need addressing. Dimensions at or above threshold are working and should
-    not be disrupted.
+    Only includes dimensions scoring below 2 (i.e., not "strong"). Dimensions
+    at the top tier are working and should not be disrupted.
 
     Args:
         rubric_output: A RubricJudgeAgentOutput instance.
 
     Returns:
-        Formatted craft notes string, or empty string if all scores are adequate.
+        Formatted craft notes string, or empty string if all scores are strong.
     """
+    tier_labels = {0: "fail", 1: "acceptable", 2: "strong"}
     lines: list[str] = []
     dimensions = getattr(rubric_output, "dimensions", {})
     for dim_name, dim_result in dimensions.items():
-        score = getattr(dim_result, "score", 1.0)
-        if score < 0.75:
+        score = getattr(dim_result, "score", 2)
+        if score < 2:
             feedback = getattr(dim_result, "feedback", "")
-            lines.append(f"- {dim_name} (score {score:.2f}): {feedback}")
+            label = tier_labels.get(score, str(score))
+            lines.append(f"- {dim_name} ({label}): {feedback}")
 
     overall = getattr(rubric_output, "overall_feedback", "")
     composite = getattr(rubric_output, "composite_score", None)
@@ -78,7 +79,7 @@ def _format_craft_notes(rubric_output: RubricJudgeAgentOutput) -> str:
 
     notes = _CRAFT_NOTES_HEADER
     if composite is not None:
-        notes += f"Prior composite score: {composite:.2f}\n\n"
+        notes += f"Prior composite score: {composite}/10\n\n"
     notes += "\n".join(lines)
     if overall:
         notes += f"\n\nOverall editorial note: {overall}"
@@ -100,7 +101,8 @@ def _format_scene_list_for_prompt(scenes: list[SceneOutline]) -> str:
             f"SCENE {i}: {scene.title}\n"
             f'Opens with (use verbatim): "{scene.opens_with}"\n'
             f"What happens: {scene.summary}\n"
-            f"Thematic function: {scene.thematic_function}"
+            f"Narrative pressure: {scene.narrative_pressure}\n"
+            f"Observational anchor: {scene.observational_anchor}"
         )
     return "\n\n".join(parts)
 
@@ -349,6 +351,11 @@ class StoryWriterAgent:
             RuntimeError: If the draft call fails or returns an empty string.
         """
         scene_list_text = _format_scene_list_for_prompt(scene_list)
+        unknowns_text = (
+            "\n".join(f"- {u}" for u in proposal.unknowns)
+            if proposal.unknowns
+            else "(none)"
+        )
         user_prompt_text = self._draft_prompt.format_user(
             title=proposal.title,
             target_words=self._target_words,
@@ -357,6 +364,7 @@ class StoryWriterAgent:
             tone=proposal.tone,
             tensions=tensions_json,
             scene_list=scene_list_text,
+            unknowns=unknowns_text,
             craft_notes_section=craft_notes_section,
         )
 

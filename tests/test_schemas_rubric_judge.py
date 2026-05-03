@@ -19,7 +19,7 @@ from storymesh.versioning.schemas import RUBRIC_SCHEMA_VERSION
 
 def _valid_dimension(**overrides: object) -> DimensionResult:
     defaults: dict[str, object] = {
-        "score": 0.8,
+        "score": 2,
         "feedback": "Good restraint across the full arc.",
         "principle_ref": "restraint",
     }
@@ -29,21 +29,20 @@ def _valid_dimension(**overrides: object) -> DimensionResult:
 
 def _valid_dimensions() -> dict[str, DimensionResult]:
     return {
-        "restraint": _valid_dimension(score=0.8, principle_ref="restraint"),
-        "convention_departure": _valid_dimension(score=0.7, principle_ref="convention_departure"),
-        "specificity": _valid_dimension(score=0.75, principle_ref="specificity"),
-        "protagonist_interiority": _valid_dimension(score=0.6, principle_ref="protagonist_interiority"),
-        "user_intent_fidelity": _valid_dimension(score=0.9, principle_ref="user_intent_fidelity"),
+        "restraint": _valid_dimension(score=2, principle_ref="restraint"),
+        "story_serving_choices": _valid_dimension(score=1, principle_ref="story_serving_choices"),
+        "specificity": _valid_dimension(score=2, principle_ref="specificity"),
+        "protagonist_interiority": _valid_dimension(score=1, principle_ref="protagonist_interiority"),
+        "user_intent_fidelity": _valid_dimension(score=2, principle_ref="user_intent_fidelity"),
     }
 
 
 def _valid_output(**overrides: object) -> RubricJudgeAgentOutput:
     defaults: dict[str, object] = {
         "passed": True,
-        "composite_score": 0.75,
-        "pass_threshold": 0.7,
+        "composite_score": 8,
+        "pass_threshold": 6,
         "dimensions": _valid_dimensions(),
-        "convention_departures": [],
         "overall_feedback": "Strong proposal with specific details and unresolved tension.",
         "debug": {},
     }
@@ -105,25 +104,29 @@ def _make_tension() -> object:
 class TestDimensionResult:
     def test_valid_construction(self) -> None:
         dim = _valid_dimension()
-        assert dim.score == 0.8
+        assert dim.score == 2
         assert dim.principle_ref == "restraint"
 
     def test_frozen(self) -> None:
         dim = _valid_dimension()
         with pytest.raises((TypeError, ValidationError)):
-            dim.score = 0.5
+            dim.score = 1
 
     def test_score_below_zero_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            _valid_dimension(score=-0.1)
+            _valid_dimension(score=-1)
 
-    def test_score_above_one_rejected(self) -> None:
+    def test_score_above_two_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            _valid_dimension(score=1.1)
+            _valid_dimension(score=3)
 
     def test_score_at_boundaries_accepted(self) -> None:
-        assert _valid_dimension(score=0.0).score == 0.0
-        assert _valid_dimension(score=1.0).score == 1.0
+        assert _valid_dimension(score=0).score == 0
+        assert _valid_dimension(score=2).score == 2
+
+    def test_all_tiers_accepted(self) -> None:
+        for tier in (0, 1, 2):
+            assert _valid_dimension(score=tier).score == tier
 
     def test_short_feedback_rejected(self) -> None:
         with pytest.raises(ValidationError):
@@ -142,7 +145,7 @@ class TestRubricJudgeAgentOutput:
     def test_valid_construction(self) -> None:
         out = _valid_output()
         assert out.passed is True
-        assert 0.0 <= out.composite_score <= 1.0
+        assert 0 <= out.composite_score <= 10
 
     def test_frozen(self) -> None:
         out = _valid_output()
@@ -153,50 +156,33 @@ class TestRubricJudgeAgentOutput:
         out = _valid_output()
         assert out.schema_version == RUBRIC_SCHEMA_VERSION
 
-    def test_convention_departures_defaults_empty(self) -> None:
-        out = RubricJudgeAgentOutput(
-            passed=True,
-            composite_score=0.8,
-            pass_threshold=0.7,
-            dimensions=_valid_dimensions(),
-            overall_feedback="Strong proposal with clear specificity and tension.",
-        )
-        assert out.convention_departures == []
-
     def test_dimensions_must_be_non_empty(self) -> None:
         with pytest.raises(ValidationError):
             _valid_output(dimensions={})
 
     def test_composite_score_bounds(self) -> None:
         with pytest.raises(ValidationError):
-            _valid_output(composite_score=-0.1)
+            _valid_output(composite_score=-1)
         with pytest.raises(ValidationError):
-            _valid_output(composite_score=1.1)
+            _valid_output(composite_score=11)
 
     def test_pass_threshold_bounds(self) -> None:
         with pytest.raises(ValidationError):
-            _valid_output(pass_threshold=-0.1)
+            _valid_output(pass_threshold=-1)
         with pytest.raises(ValidationError):
-            _valid_output(pass_threshold=1.1)
+            _valid_output(pass_threshold=11)
 
     def test_overall_feedback_min_length(self) -> None:
         with pytest.raises(ValidationError):
             _valid_output(overall_feedback="Too short")
 
     def test_passed_true_when_score_above_threshold(self) -> None:
-        out = _valid_output(passed=True, composite_score=0.75, pass_threshold=0.7)
+        out = _valid_output(passed=True, composite_score=8, pass_threshold=6)
         assert out.passed is True
 
     def test_passed_false_when_score_below_threshold(self) -> None:
-        out = _valid_output(passed=False, composite_score=0.5, pass_threshold=0.7)
+        out = _valid_output(passed=False, composite_score=3, pass_threshold=6)
         assert out.passed is False
-
-    def test_convention_departures_list(self) -> None:
-        out = _valid_output(convention_departures=[
-            "Convention followed: lone detective solves case",
-            "Departure: tribunal convicts without legal authority",
-        ])
-        assert len(out.convention_departures) == 2
 
     def test_debug_defaults_empty(self) -> None:
         out = _valid_output()
@@ -284,7 +270,7 @@ class TestExpectedDimensions:
     def test_all_five_dimensions_present(self) -> None:
         assert {
             "restraint",
-            "convention_departure",
+            "story_serving_choices",
             "specificity",
             "protagonist_interiority",
             "user_intent_fidelity",

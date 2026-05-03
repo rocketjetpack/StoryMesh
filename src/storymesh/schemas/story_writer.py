@@ -88,12 +88,21 @@ class SceneOutline(BaseModel):
         min_length=10,
         description="2–3 sentence description of what happens in this scene.",
     )
-    thematic_function: str = Field(
+    narrative_pressure: str = Field(
         min_length=10,
         description=(
-            "Which thematic tension this scene inhabits and how — without "
-            "resolving it. Guides the prose pass toward sustained tension "
-            "rather than premature resolution."
+            "What pressure this scene is under — which tension is active, "
+            "what force is applied. Describes what is happening to the scene, "
+            "not what the scene means. Guides the prose pass toward sustained "
+            "tension rather than premature interpretation."
+        ),
+    )
+    observational_anchor: str = Field(
+        min_length=5,
+        description=(
+            "One concrete physical or sensory detail the scene can return to: "
+            "an object, a repeated procedure, a room feature, a texture. Gives "
+            "the prose a stable thing to ground itself in."
         ),
     )
     opens_with: str = Field(

@@ -14,11 +14,14 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+from storymesh.schemas.book_assembler import BookAssemblerAgentOutput
 from storymesh.schemas.book_fetcher import BookFetcherAgentOutput
 from storymesh.schemas.book_ranker import BookRankerAgentOutput
 from storymesh.schemas.cover_art import CoverArtAgentOutput
 from storymesh.schemas.genre_normalizer import GenreNormalizerAgentOutput
 from storymesh.schemas.proposal_draft import ProposalDraftAgentOutput
+from storymesh.schemas.proposal_reader import ProposalReaderAgentOutput
+from storymesh.schemas.resonance_reviewer import ResonanceReviewerAgentOutput
 from storymesh.schemas.rubric_judge import RubricJudgeAgentOutput
 from storymesh.schemas.story_writer import StoryWriterAgentOutput
 from storymesh.schemas.theme_extractor import ThemeExtractorAgentOutput
@@ -58,14 +61,23 @@ class StoryMeshState(TypedDict, total=False):
     # ── Stage 4: ProposalDraftAgent (LLM) ─────────────────────────────────
     proposal_draft_output: ProposalDraftAgentOutput | None
 
+    # ── Stage 4.5: ProposalReaderAgent (LLM, retry path only) ─────────────
+    proposal_reader_output: ProposalReaderAgentOutput | None
+
     # ── Stage 5: RubricJudgeAgent (LLM, conditional retry edge) ───────────
     rubric_judge_output: RubricJudgeAgentOutput | None
 
     # ── Stage 6: StoryWriterAgent (LLM) ───────────────────────────────────
     story_writer_output: StoryWriterAgentOutput | None
 
+    # ── Stage 6b: ResonanceReviewerAgent ────────────────────────────────────
+    resonance_reviewer_output: ResonanceReviewerAgentOutput | None
+
     # ── Stage 7: CoverArtAgent ─────────────────────────────────────────────
     cover_art_output: CoverArtAgentOutput | None
+
+    # ── Stage 8: BookAssemblerAgent ────────────────────────────────────────
+    book_assembler_output: BookAssemblerAgentOutput | None
 
     # ── Rubric retry tracking ──────────────────────────────────────────────
     rubric_retry_count: int

@@ -23,6 +23,12 @@ system: |
   these into 6-10 scene outlines that cover the full story arc, including the
   opening, transitions between key moments, and the denouement.
 
+  THE OUTLINE IS A SCAFFOLD, NOT A SCRIPT
+  The prose writer will use this outline as a guide, not a contract. They may
+  linger on a moment longer than you planned, compress a transition, or add a
+  small local detail. Your job is to give them enough structure to work from and
+  enough room to discover the story as they write it.
+
   FOR EACH SCENE YOU MUST PROVIDE:
 
   1. `scene_id` — sequential identifier ("scene_01", "scene_02", etc.)
@@ -32,18 +38,25 @@ system: |
      Bad: "A Moment That Will Change Everything"
 
   3. `summary` — 2-3 sentences: what physically happens in this scene, who is
-     present, where it takes place. No interpretation. No "this represents..."
+     present, where it takes place. Keep it concrete and behavioral. Describe
+     actions, not meanings. Do not embed a fully worked-out reading of the scene.
 
-  4. `thematic_function` — which thematic tension this scene pressurizes, and
-     HOW. Be specific: name the tension, describe what detail or exchange makes
-     it visible. The scene does not resolve the tension — it turns the screw.
-     Good: "Inhabits the tension between institutional justice and personal
-     accountability: Mara interviews the last witness but has no authority to
-     compel testimony and no institution to deliver the information to — the act
-     of investigation is performed in a vacuum."
-     Bad: "Explores the theme of justice in a broken world."
+  4. `narrative_pressure` — what pressure is this scene under? Name the tension
+     that is active and describe what force is being applied. This is not about
+     what the scene means — it is about what is happening to the characters and
+     the world in this moment.
+     Good: "The tension between institutional authority and personal accountability
+     is active here — Mara interviews the last witness but has no authority to
+     compel testimony and no institution to receive the information."
+     Bad: "This scene explores the theme of justice in a broken world."
 
-  5. `opens_with` — the LITERAL first sentence of this scene in the final prose.
+  5. `observational_anchor` — one concrete physical or sensory detail the scene
+     can return to. An object, a repeated procedure, a room feature, a texture,
+     a sound. This gives the prose a stable thing to ground itself in.
+     Good: "The salvaged tax forms she uses as notebook paper — running out."
+     Bad: "The weight of her moral burden."
+
+  6. `opens_with` — the LITERAL first sentence of this scene in the final prose.
      This sentence is used verbatim by the writer. It must:
      - Be particular to this moment in this story (not a generic genre opening)
      - Start in the middle of something — action, object, sensory detail, or
@@ -75,14 +88,16 @@ system: |
   - 10 scenes for stories targeting ~5000 words (one scene ~500 words)
   - Use the `target_words` value provided to calibrate
 
-  STRUCTURAL REQUIREMENTS:
-  - Scene 1 must establish protagonist, world, and the first pressure on the
+  STRUCTURAL GUIDANCE:
+  - Scene 1 should establish protagonist, world, and the first pressure on the
     central tension — without explaining any of it
   - At least one scene should be a quiet moment (not a plot beat) that reveals
-    character through a specific detail or action
-  - The penultimate scene should be the highest-pressure moment — do not save
+    character through action or specific detail
+  - The penultimate scene should carry the highest pressure — do not save
     it for the final scene
   - The final scene should land on the tension, not resolve it
+  - Not every scene needs equal weight. Some scenes exist to apply pressure.
+    Some exist to let the reader breathe. Let the story decide.
 
   {craft_notes_section}
 
@@ -95,7 +110,8 @@ system: |
         "scene_id": "scene_01",
         "title": "<functional heading>",
         "summary": "<2-3 sentences: what physically happens>",
-        "thematic_function": "<which tension, how it is pressurized, not resolved>",
+        "narrative_pressure": "<which tension is active, what force is applied — not what the scene means>",
+        "observational_anchor": "<one concrete physical/sensory detail the scene can return to>",
         "opens_with": "<verbatim first sentence for the prose pass>"
       }}
     ]
@@ -113,7 +129,7 @@ user: |
   {proposal}
 
   ---
-  THEMATIC TENSIONS (maintain these unresolved throughout):
+  THEMATIC TENSIONS (these are active pressures, not themes to explain):
   {tensions}
 
   ---

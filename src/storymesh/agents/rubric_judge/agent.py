@@ -4,9 +4,10 @@ Evaluates a StoryProposal against a 5-dimension craft-quality rubric using an
 LLM on a DIFFERENT provider than ProposalDraftAgent. The cross-provider design
 prevents the evaluator from inheriting the generator's blind spots.
 
-The LLM returns raw dimension scores and feedback. Pass/fail is computed here
-in Python from the weighted composite score so the decision is deterministic,
-auditable, and tunable without LLM involvement.
+Uses three-tier scoring (0=fail, 1=acceptable, 2=strong) per dimension. The
+composite score is the simple sum of all tier scores (max 10). Pass/fail is
+computed here in Python so the decision is deterministic, auditable, and tunable
+without LLM involvement.
 
 If the LLM call fails entirely, the agent returns a default-fail output so the
 retry loop gets a chance to improve the proposal rather than crashing.
@@ -30,14 +31,6 @@ from storymesh.schemas.rubric_judge import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DIMENSION_WEIGHTS: dict[str, float] = {
-    "restraint": 0.25,
-    "convention_departure": 0.30,
-    "specificity": 0.20,
-    "protagonist_interiority": 0.15,
-    "user_intent_fidelity": 0.10,
-}
-
 _FALLBACK_FEEDBACK = "Dimension not evaluated by the model."
 
 
@@ -46,8 +39,8 @@ class RubricJudgeAgent:
 
     Uses a DIFFERENT LLM provider than ProposalDraftAgent to give an
     independent editorial evaluation free from the generator's blind spots.
-    Computes pass/fail from a weighted composite score against a configurable
-    threshold — the LLM never makes the pass/fail decision.
+    Computes pass/fail from a sum of three-tier scores (0/1/2) against a
+    configurable threshold — the LLM never makes the pass/fail decision.
     """
 
     def __init__(
@@ -56,8 +49,7 @@ class RubricJudgeAgent:
         llm_client: LLMClient,
         temperature: float = 0.0,
         max_tokens: int = 4096,
-        pass_threshold: float = 0.7,
-        dimension_weights: dict[str, float] | None = None,
+        pass_threshold: int = 6,
     ) -> None:
         """Construct the agent.
 
@@ -66,16 +58,14 @@ class RubricJudgeAgent:
                 than ProposalDraftAgent for independent evaluation.
             temperature: Default 0.0 — evaluation should be reproducible.
             max_tokens: Maximum tokens for the rubric feedback response.
-            pass_threshold: Composite score floor for a passing proposal.
-                Primary tuning knob for eval rounds.
-            dimension_weights: Override the default per-dimension weights.
-                Must sum to approximately 1.0. Defaults match the prompt.
+            pass_threshold: Minimum sum of tier scores to pass (max 10).
+                Default 6 ("standard" quality). Presets: draft=5, standard=6,
+                high=8.
         """
         self._llm_client = llm_client
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._pass_threshold = pass_threshold
-        self._weights = dimension_weights or DEFAULT_DIMENSION_WEIGHTS
         self._prompt = load_prompt("rubric_judge")
 
     def run(self, input_data: RubricJudgeAgentInput) -> RubricJudgeAgentOutput:
@@ -91,7 +81,7 @@ class RubricJudgeAgent:
             loop can attempt to produce a better proposal.
         """
         logger.info(
-            "RubricJudgeAgent starting | attempt=%d threshold=%.2f",
+            "RubricJudgeAgent starting | attempt=%d threshold=%d",
             input_data.attempt_number,
             self._pass_threshold,
         )
@@ -134,19 +124,22 @@ class RubricJudgeAgent:
         for dim_name in EXPECTED_DIMENSIONS:
             if dim_name not in raw_dims:
                 logger.warning(
-                    "RubricJudgeAgent: dimension '%s' missing from LLM response — assigning 0.0.",
+                    "RubricJudgeAgent: dimension '%s' missing from LLM response — assigning 0.",
                     dim_name,
                 )
                 dimensions[dim_name] = DimensionResult(
-                    score=0.0,
+                    score=0,
                     feedback=_FALLBACK_FEEDBACK,
                     principle_ref="N/A",
                 )
             else:
                 dim_data = raw_dims[dim_name]
-                score = float(dim_data.get("score", 0.0))
-                # Clamp to [0.0, 1.0] in case the LLM returns out-of-range values.
-                score = max(0.0, min(1.0, score))
+                # Parse and clamp to valid tier range [0, 2].
+                try:
+                    score = int(dim_data.get("score", 0))
+                except (TypeError, ValueError):
+                    score = 0
+                score = max(0, min(2, score))
                 feedback = str(dim_data.get("feedback", _FALLBACK_FEEDBACK))
                 if len(feedback) < 10:
                     feedback = f"{feedback} (no further detail provided)"
@@ -156,7 +149,8 @@ class RubricJudgeAgent:
                     principle_ref=str(dim_data.get("principle_ref", dim_name)),
                 )
 
-        convention_departures: list[str] = raw.get("convention_departures", [])
+        creative_direction: str = str(raw.get("creative_direction", ""))
+
         overall_feedback: str = raw.get(
             "overall_feedback",
             "No overall feedback provided.",
@@ -168,14 +162,13 @@ class RubricJudgeAgent:
         passed = composite >= self._pass_threshold
 
         logger.info(
-            "RubricJudgeAgent complete | composite=%.3f threshold=%.2f passed=%s",
+            "RubricJudgeAgent complete | composite=%d threshold=%d passed=%s",
             composite,
             self._pass_threshold,
             passed,
         )
 
         debug: dict[str, Any] = {
-            "weights_used": self._weights,
             "threshold": self._pass_threshold,
             "raw_scores": {k: v.score for k, v in dimensions.items()},
             "attempt_number": input_data.attempt_number,
@@ -187,18 +180,15 @@ class RubricJudgeAgent:
             composite_score=composite,
             pass_threshold=self._pass_threshold,
             dimensions=dimensions,
-            convention_departures=convention_departures,
+            creative_direction=creative_direction,
             overall_feedback=overall_feedback,
             debug=debug,
         )
 
-    def _compute_composite(self, dimensions: dict[str, DimensionResult]) -> float:
-        """Compute weighted composite score from dimension scores."""
-        weighted = sum(
-            self._weights.get(name, 0.0) * dim.score
-            for name, dim in dimensions.items()
-        )
-        return round(weighted, 6)
+    @staticmethod
+    def _compute_composite(dimensions: dict[str, DimensionResult]) -> int:
+        """Compute composite score as sum of all dimension tier scores."""
+        return sum(dim.score for dim in dimensions.values())
 
     def _default_fail(
         self,
@@ -212,18 +202,17 @@ class RubricJudgeAgent:
             else "Rubric evaluation failed. Treating as fail to trigger retry."
         )
         dimensions = {
-            name: DimensionResult(score=0.0, feedback=feedback_msg, principle_ref="N/A")
+            name: DimensionResult(score=0, feedback=feedback_msg, principle_ref="N/A")
             for name in EXPECTED_DIMENSIONS
         }
         return RubricJudgeAgentOutput(
             passed=False,
-            composite_score=0.0,
+            composite_score=0,
             pass_threshold=self._pass_threshold,
             dimensions=dimensions,
-            convention_departures=[],
+            creative_direction="",
             overall_feedback=feedback_msg,
             debug={
-                "weights_used": self._weights,
                 "threshold": self._pass_threshold,
                 "attempt_number": input_data.attempt_number,
                 "total_llm_calls": 1,

@@ -1,21 +1,27 @@
 GENRE_CONSTRAINT_SCHEMA_VERSION = "3.1"
 BOOK_FETCHER_SCHEMA_VERSION = "1.2"
 BOOK_RANKER_SCHEMA_VERSION = "1.1"
-PROPOSAL_SCHEMA_VERSION = "1.2"
+PROPOSAL_SCHEMA_VERSION = "1.3"
+PROPOSAL_READER_SCHEMA_VERSION = "1.0"
 THEMEPACK_SCHEMA_VERSION = "1.1"
-RUBRIC_SCHEMA_VERSION = "1.0"
+RUBRIC_SCHEMA_VERSION = "2.0"
 COVER_ART_SCHEMA_VERSION = "1.1"
-STORY_WRITER_SCHEMA_VERSION = "1.0"
+STORY_WRITER_SCHEMA_VERSION = "1.1"
+BOOK_ASSEMBLER_SCHEMA_VERSION = "1.0"
+RESONANCE_REVIEWER_SCHEMA_VERSION = "1.0"
 
 SCHEMA_VERSIONS: dict[str, str] = {
     "Genre Constraint": GENRE_CONSTRAINT_SCHEMA_VERSION,
     "Book Fetcher": BOOK_FETCHER_SCHEMA_VERSION,
     "Book Ranker": BOOK_RANKER_SCHEMA_VERSION,
     "Proposal": PROPOSAL_SCHEMA_VERSION,
+    "Proposal Reader": PROPOSAL_READER_SCHEMA_VERSION,
     "Themepack": THEMEPACK_SCHEMA_VERSION,
     "Rubric": RUBRIC_SCHEMA_VERSION,
     "Cover Art": COVER_ART_SCHEMA_VERSION,
     "Story Writer": STORY_WRITER_SCHEMA_VERSION,
+    "Book Assembler": BOOK_ASSEMBLER_SCHEMA_VERSION,
+    "Resonance Reviewer": RESONANCE_REVIEWER_SCHEMA_VERSION,
 }
 
 # Version History
@@ -74,3 +80,38 @@ SCHEMA_VERSIONS: dict[str, str] = {
 #             SynopsisWriterAgent placeholder. Produces back_cover_summary,
 #             scene_list (6-10 SceneOutline objects), and full_draft prose
 #             separated by SCENE_BREAK delimiters for book assembly.
+# 2026-05-01: Increment Story Writer schema to 1.1. Renamed thematic_function
+#             to narrative_pressure in SceneOutline (describes what pressure the
+#             scene is under, not what it means). Added observational_anchor
+#             (str, min_length=5) — a concrete physical/sensory detail the scene
+#             can return to. Breaking change — existing artifacts will not
+#             deserialize.
+# 2026-05-01: Increment Rubric schema to 2.0. Breaking change — switched from
+#             float (0.0-1.0) Likert scoring to int (0/1/2) three-tier scoring:
+#             0=fail, 1=acceptable, 2=strong. Composite is now sum of tier scores
+#             (max 10) instead of weighted average. Renamed convention_departure
+#             dimension to story_serving_choices. Removed convention_departures
+#             list field (analysis folded into D-2 feedback). pass_threshold and
+#             composite_score changed from float to int.
+# 2026-05-01: Increment Proposal schema to 1.3. Added unknowns (list[str],
+#             default_factory=list) to StoryProposal. Optional field — holds
+#             unresolved questions the story keeps open. Empty when the story
+#             does not benefit from explicit unknowns. Non-breaking additive change.
+# 2026-04-30: Add Book Assembler schema 1.0. Introduces BookAssemblerAgentInput
+#             and BookAssemblerAgentOutput. Renders story_writer_output and
+#             cover_art into PDF (WeasyPrint) and EPUB (ebooklib) deliverables.
+#             pdf_path and epub_path are absolute paths in the run directory;
+#             either is an empty string when the format was not generated.
+# 2026-05-01: Add Proposal Reader schema 1.0. Introduces ProposalReaderFeedback,
+#             ProposalReaderAgentInput, and ProposalReaderAgentOutput. Runs on
+#             the retry path between RubricJudgeAgent and ProposalDraftAgent.
+#             Cross-provider (GPT-4o) reader-perspective evaluation with five
+#             non-technical fields: what_engaged_me, what_fell_flat,
+#             protagonist_gap, premise_question, reader_direction.
+# 2026-05-01: Add Resonance Reviewer schema 1.0. Introduces NearMissMoment,
+#             ResonanceReviewerAgentInput, and ResonanceReviewerAgentOutput.
+#             Reviews completed prose drafts for near-miss moments (places
+#             where the story implies depth but retreats before engaging) and
+#             produces targeted expansions. Cross-provider review pass
+#             identifies 0-3 moments; revision pass expands avoidance moments
+#             in-place. Quality-gated: only runs at high/very_high presets.

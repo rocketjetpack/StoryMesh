@@ -402,7 +402,7 @@ class TestRubricJudgePrompt:
         pt = load_prompt("rubric_judge")
         expected = [
             "restraint",
-            "convention_departure",
+            "story_serving_choices",
             "specificity",
             "protagonist_interiority",
             "user_intent_fidelity",
@@ -414,7 +414,7 @@ class TestRubricJudgePrompt:
         pt = load_prompt("rubric_judge")
         for ref in [
             "restraint",
-            "convention_departure",
+            "story_serving_choices",
             "specificity",
             "protagonist_interiority",
             "user_intent_fidelity",

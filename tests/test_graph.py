@@ -739,49 +739,53 @@ class TestRubricRetryTopology:
 
     def test_routes_to_synopsis_writer_when_output_is_none(self) -> None:
         """Noop rubric_judge (output=None) must always route to synopsis_writer."""
-        from storymesh.orchestration.graph import _rubric_route
+        from storymesh.orchestration.graph import _make_rubric_route
 
+        rubric_route = _make_rubric_route(2)
         state: StoryMeshState = {"rubric_retry_count": 0, "rubric_judge_output": None}
-        assert _rubric_route(state) == "story_writer"
+        assert rubric_route(state) == "story_writer"
 
     def test_routes_to_proposal_draft_when_failed_and_retries_remain(self) -> None:
-        """A failed rubric with retries remaining routes back to proposal_draft."""
-        from storymesh.orchestration.graph import _rubric_route
+        """A failed rubric with retries remaining routes to proposal_reader_feedback."""
+        from storymesh.orchestration.graph import _make_rubric_route
 
         class _FailResult:
             passed = False
 
+        rubric_route = _make_rubric_route(2)
         state: StoryMeshState = {
             "rubric_retry_count": 0,
             "rubric_judge_output": _FailResult(),  # type: ignore[typeddict-item]
         }
-        assert _rubric_route(state) == "proposal_draft"
+        assert rubric_route(state) == "proposal_reader_feedback"
 
     def test_routes_to_synopsis_writer_when_retry_budget_exhausted(self) -> None:
-        """A failed rubric at MAX_RUBRIC_RETRIES forces progression to synopsis_writer."""
-        from storymesh.orchestration.graph import MAX_RUBRIC_RETRIES, _rubric_route
+        """A failed rubric at max retries forces progression to synopsis_writer."""
+        from storymesh.orchestration.graph import _DEFAULT_MAX_RUBRIC_RETRIES, _make_rubric_route
 
         class _FailResult:
             passed = False
 
+        rubric_route = _make_rubric_route(_DEFAULT_MAX_RUBRIC_RETRIES)
         state: StoryMeshState = {
-            "rubric_retry_count": MAX_RUBRIC_RETRIES,
+            "rubric_retry_count": _DEFAULT_MAX_RUBRIC_RETRIES,
             "rubric_judge_output": _FailResult(),  # type: ignore[typeddict-item]
         }
-        assert _rubric_route(state) == "story_writer"
+        assert rubric_route(state) == "story_writer"
 
     def test_routes_to_synopsis_writer_when_passed(self) -> None:
         """A passing rubric result routes to synopsis_writer regardless of retry count."""
-        from storymesh.orchestration.graph import _rubric_route
+        from storymesh.orchestration.graph import _make_rubric_route
 
         class _PassResult:
             passed = True
 
+        rubric_route = _make_rubric_route(2)
         state: StoryMeshState = {
             "rubric_retry_count": 1,
             "rubric_judge_output": _PassResult(),  # type: ignore[typeddict-item]
         }
-        assert _rubric_route(state) == "story_writer"
+        assert rubric_route(state) == "story_writer"
 
     def test_compiled_graph_accepts_conditional_edge(self) -> None:
         """build_graph() must compile without errors with the conditional rubric edge."""
@@ -989,7 +993,9 @@ class TestProposalDraftNode:
         captured_inputs: list[object] = []
 
         class _RecordingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
+            def run(  # type: ignore[override]
+                self, input_data: object, *, rubric_feedback: object = None, reader_feedback_text: str | None = None
+            ) -> ProposalDraftAgentOutput:
                 captured_inputs.append(input_data)
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1017,7 +1023,9 @@ class TestProposalDraftNode:
         observed_run_ids: list[str] = []
 
         class _ObservingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
+            def run(  # type: ignore[override]
+                self, input_data: object, *, rubric_feedback: object = None, reader_feedback_text: str | None = None
+            ) -> ProposalDraftAgentOutput:
                 observed_run_ids.append(_crid.get())
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1032,13 +1040,13 @@ class TestProposalDraftNode:
 def _make_failed_rubric_output() -> object:
     """Minimal object mimicking a failed RubricJudgeAgentOutput."""
     from types import SimpleNamespace as NS
-    dim = NS(score=0.3, feedback="Tension was resolved.", directive_ref="CD-1")
+    dim = NS(score=0, feedback="Tension was resolved.", principle_ref="restraint")
     return NS(
         passed=False,
-        composite_score=0.3,
-        pass_threshold=0.7,
+        composite_score=2,
+        pass_threshold=6,
         dimensions={"tension_inhabitation": dim},
-        cliche_violations=["love defeats the monster"],
+        creative_direction="Revise the third key scene to hold ambiguity longer.",
         overall_feedback="Proposal resolves the tension rather than inhabiting it.",
     )
 
@@ -1046,13 +1054,13 @@ def _make_failed_rubric_output() -> object:
 def _make_passed_rubric_output() -> object:
     """Minimal object mimicking a passed RubricJudgeAgentOutput."""
     from types import SimpleNamespace as NS
-    dim = NS(score=0.9, feedback="Excellent tension inhabitation.", directive_ref="CD-1")
+    dim = NS(score=2, feedback="Excellent tension inhabitation.", principle_ref="restraint")
     return NS(
         passed=True,
-        composite_score=0.9,
-        pass_threshold=0.7,
+        composite_score=8,
+        pass_threshold=6,
         dimensions={"tension_inhabitation": dim},
-        cliche_violations=[],
+        creative_direction="Consider letting the final scene end on texture rather than realization.",
         overall_feedback="Strong proposal.",
     )
 
@@ -1095,7 +1103,9 @@ class TestProposalDraftNodeRetry:
         received_feedback: list[object] = []
 
         class _CapturingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
+            def run(  # type: ignore[override]
+                self, input_data: object, *, rubric_feedback: object = None, reader_feedback_text: str | None = None
+            ) -> ProposalDraftAgentOutput:
                 received_feedback.append(rubric_feedback)
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1111,7 +1121,9 @@ class TestProposalDraftNodeRetry:
         received_feedback: list[object] = []
 
         class _CapturingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
+            def run(  # type: ignore[override]
+                self, input_data: object, *, rubric_feedback: object = None, reader_feedback_text: str | None = None
+            ) -> ProposalDraftAgentOutput:
                 received_feedback.append(rubric_feedback)
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1127,7 +1139,7 @@ class TestProposalDraftNodeRetry:
         assert isinstance(fb, RubricFeedback)
         assert fb.attempt_number == 2
         assert "tension_inhabitation" in fb.feedback_text
-        assert "love defeats the monster" in fb.feedback_text
+        assert "Revise the third key scene" in fb.feedback_text
 
     def test_retry_increments_count(self) -> None:
         """On retry, the returned dict includes rubric_retry_count incremented by 1."""
@@ -1140,11 +1152,19 @@ class TestProposalDraftNodeRetry:
         assert result["rubric_retry_count"] == 1
 
     def test_passed_rubric_no_retry(self) -> None:
-        """When rubric_judge_output has passed=True, no retry logic triggers."""
+        """When rubric_judge_output is present (even passed=True), retry logic triggers.
+
+        is_retry is detected as ``rubric_output is not None`` so that min_retries
+        can force editorial revision even when the rubric passes.
+        """
+        from storymesh.agents.proposal_draft.agent import RubricFeedback
+
         received_feedback: list[object] = []
 
         class _CapturingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
+            def run(  # type: ignore[override]
+                self, input_data: object, *, rubric_feedback: object = None, reader_feedback_text: str | None = None
+            ) -> ProposalDraftAgentOutput:
                 received_feedback.append(rubric_feedback)
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1153,15 +1173,18 @@ class TestProposalDraftNodeRetry:
         state = _base_proposal_state()
         state["rubric_judge_output"] = _make_passed_rubric_output()  # type: ignore[typeddict-item]
         result = node(state)
-        assert received_feedback == [None]
-        assert "rubric_retry_count" not in result
+        assert len(received_feedback) == 1
+        assert isinstance(received_feedback[0], RubricFeedback)
+        assert "rubric_retry_count" in result
 
     def test_none_rubric_treated_as_first_attempt(self) -> None:
         """When rubric_judge_output is None (noop), no retry logic triggers."""
         received_feedback: list[object] = []
 
         class _CapturingAgent(ProposalDraftAgent):
-            def run(self, input_data: object, *, rubric_feedback: object = None) -> ProposalDraftAgentOutput:
+            def run(  # type: ignore[override]
+                self, input_data: object, *, rubric_feedback: object = None, reader_feedback_text: str | None = None
+            ) -> ProposalDraftAgentOutput:
                 received_feedback.append(rubric_feedback)
                 return super().run(input_data)  # type: ignore[arg-type]
 
@@ -1186,20 +1209,19 @@ def _make_rubric_agent(passed: bool = True) -> RubricJudgeAgent:
 
     dims = {
         d: {
-            "score": 0.9 if passed else 0.2,
+            "score": 2 if passed else 0,
             "feedback": f"Evaluation of {d} dimension complete.",
-            "directive_ref": "CD-1",
+            "principle_ref": d,
         }
         for d in EXPECTED_DIMENSIONS
     }
     response = _json.dumps({
         "dimensions": dims,
-        "cliche_violations": [],
         "overall_feedback": "Solid proposal with clear tension inhabitation.",
     })
     return RubricJudgeAgent(
         llm_client=FakeLLMClient(responses=[response]),
-        pass_threshold=0.7,
+        pass_threshold=6,
     )
 
 
@@ -1262,19 +1284,18 @@ class TestRubricRouteWithRealOutputType:
 
         dims = {
             d: {
-                "score": 0.9 if passed else 0.2,
+                "score": 2 if passed else 0,
                 "feedback": f"Evaluation of {d} complete.",
-                "directive_ref": "CD-1",
+                "principle_ref": d,
             }
             for d in EXPECTED_DIMENSIONS
         }
         resp = _json.dumps({
             "dimensions": dims,
-            "cliche_violations": [],
             "overall_feedback": "Evaluation complete for the proposal.",
         })
         from storymesh.llm.base import FakeLLMClient as _FLC
-        agent = RubricJudgeAgent(llm_client=_FLC(responses=[resp]), pass_threshold=0.7)
+        agent = RubricJudgeAgent(llm_client=_FLC(responses=[resp]), pass_threshold=6)
         theme_out = _make_theme_extractor_output_for_proposal()
         inp = RubricJudgeAgentInput(
             proposal=_make_proposal_agent().run(
@@ -1295,31 +1316,34 @@ class TestRubricRouteWithRealOutputType:
         return agent.run(inp)
 
     def test_passed_output_routes_to_synopsis_writer(self) -> None:
-        from storymesh.orchestration.graph import _rubric_route
+        from storymesh.orchestration.graph import _make_rubric_route
 
+        rubric_route = _make_rubric_route(2)
         state: StoryMeshState = {
             "rubric_retry_count": 0,
             "rubric_judge_output": self._make_output(passed=True),
         }
-        assert _rubric_route(state) == "story_writer"
+        assert rubric_route(state) == "story_writer"
 
     def test_failed_output_routes_to_proposal_draft(self) -> None:
-        from storymesh.orchestration.graph import _rubric_route
+        from storymesh.orchestration.graph import _make_rubric_route
 
+        rubric_route = _make_rubric_route(2)
         state: StoryMeshState = {
             "rubric_retry_count": 0,
             "rubric_judge_output": self._make_output(passed=False),
         }
-        assert _rubric_route(state) == "proposal_draft"
+        assert rubric_route(state) == "proposal_reader_feedback"
 
     def test_failed_at_max_retries_routes_to_synopsis_writer(self) -> None:
-        from storymesh.orchestration.graph import MAX_RUBRIC_RETRIES, _rubric_route
+        from storymesh.orchestration.graph import _DEFAULT_MAX_RUBRIC_RETRIES, _make_rubric_route
 
+        rubric_route = _make_rubric_route(_DEFAULT_MAX_RUBRIC_RETRIES)
         state: StoryMeshState = {
-            "rubric_retry_count": MAX_RUBRIC_RETRIES,
+            "rubric_retry_count": _DEFAULT_MAX_RUBRIC_RETRIES,
             "rubric_judge_output": self._make_output(passed=False),
         }
-        assert _rubric_route(state) == "story_writer"
+        assert rubric_route(state) == "story_writer"
 
 
 # ── TestCoverArtNodeWrapper ────────────────────────────────────────────────────

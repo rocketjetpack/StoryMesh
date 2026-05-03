@@ -14,7 +14,7 @@
 llm:
   default_provider: anthropic
   default_model: claude-haiku-4-5-20251001
-  default_max_tokens: 1024
+  default_max_tokens: 2048
   default_temperature: 1.0
 
 # ------
@@ -25,7 +25,7 @@ agents:
     provider: anthropic
     model: claude-haiku-4-5-20251001
     temperature: 0.0
-    max_tokens: 2048
+    max_tokens: 4096
   book_ranker:
     top_n: 10
     llm_rerank: false
@@ -55,19 +55,20 @@ agents:
     num_candidates: 3
     selection_temperature: 0.2
     selection_max_tokens: 2048
+    revision_temperature: 0.5  # Lower temp for directed revision — precision over variance
+
+  proposal_reader:
+    provider: openai            # Cross-provider: different model finds what the drafter cannot see
+    model: gpt-4o
+    temperature: 0.4            # Analytical but allows natural variation in reader reactions
+    max_tokens: 1024            # Reader feedback is short — five structured fields
 
   rubric_judge:
     provider: openai          # Different provider than proposal_draft for independent evaluation
     model: gpt-4o
     temperature: 0.0          # Deterministic evaluation — same proposal should score the same
     max_tokens: 4096
-    pass_threshold: 0.7       # Primary tuning knob: lower to relax, raise to tighten
-    # dimension_weights:      # Uncomment to override defaults
-    #   restraint: 0.25
-    #   convention_departure: 0.30
-    #   specificity: 0.20
-    #   protagonist_interiority: 0.15
-    #   user_intent_fidelity: 0.10
+    pass_threshold: 6         # Sum of tier scores (max 10). Presets: draft=5, standard=6, high=7
 
   story_writer:
     provider: anthropic
@@ -85,6 +86,21 @@ agents:
     image_model: gpt-image-1
     image_size: "1024x1536"
     image_quality: auto
+
+  resonance_reviewer:
+    review_provider: openai             # Cross-provider: different model finds different blind spots
+    review_model: gpt-4o                # Reasoning model for emotional/contextual sensitivity
+    revision_provider: anthropic        # Same as writer for voice consistency
+    revision_model: claude-sonnet-4-6
+    review_temperature: 0.4             # Analytical but sensitive
+    revision_temperature: 0.7           # Creative but controlled
+    summary_temperature: 0.4            # Back-cover summary re-run
+    review_max_tokens: 4096
+    revision_max_tokens: 8000           # Must hold full revised draft
+    summary_max_tokens: 1024
+
+  book_assembler:
+    output_formats: ["pdf", "epub"]   # Formats to generate; remove either to skip it
 
   # To use OpenAI for any agent, set provider and model:
   # proposal_draft:

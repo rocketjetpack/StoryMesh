@@ -1,6 +1,6 @@
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -24,6 +24,14 @@ from storymesh.versioning import __version__ as storymesh_version
 app = typer.Typer()
 console = Console()
 
+# Quality presets: (pass_threshold, max_retries, min_retries, enable_resonance_review)
+_QUALITY_PRESETS: dict[str, tuple[int, int, int, bool]] = {
+    "draft":     (5, 1, 0, False),
+    "standard":  (6, 2, 1, False),
+    "high":      (7, 3, 1, True),   # threshold lowered 8→7: rubric scores cluster at 6-7
+    "very_high": (9, 3, 2, True),
+}
+
 # Pipeline stage names in execution order — used to build the stage table.
 _STAGE_NAMES = [
     "genre_normalizer",
@@ -32,8 +40,11 @@ _STAGE_NAMES = [
     "theme_extractor",
     "proposal_draft",
     "rubric_judge",
+    "proposal_reader_feedback",
     "story_writer",
+    "resonance_reviewer",  # Stage 6b
     "cover_art",           # Stage 7
+    "book_assembler",      # Stage 8
 ]
 
 
@@ -43,9 +54,34 @@ def generate(
         ...,
         help="Describe the fiction you want a synopsis for (genres, tones, setting, etc.).",
     ),
+    quality: Annotated[
+        str,
+        typer.Option(
+            "--quality",
+            "-q",
+            help="Quality preset: 'draft' (fast, no editorial cycle), "
+            "'standard' (1 mandatory revision), 'high' (1 mandatory, threshold=8), "
+            "'very_high' (2 mandatory revisions, threshold=9).",
+        ),
+    ] = "standard",
 ) -> None:
     """Generate an original fiction synopsis from the given prompt."""
-    result = generate_synopsis(user_prompt)
+    if quality not in _QUALITY_PRESETS:
+        valid = ", ".join(sorted(_QUALITY_PRESETS))
+        console.print(
+            f"[bold red]Error:[/bold red] Unknown quality preset {quality!r}. "
+            f"Valid options: {valid}"
+        )
+        raise typer.Exit(code=1)
+
+    pass_threshold, max_retries, min_retries, enable_resonance = _QUALITY_PRESETS[quality]
+    result = generate_synopsis(
+        user_prompt,
+        pass_threshold=pass_threshold,
+        max_retries=max_retries,
+        min_retries=min_retries,
+        skip_resonance_review=not enable_resonance,
+    )
 
     meta = result.metadata
     run_id: str = str(meta.get("run_id", "unknown"))
@@ -93,18 +129,28 @@ def generate(
     console.print(Panel(result.final_synopsis, title="Synopsis", expand=False))
     console.print()
 
+    # ── Output file paths (PDF / EPUB) ─────────────────────────────────────
+    pdf_path = str(meta.get("pdf_path", ""))
+    epub_path = str(meta.get("epub_path", ""))
+    if pdf_path or epub_path:
+        if pdf_path:
+            console.print(f"PDF:  [dim]{pdf_path}[/dim]")
+        if epub_path:
+            console.print(f"EPUB: [dim]{epub_path}[/dim]")
+        console.print()
+
     if run_dir != Path("") and run_dir.exists():
         console.print(f"Artifacts saved to: [dim]{run_dir}[/dim]")
 
 
-_RERUN_SUPPORTED_STAGES = {"cover_art"}
+_RERUN_SUPPORTED_STAGES = {"cover_art", "book_assembler"}
 
 
 @app.command()
 def rerun(
     stage: str = typer.Argument(
         ...,
-        help="Pipeline stage to re-run (currently only 'cover_art' is supported).",
+        help="Pipeline stage to re-run ('cover_art' or 'book_assembler').",
     ),
     run_id: str | None = typer.Argument(
         None,
@@ -130,6 +176,22 @@ def rerun(
             raise typer.Exit(code=1) from exc
 
         console.print(f"[green]Cover art regenerated:[/green] {image_path}")
+
+    elif stage == "book_assembler":
+        from storymesh import regenerate_book_assembler  # noqa: PLC0415
+
+        try:
+            pdf_path, epub_path = regenerate_book_assembler(run_id)
+        except (RuntimeError, ValueError) as exc:
+            console.print(f"[bold red]Error:[/bold red] {exc}")
+            raise typer.Exit(code=1) from exc
+
+        if pdf_path:
+            console.print(f"[green]PDF regenerated:[/green] {pdf_path}")
+        if epub_path:
+            console.print(f"[green]EPUB regenerated:[/green] {epub_path}")
+        if not pdf_path and not epub_path:
+            console.print("[yellow]No output files were generated (check library installation).[/yellow]")
 
 
 @app.command()

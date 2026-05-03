@@ -57,6 +57,40 @@ def _strip_markdown_fences(text: str) -> str:
         return match.group(1)
     return text
 
+
+def _sanitize_json_strings(text: str) -> str:
+    """Escape literal control characters that appear inside JSON string values.
+
+    LLMs sometimes emit multi-paragraph prose with real newlines inside a JSON
+    string value, which is invalid JSON. This function fixes that without
+    touching structural whitespace that sits outside string delimiters.
+
+    Args:
+        text: Raw JSON text, potentially containing unescaped control chars.
+
+    Returns:
+        The same text with control characters inside strings properly escaped.
+    """
+    _CTRL_MAP: dict[str, str] = {"\n": "\\n", "\r": "\\r", "\t": "\\t"}
+    result: list[str] = []
+    in_string = False
+    escape_next = False
+    for ch in text:
+        if escape_next:
+            result.append(ch)
+            escape_next = False
+        elif ch == "\\" and in_string:
+            result.append(ch)
+            escape_next = True
+        elif ch == '"':
+            in_string = not in_string
+            result.append(ch)
+        elif in_string and ord(ch) < 0x20:
+            result.append(_CTRL_MAP.get(ch, f"\\u{ord(ch):04x}"))
+        else:
+            result.append(ch)
+    return "".join(result)
+
 class LLMClient(ABC):
     """
     This class provides a vendor agnostic interface for LLM completions.
@@ -148,7 +182,7 @@ class LLMClient(ABC):
                 raise
             latency_ms = round((time.perf_counter() - t0) * 1000)
 
-            cleaned = _strip_markdown_fences(raw.strip())
+            cleaned = _sanitize_json_strings(_strip_markdown_fences(raw.strip()))
 
             try:
                 parsed = orjson.loads(cleaned)

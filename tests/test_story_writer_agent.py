@@ -82,10 +82,11 @@ _OUTLINE_RESPONSE = json.dumps({
                 "Mara finds the body arranged in the old courthouse. "
                 "She photographs each detail with a cracked phone."
             ),
-            "thematic_function": (
+            "narrative_pressure": (
                 "Inhabits the tension between order and absence: the body is arranged "
                 "as if evidence still matters in a city with no court."
             ),
+            "observational_anchor": "The cracked phone screen she uses to photograph evidence.",
             "opens_with": (
                 "The body had been arranged with the careful deliberation of someone "
                 "who expected it to be found."
@@ -98,10 +99,11 @@ _OUTLINE_RESPONSE = json.dumps({
                 "Mara interviews three witnesses in a flooded block. "
                 "None of them saw anything. One of them is lying."
             ),
-            "thematic_function": (
+            "narrative_pressure": (
                 "Pressurises the tension between investigation and futility: "
                 "her tools are intact but the infrastructure they require is gone."
             ),
+            "observational_anchor": "The salvaged tax forms she uses as notebook paper.",
             "opens_with": (
                 "She had run out of notebook paper two weeks ago and was using "
                 "the backs of salvaged tax forms."
@@ -114,10 +116,11 @@ _OUTLINE_RESPONSE = json.dumps({
                 "Mara convenes a community tribunal with no legal standing. "
                 "They reach a verdict she must decide whether to enforce."
             ),
-            "thematic_function": (
+            "narrative_pressure": (
                 "Lands on the tension unresolved: the tribunal has moral authority "
                 "but no mechanism for enforcement."
             ),
+            "observational_anchor": "The parking garage's oil-stained concrete floor.",
             "opens_with": (
                 "The tribunal met in what had been a parking garage because it was the "
                 "only space large enough and because no one had claimed it."
@@ -440,21 +443,24 @@ class TestOutlinePassFailures:
                     "scene_id": "scene_01",
                     "title": "Opening",
                     "summary": "She finds the body and photographs it carefully.",
-                    "thematic_function": "Establishes the central tension between order and collapse.",
+                    "narrative_pressure": "Establishes the central tension between order and collapse.",
+                    "observational_anchor": "The cracked phone screen.",
                     "opens_with": "The body had been arranged with care.",
                 },
                 {
                     "scene_id": "scene_02",
                     "title": "The Canvass",
                     "summary": "She interviews three witnesses in the flooded block.",
-                    "thematic_function": "Pressurises the tension between investigation and futility.",
+                    "narrative_pressure": "Pressurises the tension between investigation and futility.",
+                    "observational_anchor": "The salvaged tax forms.",
                     "opens_with": "She had run out of notebook paper two weeks ago.",
                 },
                 {
                     "scene_id": "scene_03",
                     "title": "The Verdict",
                     "summary": "Mara convenes a community tribunal with no legal standing.",
-                    "thematic_function": "Lands on the tension between authority and legitimacy.",
+                    "narrative_pressure": "Lands on the tension between authority and legitimacy.",
+                    "observational_anchor": "The oil-stained concrete floor.",
                     "opens_with": "The tribunal met in what had been a parking garage.",
                 },
                 {"bad": "data"},  # will be skipped
@@ -537,11 +543,11 @@ class TestSummaryPassFailures:
 class TestFormatCraftNotes:
     def _make_rubric_output(
         self,
-        scores: dict[str, float],
+        scores: dict[str, int],
         overall_feedback: str = "",
-        composite_score: float | None = None,
+        composite_score: int | None = None,
     ) -> MagicMock:
-        """Build a minimal mock rubric output with dimension scores."""
+        """Build a minimal mock rubric output with dimension tier scores."""
         mock = MagicMock()
         mock.overall_feedback = overall_feedback
         mock.composite_score = composite_score
@@ -555,47 +561,55 @@ class TestFormatCraftNotes:
         mock.dimensions = dims
         return mock
 
-    def test_low_score_dimension_included(self) -> None:
-        rubric = self._make_rubric_output({"restraint": 0.4})
+    def test_fail_score_dimension_included(self) -> None:
+        rubric = self._make_rubric_output({"restraint": 0})
         notes = _format_craft_notes(rubric)
 
         assert "restraint" in notes
+        assert "fail" in notes
 
-    def test_high_score_dimension_excluded(self) -> None:
-        rubric = self._make_rubric_output({"specificity": 0.9})
+    def test_acceptable_score_dimension_included(self) -> None:
+        rubric = self._make_rubric_output({"specificity": 1})
+        notes = _format_craft_notes(rubric)
+
+        assert "specificity" in notes
+        assert "acceptable" in notes
+
+    def test_strong_score_dimension_excluded(self) -> None:
+        rubric = self._make_rubric_output({"specificity": 2})
         notes = _format_craft_notes(rubric)
 
         assert notes == ""
 
-    def test_threshold_boundary_included_below(self) -> None:
-        rubric = self._make_rubric_output({"convention_departure": 0.74})
+    def test_story_serving_choices_included_when_fail(self) -> None:
+        rubric = self._make_rubric_output({"story_serving_choices": 0})
         notes = _format_craft_notes(rubric)
 
-        assert "convention_departure" in notes
+        assert "story_serving_choices" in notes
 
-    def test_threshold_boundary_excluded_at(self) -> None:
-        rubric = self._make_rubric_output({"convention_departure": 0.75})
+    def test_story_serving_choices_excluded_when_strong(self) -> None:
+        rubric = self._make_rubric_output({"story_serving_choices": 2})
         notes = _format_craft_notes(rubric)
 
         assert notes == ""
 
     def test_composite_score_included_in_notes(self) -> None:
-        rubric = self._make_rubric_output({"restraint": 0.5}, composite_score=0.61)
+        rubric = self._make_rubric_output({"restraint": 1}, composite_score=6)
         notes = _format_craft_notes(rubric)
 
-        assert "0.61" in notes
+        assert "6/10" in notes
 
     def test_overall_feedback_appended(self) -> None:
         rubric = self._make_rubric_output(
-            {"restraint": 0.4},
+            {"restraint": 0},
             overall_feedback="The proposal leans too heavily on genre convention.",
         )
         notes = _format_craft_notes(rubric)
 
         assert "leans too heavily" in notes
 
-    def test_all_dimensions_adequate_returns_empty_string(self) -> None:
-        rubric = self._make_rubric_output({"restraint": 0.8, "specificity": 0.9})
+    def test_all_dimensions_strong_returns_empty_string(self) -> None:
+        rubric = self._make_rubric_output({"restraint": 2, "specificity": 2})
         notes = _format_craft_notes(rubric)
 
         assert notes == ""
@@ -619,7 +633,8 @@ class TestFormatSceneListForPrompt:
             scene_id=f"scene_0{n}",
             title=f"Scene {n} Title",
             summary=f"What happens in scene {n}.",
-            thematic_function=f"Tension work for scene {n}.",
+            narrative_pressure=f"Tension work for scene {n}.",
+            observational_anchor=f"A concrete detail for scene {n}.",
             opens_with=f"The first sentence of scene {n} is specific.",
         )
 
@@ -701,7 +716,8 @@ class TestStoryWriterNode:
                         scene_id="scene_01",
                         title="The Third Complaint",
                         summary="Mara finds the body arranged in the old courthouse.",
-                        thematic_function="Establishes tension between order and absence.",
+                        narrative_pressure="Establishes tension between order and absence.",
+                        observational_anchor="The cracked phone screen.",
                         opens_with=(
                             "The body had been arranged with the careful deliberation "
                             "of someone who expected it to be found."
@@ -711,7 +727,8 @@ class TestStoryWriterNode:
                         scene_id="scene_02",
                         title="The Canvass",
                         summary="Mara interviews three witnesses in the flooded block.",
-                        thematic_function="Pressurises the tension between investigation and futility.",
+                        narrative_pressure="Pressurises the tension between investigation and futility.",
+                        observational_anchor="The salvaged tax forms.",
                         opens_with=(
                             "She had run out of notebook paper two weeks ago and was "
                             "using the backs of salvaged tax forms."
@@ -721,7 +738,8 @@ class TestStoryWriterNode:
                         scene_id="scene_03",
                         title="The Verdict",
                         summary="Mara convenes a community tribunal with no legal standing.",
-                        thematic_function="Lands on the tension between authority and legitimacy.",
+                        narrative_pressure="Lands on the tension between authority and legitimacy.",
+                        observational_anchor="The oil-stained concrete floor.",
                         opens_with=(
                             "The tribunal met in what had been a parking garage "
                             "because it was the only space large enough."
