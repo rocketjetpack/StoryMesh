@@ -88,12 +88,16 @@ def make_resonance_reviewer_node(
             f"- {s.title}: {s.summary}" for s in story_output.scene_list
         )
 
+        vps_output = state.get("voice_profile_selector_output")
+        voice_profile = vps_output.voice_profile if vps_output is not None else None
+
         input_data = ResonanceReviewerAgentInput(
             full_draft=story_output.full_draft,
             proposal_title=proposal.title,
             thematic_thesis=proposal.thematic_thesis,
             scene_list_summary=scene_summary,
             user_prompt=state["user_prompt"],
+            voice_profile=voice_profile,
         )
 
         token = current_run_id.set(state.get("run_id", ""))

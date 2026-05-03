@@ -18,6 +18,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from storymesh.schemas.voice_profile import VoiceProfile
 from storymesh.versioning.schemas import RESONANCE_REVIEWER_SCHEMA_VERSION
 
 
@@ -110,6 +111,14 @@ class ResonanceReviewerAgentInput(BaseModel):
     user_prompt: str = Field(
         min_length=1,
         description="Original raw user input string (for summary re-run).",
+    )
+    voice_profile: VoiceProfile | None = Field(
+        default=None,
+        description=(
+            "Voice profile selected by VoiceProfileSelectorAgent. When present, "
+            "voice_register_note is applied to the revision pass and summary_overlay "
+            "to the summary pass. When None, base behavior is used."
+        ),
     )
 
 

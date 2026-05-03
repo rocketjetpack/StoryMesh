@@ -62,7 +62,7 @@ system: |
 
     9. Natural over logical.
        Sentences should sound like a person wrote them, not like they were assembled from valid propositions. Watch for double negatives used as emphasis, redundant conceptual repetition, and phrasing that is technically correct but idiomatically wrong. When a sentence is accurate but strange, rewrite it simpler. "Her documents checked out" not "there is nothing in any of her documentation that is not true."
-
+  {craft_overlay}
   UNKNOWNS
   If the story has unknowns — unresolved questions, things the protagonist cannot verify, things the world resists explaining — let them breathe in the prose. Do not resolve them. Do not spotlight them. Let them exist as natural gaps in understanding.
 
@@ -80,7 +80,7 @@ system: |
     - Mirror/window/water self-reflection
     - Excessive em dashes
     - A fully resolved explanation when ambiguity would serve better
-
+  {avoid_overlay}
   DEFAULT CHOICE
   When two options are available, choose the one that is more specific, more physical, and less explanatory. Prefer the sentence that shows the moment happening over the sentence that summarizes it afterward.
 

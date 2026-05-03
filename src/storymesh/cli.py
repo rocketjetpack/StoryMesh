@@ -661,5 +661,145 @@ def _as_list(value: object) -> list[Any]:
     return value if isinstance(value, list) else []
 
 
+# ---------------------------------------------------------------------------
+# stylometrics — offline tic counter
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def stylometrics(
+    run_id: str | None = typer.Argument(
+        None,
+        help="Run ID to inspect. Use 'latest' or omit to use the most recent run.",
+    ),
+    all_runs: bool = typer.Option(
+        False,
+        "--all",
+        help="Count tics across all runs in the store.",
+    ),
+    pretty: bool = typer.Option(
+        False,
+        "--pretty",
+        help="Render a human-readable table instead of JSON.",
+    ),
+) -> None:
+    """Count prose tics in a story draft.
+
+    Reads the story_writer_output.json (or resonance_reviewer_output.json if
+    present) for the specified run and reports tic frequencies.  Output is
+    informational only — no pass/fail thresholds.
+    """
+    import json as _json
+
+    from storymesh.exceptions import RunNotFoundError
+
+    store = ArtifactStore()
+    inspector = RunInspector(store)
+
+    target_ids: list[str]
+    if all_runs:
+        target_ids = store.list_run_ids()
+        if not target_ids:
+            console.print("[yellow]No runs found.[/yellow]")
+            raise typer.Exit(0)
+    else:
+        resolved = run_id or "latest"
+        try:
+            report = inspector.load(resolved)
+        except RunNotFoundError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+        target_ids = [report.run_id]
+
+    results: list[dict[str, Any]] = []
+    for rid in target_ids:
+        result = _stylometrics_for_run(store, rid)
+        if result is not None:
+            results.append(result)
+
+    if not results:
+        console.print("[yellow]No story_writer_output found for the specified run(s).[/yellow]")
+        raise typer.Exit(0)
+
+    if pretty:
+        for r in results:
+            _render_stylometrics_table(r)
+    else:
+        if len(results) == 1:
+            typer.echo(_json.dumps(results[0], indent=2))
+        else:
+            typer.echo(_json.dumps(results, indent=2))
+
+
+def _stylometrics_for_run(store: ArtifactStore, run_id: str) -> dict[str, Any] | None:
+    """Load draft text and metadata for a run and return count_tics result."""
+    from storymesh.diagnostics.stylometric_counter import count_tics
+
+    # Prefer the resonance-reviewed draft when available (it's the final text).
+    raw = store.load_run_file(run_id, "resonance_reviewer_output.json")
+    draft_key = "revised_draft"
+    if raw is None:
+        raw = store.load_run_file(run_id, "story_writer_output.json")
+        draft_key = "full_draft"
+    if raw is None:
+        return None
+
+    import json as _json
+
+    try:
+        data = _json.loads(raw)
+    except Exception:
+        return None
+
+    draft = data.get(draft_key, "")
+    if not draft:
+        return None
+
+    # Resolve metadata for title and voice profile.
+    meta_raw = store.load_run_file(run_id, "run_metadata.json")
+    title = "unknown"
+    voice_profile_id = "unknown"
+    if meta_raw:
+        try:
+            meta = _json.loads(meta_raw)
+            title = str(meta.get("title", "unknown"))
+        except Exception:
+            pass
+
+    # Pull voice_profile_id from voice_profile_selector_output if available.
+    vps_raw = store.load_run_file(run_id, "voice_profile_selector_output.json")
+    if vps_raw:
+        try:
+            vps = _json.loads(vps_raw)
+            voice_profile_id = str(vps.get("selected_profile_id", "unknown"))
+        except Exception:
+            pass
+
+    result = count_tics(draft)
+    return {
+        "run_id": run_id,
+        "story_title": title,
+        "voice_profile": voice_profile_id,
+        **result,
+    }
+
+
+def _render_stylometrics_table(r: dict[str, Any]) -> None:
+    """Render a stylometrics result as a Rich table."""
+    console.print(
+        f"\n[bold]Run:[/bold] {r['run_id']}  "
+        f"[bold]Title:[/bold] {r['story_title']}  "
+        f"[bold]Profile:[/bold] {r['voice_profile']}  "
+        f"[bold]Words:[/bold] {r['word_count']}"
+    )
+    table = Table("Tic", "Count / Value", "Per 1000 words", box=None)
+    for tic_name, tic_data in r.get("tics", {}).items():
+        if "count" in tic_data:
+            table.add_row(tic_name, str(tic_data["count"]), str(tic_data["per_1000_words"]))
+        else:
+            table.add_row(tic_name, str(tic_data["value"]), "—")
+    console.print(table)
+
+
 if __name__ == "__main__":
     app()

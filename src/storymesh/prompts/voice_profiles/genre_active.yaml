@@ -1,0 +1,84 @@
+# Voice Profile: genre_active
+#
+# Kinetic, forward-moving prose for action, adventure, high-energy fanfic,
+# and pulp narratives. Selected when the user prompt signals momentum,
+# spectacle, dialogue-driven scenes, or genre-convention pleasure.
+#
+# The overlay additions extend the base literary_restraint principles with
+# genre-active permissions (kinetic prose, faster pacing, dialogue-forward
+# scenes) and constraints (avoid over-interiority, cascading subordinate clauses).
+
+id: genre_active
+description: >-
+  Kinetic, forward-moving prose for action, adventure, pulp fiction, and
+  high-energy fanfic. Dialogue-forward scenes, faster pacing, and less
+  interiority than literary_restraint. Momentum matters more than
+  observation. The reader should feel things moving, not pausing to reflect.
+
+tone_keywords:
+  - action
+  - adventure
+  - pulp
+  - energetic
+  - fast_paced
+  - exciting
+  - swashbuckling
+  - dramatic
+  - tense
+  - propulsive
+  - fun
+  - heroic
+
+genre_keywords:
+  - action
+  - adventure
+  - fanfic
+  - science_fiction
+  - fantasy
+  - thriller
+  - superhero
+  - space_opera
+  - military
+  - heist
+
+craft_overlay: |
+  10. Kinetic over interior.
+     If a moment can be conveyed through movement, dialogue, or physical action,
+     prefer that over interior observation. Reserve interiority for decisive
+     turns — moments where the character's thought changes what they do next.
+
+  11. Dialogue carries weight.
+     Characters in active genre fiction often speak to do things: give orders,
+     make deals, issue challenges, reveal information. Let dialogue move the
+     scene forward. Subtext is welcome, but not at the cost of momentum.
+
+  12. Scene exits on motion.
+     Where literary_restraint exits on texture or image, genre_active can exit
+     on action, decision, or consequence. The scene's final beat should propel
+     the reader into what comes next.
+
+  13. Sentence economy under pressure.
+     During high-stakes moments, sentences should get shorter. Long subordinate
+     structures slow what should feel fast. In action sequences: short. In
+     aftermath and planning: longer is fine.
+
+avoid_overlay: |
+  - Cascading subordinate clauses during action sequences ("...which had been, when she
+    thought about it, the kind of thing that...") — these kill momentum
+  - Sentence-fragment paragraphs used as philosophical beats (one-word-paragraph emphasis)
+  - Extended interiority during action — a character in motion should not pause for three
+    paragraphs of reflection
+  - Observation-heavy scene-building when the scene needs to move
+
+exemplars:
+  - "The door opened before she could knock and someone she didn't recognise told her to get in."
+  - "He had three seconds to decide and he used all of them."
+  - "The corridor was longer than the blueprints had suggested, which meant someone had changed the blueprints."
+  - "She won the argument, which meant nothing, because winning the argument had cost her the room."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This is a genre-active story — action, adventure, or high-energy fiction.
+  The back-cover copy should have momentum. Use short sentences for hook lines.
+  Establish the stakes clearly and quickly. The copy should make the reader
+  want to turn the page, not settle in. End on tension or promise, not resolution.

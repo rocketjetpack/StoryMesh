@@ -32,6 +32,7 @@ from storymesh.schemas.story_writer import (
     StoryWriterAgentInput,
     StoryWriterAgentOutput,
 )
+from storymesh.schemas.voice_profile import VoiceProfile, load_voice_profile
 from storymesh.versioning.schemas import STORY_WRITER_SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,18 @@ def _format_craft_notes(rubric_output: RubricJudgeAgentOutput) -> str:
     if overall:
         notes += f"\n\nOverall editorial note: {overall}"
     return notes
+
+
+def _format_profile_exemplars(profile: VoiceProfile) -> str:
+    """Format voice profile exemplars into the opens_with examples format.
+
+    Args:
+        profile: The active voice profile.
+
+    Returns:
+        Multi-line string of exemplar sentences, formatted for the outline prompt.
+    """
+    return "\n".join(f'     - "{e}"' for e in profile.exemplars)
 
 
 def _format_scene_list_for_prompt(scenes: list[SceneOutline]) -> str:
@@ -175,6 +188,18 @@ class StoryWriterAgent:
             RuntimeError: If the outline or draft passes fail to produce valid output.
         """
         proposal = input_data.proposal
+
+        # Resolve voice profile overlays — fall back to literary_restraint when None.
+        voice_profile: VoiceProfile = (
+            input_data.voice_profile
+            if input_data.voice_profile is not None
+            else load_voice_profile("literary_restraint")
+        )
+        craft_overlay = voice_profile.craft_overlay
+        avoid_overlay = voice_profile.avoid_overlay
+        summary_overlay = voice_profile.summary_overlay
+        profile_exemplars = _format_profile_exemplars(voice_profile)
+
         craft_notes = (
             _format_craft_notes(input_data.rubric_feedback)
             if input_data.rubric_feedback is not None
@@ -200,6 +225,7 @@ class StoryWriterAgent:
             proposal=proposal,
             tensions_json=tensions_json,
             craft_notes_section=craft_notes_section,
+            profile_exemplars=profile_exemplars,
             user_prompt=input_data.user_prompt,
             normalized_genres=input_data.normalized_genres,
             user_tones=input_data.user_tones,
@@ -216,6 +242,8 @@ class StoryWriterAgent:
             scene_list=scene_list,
             tensions_json=tensions_json,
             craft_notes_section=craft_notes_section,
+            craft_overlay=craft_overlay,
+            avoid_overlay=avoid_overlay,
         )
 
         word_count = len(full_draft.split())
@@ -229,6 +257,7 @@ class StoryWriterAgent:
             proposal=proposal,
             full_draft=full_draft,
             user_prompt=input_data.user_prompt,
+            summary_overlay=summary_overlay,
         )
 
         logger.info("StoryWriterAgent summary complete")
@@ -261,6 +290,7 @@ class StoryWriterAgent:
         proposal: StoryProposal,
         tensions_json: str,
         craft_notes_section: str,
+        profile_exemplars: str,
         user_prompt: str,
         normalized_genres: list[str],
         user_tones: list[str],
@@ -271,6 +301,7 @@ class StoryWriterAgent:
             proposal: The selected StoryProposal.
             tensions_json: JSON-encoded list of ThematicTension objects.
             craft_notes_section: Formatted rubric craft notes, or empty string.
+            profile_exemplars: Formatted voice-profile exemplar sentences.
             user_prompt: Original user input string.
             normalized_genres: Canonical genre names.
             user_tones: User-specified tone words.
@@ -281,6 +312,11 @@ class StoryWriterAgent:
         Raises:
             RuntimeError: If the outline call fails or produces no valid scenes.
         """
+        self._llm_client.agent_name = "story_writer_outline"
+        formatted_system = self._outline_prompt.system.format(
+            craft_notes_section=craft_notes_section,
+            profile_exemplars=profile_exemplars,
+        )
         proposal_json = orjson.dumps(proposal.model_dump()).decode()
         user_prompt_text = self._outline_prompt.format_user(
             target_words=self._target_words,
@@ -295,7 +331,7 @@ class StoryWriterAgent:
         try:
             response = self._llm_client.complete_json(
                 user_prompt_text,
-                system_prompt=self._outline_prompt.system,
+                system_prompt=formatted_system,
                 temperature=self._outline_temperature,
                 max_tokens=self._outline_max_tokens,
             )
@@ -335,6 +371,8 @@ class StoryWriterAgent:
         scene_list: list[SceneOutline],
         tensions_json: str,
         craft_notes_section: str,
+        craft_overlay: str,
+        avoid_overlay: str,
     ) -> str:
         """Execute Pass 2: write full prose draft from scene outlines.
 
@@ -343,6 +381,8 @@ class StoryWriterAgent:
             scene_list: Validated scene outlines from Pass 1.
             tensions_json: JSON-encoded thematic tensions.
             craft_notes_section: Formatted rubric craft notes, or empty string.
+            craft_overlay: Additional craft principles from the active voice profile.
+            avoid_overlay: Additional avoid items from the active voice profile.
 
         Returns:
             Full prose draft as a string, scenes separated by SCENE_BREAK.
@@ -350,6 +390,11 @@ class StoryWriterAgent:
         Raises:
             RuntimeError: If the draft call fails or returns an empty string.
         """
+        self._llm_client.agent_name = "story_writer_draft"
+        formatted_system = self._draft_prompt.system.format(
+            craft_overlay=craft_overlay,
+            avoid_overlay=avoid_overlay,
+        )
         scene_list_text = _format_scene_list_for_prompt(scene_list)
         unknowns_text = (
             "\n".join(f"- {u}" for u in proposal.unknowns)
@@ -371,7 +416,7 @@ class StoryWriterAgent:
         try:
             response = self._llm_client.complete_json(
                 user_prompt_text,
-                system_prompt=self._draft_prompt.system,
+                system_prompt=formatted_system,
                 temperature=self._draft_temperature,
                 max_tokens=self._draft_max_tokens,
             )
@@ -394,6 +439,7 @@ class StoryWriterAgent:
         proposal: StoryProposal,
         full_draft: str,
         user_prompt: str,
+        summary_overlay: str,
     ) -> str:
         """Execute Pass 3: write back-cover summary from completed draft.
 
@@ -401,6 +447,7 @@ class StoryWriterAgent:
             proposal: The selected StoryProposal (for title and thesis).
             full_draft: Completed prose draft from Pass 2.
             user_prompt: Original user input string.
+            summary_overlay: Register note from the active voice profile.
 
         Returns:
             Back-cover marketing copy as a string.
@@ -408,6 +455,10 @@ class StoryWriterAgent:
         Raises:
             RuntimeError: If the summary call fails or returns an empty string.
         """
+        self._llm_client.agent_name = "story_writer_summary"
+        formatted_system = self._summary_prompt.system.format(
+            summary_overlay=summary_overlay,
+        )
         user_prompt_text = self._summary_prompt.format_user(
             title=proposal.title,
             user_prompt=user_prompt,
@@ -418,7 +469,7 @@ class StoryWriterAgent:
         try:
             response = self._llm_client.complete_json(
                 user_prompt_text,
-                system_prompt=self._summary_prompt.system,
+                system_prompt=formatted_system,
                 temperature=self._summary_temperature,
                 max_tokens=self._summary_max_tokens,
             )

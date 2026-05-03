@@ -1,0 +1,85 @@
+# Voice Profile: cozy_warmth
+#
+# Warm, gentle prose for bedtime stories, comforting fiction, and quietly
+# wondrous narratives. Selected when the user prompt signals safety, softness,
+# childhood, ritual, or comfort.
+#
+# The overlay additions extend the base literary_restraint craft principles
+# and avoid list with cozy-specific permissions and constraints. The exemplars
+# replace the dark-literary few-shot examples with warm, direct alternatives.
+
+id: cozy_warmth
+description: >-
+  Warm, gentle prose for bedtime stories, comforting fiction, and quietly
+  wondrous narratives. Direct emotion-naming is welcome. Repetition and
+  refrain are features, not tics. Darkness, decay, and dread are absent.
+  Sentences are shorter and simpler than literary_restraint. The reader
+  should feel settled, not unsettled.
+
+tone_keywords:
+  - cozy
+  - warm
+  - gentle
+  - comforting
+  - quiet
+  - bedtime
+  - whimsical
+  - soft
+  - cute
+  - sweet
+  - soothing
+  - friendly
+  - wondrous
+  - cheerful
+
+genre_keywords:
+  - children
+  - bedtime
+  - cozy
+  - fantasy
+  - slice_of_life
+  - fable
+  - fairy_tale
+  - picture_book
+
+craft_overlay: |
+  10. Direct emotion-naming is permitted and often preferable.
+     "Wren felt warm all the way to her toes" is a complete sentence. It does
+     not need to be performed by a comparator or enacted through physical symptom.
+     Reserve action-based emotion for moments where the action genuinely reveals
+     more than the name would.
+
+  11. Repetition is form, not failure.
+     In cozy and bedtime narratives, repeating a phrase, a refrain, or a sensory
+     anchor is comforting and intentional. Do not vary for variation's sake.
+     Let the repeated thing deepen each time it returns.
+
+  12. Softness is not vagueness.
+     A gentle story is still specific. Name the exact colour of the blanket, the
+     exact sound the fire makes, the exact way the character folds their hands.
+     Warmth lives in the specific detail, not in soft adjectives.
+
+  13. Pattern and fulfilment.
+     Cozy narratives often satisfy by completing a gentle pattern: the lost thing
+     is found, the worry dissolves, the creature arrives at home. Let the
+     resolution feel earned and quiet, not dramatic.
+
+avoid_overlay: |
+  - "The way X is when Y" simile structures — they create cognitive friction that works against warmth
+  - Philosophical paragraph cappers ("This was what it meant to be...")
+  - Dark, decaying, or sterile imagery (ruins, collapse, decay, blood, cold procedural detail)
+  - Sentence-fragment paragraphs used as dramatic beats
+  - Subtext-heavy dialogue — in cozy register, characters can say what they mean
+
+exemplars:
+  - "The lantern on the windowsill had been lit every evening for as long as Pip could remember, and tonight was no different."
+  - "She kept the extra blanket folded at the end of the bed, just in case, the way her mother had taught her."
+  - "The bread was still warm when she broke it, and the smell of it filled the kitchen the way good smells do — slowly, then all at once."
+  - "Every night the little boat came back, and every night she was there to tie it to the dock."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This is a cozy or bedtime story. The back-cover copy should feel warm,
+  inviting, and gentle. Use simple sentences. Avoid drama, stakes, or urgency.
+  The copy should make the reader want to settle in, not hold their breath.
+  End on comfort, not tension.

@@ -1,0 +1,66 @@
+# Voice Profile: literary_restraint
+#
+# The default profile. Preserves the existing prose-generation behavior exactly.
+# All overlay fields are intentionally empty — the base prompts in
+# story_writer_draft.yaml and story_writer_outline.yaml contain the full
+# literary_restraint craft principles, avoid list, and exemplars.
+#
+# This profile is selected for: dark fiction, mystery, literary SF, dread,
+# psychological tension, noir, slow-burn, conspiratorial, eerie, and any
+# ambiguous input that doesn't clearly signal cozy or genre-active.
+#
+# Empty overlays produce prompts byte-identical to the pre-voice-profile
+# pipeline, ensuring no regression in the existing observed voice.
+
+id: literary_restraint
+description: >-
+  Dark, restrained literary prose for mystery, noir, psychological fiction,
+  and slow-burn dread. The default voice. Emphasizes concrete detail,
+  subtext-heavy dialogue, emotion enacted through action, and thematic
+  pressure that is never stated. Exemplars are drawn from the tribunal
+  and investigation scenes that anchor the pipeline's existing few-shot
+  examples.
+
+tone_keywords:
+  - dark
+  - eerie
+  - cerebral
+  - dread
+  - psychological
+  - conspiratorial
+  - slow
+  - gritty
+  - literary
+  - noir
+  - melancholic
+  - haunting
+  - unsettling
+
+genre_keywords:
+  - mystery
+  - literary
+  - horror
+  - thriller
+  - noir
+  - post_apocalyptic
+  - dystopian
+  - gothic
+  - crime
+  - speculative
+
+# Empty — the base draft prompt's craft principles are the literary_restraint craft principles.
+craft_overlay: ""
+
+# Empty — the base draft prompt's avoid list is the literary_restraint avoid list.
+avoid_overlay: ""
+
+# The four canonical strong opens_with sentences from story_writer_outline.yaml.
+# These are the exemplars the outline pass uses when literary_restraint is active.
+exemplars:
+  - "The body had been arranged with the careful deliberation of someone who expected it to be found."
+  - "She had run out of notebook paper two weeks ago and was using the backs of salvaged tax forms."
+  - "The tribunal met in what had been a parking garage because it was the only space large enough and because no one had claimed it."
+  - "He said the word 'evidence' with the slight pause of someone translating from a language they no longer believed in."
+
+# Empty — the base summary prompt's register is already literary_restraint.
+summary_overlay: ""

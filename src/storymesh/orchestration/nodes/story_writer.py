@@ -87,6 +87,9 @@ def make_story_writer_node(
 
         rubric_output = state.get("rubric_judge_output")
 
+        vps_output = state.get("voice_profile_selector_output")
+        voice_profile = vps_output.voice_profile if vps_output is not None else None
+
         input_data = StoryWriterAgentInput(
             proposal=best_proposal,
             tensions=theme_extractor_output.tensions,
@@ -94,6 +97,7 @@ def make_story_writer_node(
             user_prompt=state["user_prompt"],
             normalized_genres=genre_normalizer_output.normalized_genres,
             user_tones=theme_extractor_output.user_tones_carried,
+            voice_profile=voice_profile,
         )
 
         token = current_run_id.set(state.get("run_id", ""))

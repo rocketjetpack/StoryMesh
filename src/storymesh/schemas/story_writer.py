@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from storymesh.schemas.proposal_draft import StoryProposal
 from storymesh.schemas.rubric_judge import RubricJudgeAgentOutput
 from storymesh.schemas.theme_extractor import ThematicTension
+from storymesh.schemas.voice_profile import VoiceProfile
 from storymesh.versioning.schemas import STORY_WRITER_SCHEMA_VERSION
 
 # Delimiter used between scenes in ``StoryWriterAgentOutput.full_draft``.
@@ -63,6 +64,14 @@ class StoryWriterAgentInput(BaseModel):
     user_tones: list[str] = Field(
         default_factory=list,
         description="User-specified tone words carried through from earlier stages.",
+    )
+    voice_profile: VoiceProfile | None = Field(
+        default=None,
+        description=(
+            "Voice profile selected by VoiceProfileSelectorAgent. When present, "
+            "overlays are applied to all three prompt passes. When None, "
+            "the base literary_restraint behavior is used unchanged."
+        ),
     )
 
 

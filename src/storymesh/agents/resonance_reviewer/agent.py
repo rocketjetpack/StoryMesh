@@ -142,8 +142,22 @@ class ResonanceReviewerAgent:
                 schema_version=RESONANCE_REVIEWER_SCHEMA_VERSION,
             )
 
+        # Extract voice overlays from the profile (empty strings when no profile).
+        voice_register_note = (
+            input_data.voice_profile.craft_overlay  # craft_overlay reused as voice register note
+            if input_data.voice_profile is not None
+            else ""
+        )
+        summary_overlay = (
+            input_data.voice_profile.summary_overlay
+            if input_data.voice_profile is not None
+            else ""
+        )
+
         # ── Pass 2: Revision (same provider as writer) ────────────────────
-        revised_draft = self._run_revision_pass(input_data.full_draft, avoidance_moments)
+        revised_draft = self._run_revision_pass(
+            input_data.full_draft, avoidance_moments, voice_register_note=voice_register_note
+        )
         revised_word_count = len(revised_draft.split())
         word_delta = revised_word_count - original_word_count
 
@@ -158,6 +172,7 @@ class ResonanceReviewerAgent:
             title=input_data.proposal_title,
             thematic_thesis=input_data.thematic_thesis,
             user_prompt=input_data.user_prompt,
+            summary_overlay=summary_overlay,
         )
 
         logger.info("ResonanceReviewerAgent summary re-run complete.")
@@ -239,12 +254,14 @@ class ResonanceReviewerAgent:
         self,
         full_draft: str,
         avoidance_moments: list[NearMissMoment],
+        voice_register_note: str = "",
     ) -> str:
         """Execute Pass 2: expand avoidance moments in the draft.
 
         Args:
             full_draft: The original prose draft.
             avoidance_moments: Validated near-miss moments classified as avoidance.
+            voice_register_note: Register reminder injected into the revision prompt.
 
         Returns:
             Complete revised draft with expansions applied.
@@ -264,6 +281,9 @@ class ResonanceReviewerAgent:
             )
 
         near_miss_directives = "\n\n".join(directives_parts)
+        formatted_system = self._revise_prompt.system.format(
+            voice_register_note=voice_register_note,
+        )
 
         user_prompt_text = self._revise_prompt.format_user(
             full_draft=full_draft,
@@ -273,7 +293,7 @@ class ResonanceReviewerAgent:
         try:
             response = self._revision_llm.complete_json(
                 user_prompt_text,
-                system_prompt=self._revise_prompt.system,
+                system_prompt=formatted_system,
                 temperature=self._revision_temperature,
                 max_tokens=self._revision_max_tokens,
             )
@@ -297,6 +317,7 @@ class ResonanceReviewerAgent:
         title: str,
         thematic_thesis: str,
         user_prompt: str,
+        summary_overlay: str = "",
     ) -> str:
         """Execute Pass 3: re-generate back-cover summary from revised draft.
 
@@ -307,6 +328,7 @@ class ResonanceReviewerAgent:
             title: Story title.
             thematic_thesis: Central thematic pressure.
             user_prompt: Original user input string.
+            summary_overlay: Register note from the active voice profile.
 
         Returns:
             Back-cover marketing copy as a string.
@@ -314,6 +336,9 @@ class ResonanceReviewerAgent:
         Raises:
             RuntimeError: If the summary call fails or returns empty.
         """
+        formatted_system = self._summary_prompt.system.format(
+            summary_overlay=summary_overlay,
+        )
         user_prompt_text = self._summary_prompt.format_user(
             title=title,
             user_prompt=user_prompt,
@@ -324,7 +349,7 @@ class ResonanceReviewerAgent:
         try:
             response = self._revision_llm.complete_json(
                 user_prompt_text,
-                system_prompt=self._summary_prompt.system,
+                system_prompt=formatted_system,
                 temperature=self._summary_temperature,
                 max_tokens=self._summary_max_tokens,
             )

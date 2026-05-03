@@ -31,6 +31,7 @@ from storymesh.core.artifacts import ArtifactStore
 from storymesh.llm.base import LLMClient
 from storymesh.llm.image_base import ImageClient
 from storymesh.orchestration.nodes.genre_normalizer import make_genre_normalizer_node
+from storymesh.orchestration.nodes.voice_profile_selector import make_voice_profile_selector_node
 from storymesh.orchestration.state import StoryMeshState
 
 logger = logging.getLogger(__name__)
@@ -197,7 +198,7 @@ _DEFAULT_MAX_RUBRIC_RETRIES: int = 2
 
 
 def _genre_normalizer_route(state: StoryMeshState) -> str:
-    """Route to book_fetcher if genre normalization succeeded, otherwise END.
+    """Route to voice_profile_selector if genre normalization succeeded, otherwise END.
 
     Genre normalization sets ``genre_normalizer_output`` to ``None`` and writes
     to ``errors`` when it cannot resolve any genres. Short-circuiting here
@@ -207,9 +208,9 @@ def _genre_normalizer_route(state: StoryMeshState) -> str:
         state: Current pipeline state.
 
     Returns:
-        ``'book_fetcher'`` on success, ``END`` on failure.
+        ``'voice_profile_selector'`` on success, ``END`` on failure.
     """
-    return "book_fetcher" if state.get("genre_normalizer_output") is not None else END
+    return "voice_profile_selector" if state.get("genre_normalizer_output") is not None else END
 
 
 def _noop_node(state: StoryMeshState) -> dict[str, Any]:
@@ -281,6 +282,7 @@ def build_graph(
     max_retries: int | None = None,
     min_retries: int = 0,
     skip_resonance_review: bool = True,
+    voice_profile_override: str | None = None,
 ) -> Any:  # noqa: ANN401  # CompiledStateGraph generics not resolvable under mypy strict.
     """Construct and compile the StoryMesh pipeline StateGraph.
 
@@ -288,6 +290,7 @@ def build_graph(
 
         START
           → genre_normalizer
+          → voice_profile_selector
           → book_fetcher
           → book_ranker
           → theme_extractor
@@ -319,13 +322,16 @@ def build_graph(
         skip_resonance_review: When True (default), the resonance reviewer
             node passes through without making LLM calls. Set to False by
             ``high`` and ``very_high`` quality presets.
+        voice_profile_override: Optional profile ID to force for the run
+            without calling the classifier LLM. Useful for testing or
+            forcing a specific prose register.
 
     Returns:
         A compiled LangGraph StateGraph ready for ``.stream()`` or
         ``.invoke()``.
     """
     resolved_max_retries = max_retries if max_retries is not None else _DEFAULT_MAX_RUBRIC_RETRIES
-    # ── Stage 0: GenreNormalizerAgent ──────────────────────────────────────
+    # ── Stage 0: GenreNormalizerAgent ─────────────────────────────────────
     genre_cfg = get_agent_config("genre_normalizer")
     genre_llm = _build_llm_client(genre_cfg, agent_name="genre_normalizer", artifact_store=artifact_store)
 
@@ -337,6 +343,35 @@ def build_graph(
         max_tokens=genre_cfg.get("max_tokens", 1024),
     )
     genre_node = make_genre_normalizer_node(genre_agent, artifact_store=artifact_store)
+
+    # ── Stage 0.5: VoiceProfileSelectorAgent ──────────────────────────────
+    vps_cfg = get_agent_config("voice_profile_selector")
+    vps_llm = _build_llm_client(vps_cfg, agent_name="voice_profile_selector", artifact_store=artifact_store)
+
+    from storymesh.agents.voice_profile_selector.agent import VoiceProfileSelectorAgent  # noqa: PLC0415
+
+    if vps_llm is None:
+        logger.warning(
+            "VoiceProfileSelectorAgent: no LLM client available — defaulting to literary_restraint."
+        )
+        from storymesh.llm.base import FakeLLMClient  # noqa: PLC0415
+
+        _fallback_response = '{"selected_profile_id": "literary_restraint", "rationale": "No LLM available."}'
+        vps_agent_instance: VoiceProfileSelectorAgent = VoiceProfileSelectorAgent(
+            llm_client=FakeLLMClient(responses=[_fallback_response]),
+        )
+    else:
+        vps_agent_instance = VoiceProfileSelectorAgent(
+            llm_client=vps_llm,
+            temperature=vps_cfg.get("temperature", 0.0),
+            max_tokens=vps_cfg.get("max_tokens", 256),
+        )
+
+    voice_profile_selector_node: Any = make_voice_profile_selector_node(
+        vps_agent_instance,
+        artifact_store=artifact_store,
+        voice_profile_override=voice_profile_override,
+    )
 
     # ── Stage 1: BookFetcherAgent ──────────────────────────────────────────
     from storymesh.agents.book_fetcher.agent import BookFetcherAgent  # noqa: PLC0415
@@ -594,6 +629,7 @@ def build_graph(
     graph: Any = StateGraph(StoryMeshState)
 
     graph.add_node("genre_normalizer", genre_node)
+    graph.add_node("voice_profile_selector", voice_profile_selector_node)
     graph.add_node("book_fetcher", book_fetcher_node)
     graph.add_node("book_ranker", book_ranker_node)
     graph.add_node("theme_extractor", theme_extractor_node)
@@ -610,8 +646,9 @@ def build_graph(
     graph.add_conditional_edges(
         "genre_normalizer",
         _genre_normalizer_route,
-        {"book_fetcher": "book_fetcher", END: END},
+        {"voice_profile_selector": "voice_profile_selector", END: END},
     )
+    graph.add_edge("voice_profile_selector", "book_fetcher")
     graph.add_edge("book_fetcher", "book_ranker")
     graph.add_edge("book_ranker", "theme_extractor")
     graph.add_edge("theme_extractor", "proposal_draft")

@@ -26,6 +26,13 @@ agents:
     model: claude-haiku-4-5-20251001
     temperature: 0.0
     max_tokens: 4096
+
+  voice_profile_selector:
+    provider: anthropic
+    model: claude-haiku-4-5-20251001  # Lightweight classifier — Haiku is sufficient
+    temperature: 0.0                   # Deterministic: same input always selects the same profile
+    max_tokens: 256                    # Small output: profile_id + one-sentence rationale
+    # voice_profile_override: cozy_warmth  # Uncomment to force a specific profile for all runs
   book_ranker:
     top_n: 10
     llm_rerank: false

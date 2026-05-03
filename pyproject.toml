@@ -57,5 +57,5 @@ python_version = "3.12"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["weasyprint", "ebooklib", "ebooklib.epub"]
+module = ["weasyprint", "ebooklib", "ebooklib.epub", "diskcache"]
 ignore_missing_imports = true

@@ -67,14 +67,7 @@ system: |
      - NOT use "As" or "When" as the first word
 
      Examples of strong opens_with:
-     - "The body had been arranged with the careful deliberation of someone who
-       expected it to be found."
-     - "She had run out of notebook paper two weeks ago and was using the backs
-       of salvaged tax forms."
-     - "The tribunal met in what had been a parking garage because it was the
-       only space large enough and because no one had claimed it."
-     - "He said the word 'evidence' with the slight pause of someone translating
-       from a language they no longer believed in."
+  {profile_exemplars}
 
      Examples of weak opens_with (do not write these):
      - "The morning was cold and grey over the flooded city."

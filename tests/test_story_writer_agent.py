@@ -5,7 +5,9 @@ Covers:
 - StoryWriterAgent: per-pass failure modes (empty/exception/invalid scenes)
 - StoryWriterAgent: craft notes formatting from RubricJudgeAgentOutput
 - StoryWriterAgent: temperature and token params forwarded correctly
+- StoryWriterAgent: voice profile overlays injected into system prompts (WI-3)
 - make_story_writer_node: state assembly, best-proposal selection, artifact persistence
+- make_story_writer_node: voice_profile read from voice_profile_selector_output (WI-3)
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ from storymesh.schemas.story_writer import (
     StoryWriterAgentOutput,
 )
 from storymesh.schemas.theme_extractor import ThematicTension
+from storymesh.schemas.voice_profile import load_voice_profile
 from storymesh.versioning.schemas import STORY_WRITER_SCHEMA_VERSION
 
 # ---------------------------------------------------------------------------
@@ -59,6 +62,7 @@ class CapturingFakeLLMClient(FakeLLMClient):
                 "system_prompt": system_prompt,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "agent_name": self.agent_name,
             }
         )
         return super().complete(
@@ -204,6 +208,7 @@ def _make_proposal() -> StoryProposal:
 
 def _make_input(
     rubric_feedback: RubricJudgeAgentOutput | None = None,
+    voice_profile: object | None = None,
 ) -> StoryWriterAgentInput:
     return StoryWriterAgentInput(
         proposal=_make_proposal(),
@@ -212,6 +217,7 @@ def _make_input(
         user_prompt="dark post-apocalyptic mystery",
         normalized_genres=["mystery", "post_apocalyptic"],
         user_tones=["dark", "cerebral"],
+        voice_profile=voice_profile,  # type: ignore[arg-type]
     )
 
 
@@ -666,6 +672,22 @@ class TestFormatSceneListForPrompt:
 
 
 # ---------------------------------------------------------------------------
+# Agent name per pass (WI-4 logging hygiene)
+# ---------------------------------------------------------------------------
+
+
+class TestAgentNamePerPass:
+    def test_each_pass_uses_distinct_agent_name(self) -> None:
+        agent, client = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent.run(_make_input())
+
+        names = [call["agent_name"] for call in client.captured_calls]
+        assert names == ["story_writer_outline", "story_writer_draft", "story_writer_summary"]
+
+
+# ---------------------------------------------------------------------------
 # make_story_writer_node — node wrapper
 # ---------------------------------------------------------------------------
 
@@ -878,3 +900,184 @@ class TestStoryWriterNode:
         capturing_node(_base_state(run_id="myrunid999"))  # type: ignore[arg-type]
 
         assert captured == ["myrunid999"]
+
+
+# ---------------------------------------------------------------------------
+# Voice profile overlay injection (WI-3)
+# ---------------------------------------------------------------------------
+
+
+class TestVoiceProfileOverlays:
+    """Verify that voice profile overlays reach the LLM system prompts."""
+
+    def test_no_voice_profile_uses_literary_restraint_fallback(self) -> None:
+        """When voice_profile is None, literary_restraint is loaded — no crash, overlays empty."""
+        agent, client = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent.run(_make_input(voice_profile=None))
+
+        # literary_restraint has empty overlays — system prompts should not contain overlay markers
+        draft_system = client.captured_calls[1]["system_prompt"] or ""
+        assert "Direct emotion-naming" not in draft_system
+        assert "Kinetic over interior" not in draft_system
+
+    def test_cozy_warmth_craft_overlay_in_draft_system(self) -> None:
+        """cozy_warmth craft_overlay appears in the draft pass system prompt."""
+        profile = load_voice_profile("cozy_warmth")
+        agent, client = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent.run(_make_input(voice_profile=profile))
+
+        draft_system = client.captured_calls[1]["system_prompt"] or ""
+        assert "Direct emotion-naming" in draft_system
+
+    def test_cozy_warmth_avoid_overlay_in_draft_system(self) -> None:
+        """cozy_warmth avoid_overlay appears in the draft pass system prompt."""
+        profile = load_voice_profile("cozy_warmth")
+        agent, client = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent.run(_make_input(voice_profile=profile))
+
+        draft_system = client.captured_calls[1]["system_prompt"] or ""
+        assert "The way X is when Y" in draft_system
+
+    def test_genre_active_craft_overlay_in_draft_system(self) -> None:
+        """genre_active craft_overlay appears in the draft pass system prompt."""
+        profile = load_voice_profile("genre_active")
+        agent, client = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent.run(_make_input(voice_profile=profile))
+
+        draft_system = client.captured_calls[1]["system_prompt"] or ""
+        assert "Kinetic over interior" in draft_system
+
+    def test_cozy_warmth_exemplars_in_outline_system(self) -> None:
+        """cozy_warmth exemplars replace the default opens_with examples in the outline prompt."""
+        profile = load_voice_profile("cozy_warmth")
+        agent, client = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent.run(_make_input(voice_profile=profile))
+
+        outline_system = client.captured_calls[0]["system_prompt"] or ""
+        # cozy_warmth first exemplar contains "lantern"
+        assert "lantern" in outline_system
+
+    def test_literary_restraint_exemplars_in_outline_system(self) -> None:
+        """literary_restraint exemplars (default fallback) appear in the outline prompt."""
+        agent, client = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent.run(_make_input(voice_profile=None))
+
+        outline_system = client.captured_calls[0]["system_prompt"] or ""
+        # literary_restraint first exemplar references arranged body / tax forms
+        assert "salvaged tax forms" in outline_system or "arranged" in outline_system
+
+    def test_cozy_warmth_summary_overlay_in_summary_system(self) -> None:
+        """cozy_warmth summary_overlay appears in the summary pass system prompt."""
+        profile = load_voice_profile("cozy_warmth")
+        agent, client = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent.run(_make_input(voice_profile=profile))
+
+        summary_system = client.captured_calls[2]["system_prompt"] or ""
+        assert summary_system  # not empty
+        # literary_restraint has no summary_overlay; cozy_warmth should differ
+        agent2, client2 = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent2.run(_make_input(voice_profile=None))
+        default_system = client2.captured_calls[2]["system_prompt"] or ""
+        assert summary_system != default_system
+
+    def test_overlays_do_not_appear_in_wrong_pass(self) -> None:
+        """craft_overlay is draft-only; it must not leak into the outline or summary system prompts."""
+        profile = load_voice_profile("cozy_warmth")
+        agent, client = _capturing_agent(
+            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
+        )
+        agent.run(_make_input(voice_profile=profile))
+
+        outline_system = client.captured_calls[0]["system_prompt"] or ""
+        summary_system = client.captured_calls[2]["system_prompt"] or ""
+        assert "Direct emotion-naming" not in outline_system
+        assert "Direct emotion-naming" not in summary_system
+
+
+# ---------------------------------------------------------------------------
+# make_story_writer_node — voice_profile_selector_output integration (WI-3)
+# ---------------------------------------------------------------------------
+
+
+class TestStoryWriterNodeVoiceProfile:
+    """Verify the node wrapper reads voice_profile from voice_profile_selector_output."""
+
+    def _mock_agent(self) -> MagicMock:
+        agent = MagicMock(spec=StoryWriterAgent)
+        draft = json.loads(_DRAFT_RESPONSE)["full_draft"].strip()
+        summary = json.loads(_SUMMARY_RESPONSE)["back_cover_summary"].strip()
+        output = StoryWriterAgentOutput(
+            back_cover_summary=summary,
+            scene_list=[
+                SceneOutline(
+                    scene_id="scene_01",
+                    title="Opening",
+                    summary="Mara finds the body.",
+                    narrative_pressure="Tension between order and collapse.",
+                    observational_anchor="The cracked phone screen.",
+                    opens_with="The body had been arranged with care.",
+                ),
+                SceneOutline(
+                    scene_id="scene_02",
+                    title="The Canvass",
+                    summary="Mara interviews witnesses.",
+                    narrative_pressure="Investigation without infrastructure.",
+                    observational_anchor="The salvaged tax forms.",
+                    opens_with="She had run out of notebook paper.",
+                ),
+                SceneOutline(
+                    scene_id="scene_03",
+                    title="The Verdict",
+                    summary="The tribunal meets.",
+                    narrative_pressure="Authority without legitimacy.",
+                    observational_anchor="The oil-stained floor.",
+                    opens_with="The tribunal met in the parking garage.",
+                ),
+            ],
+            full_draft=draft,
+            word_count=len(draft.split()),
+            debug={},
+            schema_version=STORY_WRITER_SCHEMA_VERSION,
+        )
+        agent.run.return_value = output
+        return agent
+
+    def test_voice_profile_none_when_no_vps_output(self) -> None:
+        """When voice_profile_selector_output is absent, voice_profile passed as None."""
+        agent = self._mock_agent()
+        node = make_story_writer_node(agent)
+
+        node(_base_state(voice_profile_selector_output=None))  # type: ignore[arg-type]
+
+        call_input: StoryWriterAgentInput = agent.run.call_args[0][0]
+        assert call_input.voice_profile is None
+
+    def test_voice_profile_passed_from_vps_output(self) -> None:
+        """When voice_profile_selector_output is present, its voice_profile is forwarded."""
+        profile = load_voice_profile("cozy_warmth")
+        vps_mock = MagicMock()
+        vps_mock.voice_profile = profile
+
+        agent = self._mock_agent()
+        node = make_story_writer_node(agent)
+
+        node(_base_state(voice_profile_selector_output=vps_mock))  # type: ignore[arg-type]
+
+        call_input: StoryWriterAgentInput = agent.run.call_args[0][0]
+        assert call_input.voice_profile is profile

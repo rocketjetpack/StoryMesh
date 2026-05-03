@@ -48,7 +48,7 @@ system: |
   8. Every passage that was NOT identified as a near-miss must appear
      EXACTLY as it was in the original — word for word, punctuation for
      punctuation. Do not copyedit, polish, or "improve" surrounding text.
-
+  {voice_register_note}
   RESPONSE FORMAT:
 
   Return ONLY a valid JSON object containing the complete revised story.

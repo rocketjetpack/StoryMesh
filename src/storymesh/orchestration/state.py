@@ -25,6 +25,7 @@ from storymesh.schemas.resonance_reviewer import ResonanceReviewerAgentOutput
 from storymesh.schemas.rubric_judge import RubricJudgeAgentOutput
 from storymesh.schemas.story_writer import StoryWriterAgentOutput
 from storymesh.schemas.theme_extractor import ThemeExtractorAgentOutput
+from storymesh.schemas.voice_profile_selector import VoiceProfileSelectorAgentOutput
 
 
 class StoryMeshState(TypedDict, total=False):
@@ -48,6 +49,9 @@ class StoryMeshState(TypedDict, total=False):
 
     # ── Stage 0: GenreNormalizerAgent ──────────────────────────────────────
     genre_normalizer_output: GenreNormalizerAgentOutput | None
+
+    # ── Stage 0.5: VoiceProfileSelectorAgent ──────────────────────────────
+    voice_profile_selector_output: VoiceProfileSelectorAgentOutput | None
 
     # ── Stage 1: BookFetcherAgent ──────────────────────────────────────────
     book_fetcher_output: BookFetcherAgentOutput | None

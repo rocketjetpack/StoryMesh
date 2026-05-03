@@ -8,7 +8,7 @@ This is a single repository for an agentic ai pipeline that will take a user sup
 
 ### Components
 
-For components review the README.md in the root of the repository. This file is always up to date and has information related to the list of agents and responsibility scope for each agent. 
+For components review the README.md in the root of the repository. README.md is maintained as a best-effort record of the current pipeline state; treat it as a starting point, not a source of truth. When README.md conflicts with the code, the code takes precedence. If a significant discrepancy is found, flag it and update the README as part of the work.
 
 ### Core Concents
 
@@ -19,6 +19,7 @@ For version data about dependencies always review pyproject.toml in the root of 
 ### Technical Details
 
 Prompts should ALWAYS reside in dedicated data files and never be embedded in agent code.  
+Voice profiles (`src/storymesh/prompts/voice_profiles/*.yaml`) are prompt-adjacent data — they contain overlay text and exemplars that are injected into system prompts at runtime. They follow the same "data files only" rule.  
 Model selection and temperature should be active decisions to balance accuracy against cost.  
 
 ### Python Best Practices

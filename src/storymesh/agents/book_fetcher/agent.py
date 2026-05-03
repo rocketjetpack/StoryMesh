@@ -12,7 +12,7 @@ import logging
 import time
 from typing import Any
 
-import diskcache  # type: ignore[import-untyped]
+import diskcache
 import orjson
 
 from storymesh.agents.book_fetcher.client import OpenLibraryAPIError, OpenLibraryClient

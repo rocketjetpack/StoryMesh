@@ -1,42 +1,29 @@
 # StoryMesh
 
-StoryMesh is a Python package for building an agentic fiction-synopsis pipeline. The repository includes a working LangGraph pipeline, a fully implemented genre normalization stage, an implemented Open Library book-fetching stage, a deterministic book ranking stage with optional LLM re-ranking and MMR diversity selection, a creative theme extraction stage, a multi-sample proposal drafting stage with Craft Directives, a cross-provider rubric evaluation stage with retry loop, a gpt-image-2 cover art generation stage with Pillow text compositing, per-node artifact persistence, a Rich-formatted CLI, and a Python API for running the current pipeline.
-
-The final creative stage (synopsis writing) is scaffolded but not implemented yet. Today, a full `generate` run executes stages 0–7, including real rubric evaluation and up to 2 retries, cover art generation via gpt-image-2 (when `OPENAI_API_KEY` is set), persists artifacts, and returns a placeholder synopsis while stage 6 remains a stub.
+StoryMesh is a Python package for a fully implemented agentic fiction pipeline. A single `generate` call normalizes a free-text creative prompt, fetches thematically relevant books from Open Library, extracts the tensions between genre traditions, drafts and edits a story proposal (with rubric-driven retry), selects a voice profile, writes a complete short story in three prose passes, reviews it for near-miss moments, generates a cover image, and assembles a PDF and EPUB.
 
 ## Current Status
 
-Implemented:
+All pipeline stages are implemented:
 
 - Package, CLI, config loader, and version reporting
 - LangGraph orchestration with typed shared state and per-node artifact persistence
 - `GenreNormalizerAgent` with deterministic mapping, fuzzy matching, and optional LLM fallback
 - `BookFetcherAgent` backed by the Open Library Search API with disk cache, deduplication, and configurable `max_books` cap
-- `BookRankerAgent` with deterministic weighted composite scoring (genre overlap, reader engagement, rating quality, rating volume), optional LLM re-ranking by narrative potential, and MMR diversity selection to ensure the shortlist covers the thematic space
-- `ThemeExtractorAgent` — the creative engine of the pipeline. Identifies the thematic assumptions each genre tradition takes for granted, finds contradictions between traditions, frames them as creative questions, and generates concrete narrative seeds for the downstream proposal stage
-- `ProposalDraftAgent` with multi-sample seed-steering and self-selection for creative proposal generation. Generates N candidate proposals from different narrative seeds at elevated temperature, then uses a low-temperature critic call to select the strongest one
-- `RubricJudgeAgent` with 6-dimension craft quality rubric, cross-provider evaluation (OpenAI evaluating Anthropic output), cliché violation detection, composite scoring with configurable pass threshold, and actionable structured feedback for the retry loop
-- `CoverArtAgent` — generates a cover image via gpt-image-2 using the `image_prompt` embedded in the selected `StoryProposal`. Title and byline are composited onto the image using Pillow. PNG saved to the run directory. Runs as a noop if `OPENAI_API_KEY` is absent
-- LLM provider registry for extensible provider support
-- ImageClient provider registry mirroring the LLM registry for extensible image generation backend support
-- Rubric retry loop: conditional edge wired; real pass/fail signal from RubricJudgeAgent; failing proposals trigger a targeted retry with RubricFeedback injected into the prompt (max 2 retries)
-- Rich-formatted CLI output with per-stage timing and artifact paths
-- Test coverage for import, CLI, schemas, graph node wrappers, prompt loading, book fetching, book ranking, genre normalization, theme extraction, proposal drafting, rubric evaluation, cover art generation, LLM registry, image registry, and artifacts
-
-Not implemented yet:
-
-- `SynopsisWriterAgent`
-
-Current runtime behavior:
-
-1. Normalize the user's prompt into genres, tones, and narrative context tokens.
-2. Fetch matching books from Open Library.
-3. Rank books by composite score with MMR diversity selection (deterministic; optionally refined by LLM).
-4. Extract thematic tensions, genre clusters, and narrative seeds (LLM — requires API key).
-5. Generate N candidate story proposals from different seeds, then select the strongest via a critic call (LLM — requires API key).
-6. Evaluate the selected proposal against a 6-dimension craft quality rubric (LLM — cross-provider; requires API key). If the proposal fails the pass threshold, inject structured feedback and retry Stage 5 (up to 2 retries).
-7. Produce a placeholder `final_synopsis` (SynopsisWriterAgent not yet implemented).
-8. Generate a cover image via gpt-image-2 using the `image_prompt` from the selected `StoryProposal`. Title and byline text are composited onto the raw PNG using Pillow. The final image is saved to the run directory as `cover_art.png`. Runs as a noop if `OPENAI_API_KEY` is absent.
+- `BookRankerAgent` with deterministic weighted composite scoring (genre overlap, reader engagement, rating quality, rating volume), optional LLM re-ranking by narrative potential, and MMR diversity selection
+- `ThemeExtractorAgent` — identifies thematic assumptions each genre tradition takes for granted, finds contradictions between traditions, frames them as creative questions, and generates concrete narrative seeds
+- `ProposalDraftAgent` with multi-sample seed-steering and self-selection. Generates N candidate proposals from different seeds at elevated temperature, then uses a critic call to select the strongest
+- `RubricJudgeAgent` with 6-dimension craft quality rubric, cross-provider evaluation (OpenAI evaluating Anthropic output), cliché detection, composite scoring with configurable pass threshold, and structured feedback for the retry loop
+- `VoiceProfileSelectorAgent` — classifies the user's prompt into one of three voice profiles (`literary_restraint`, `cozy_warmth`, `genre_active`) to produce genre-appropriate prose without homogenizing output across the portfolio
+- `StoryWriterAgent` — three-pass prose generation: scene outline → full draft → back-cover summary. Voice profile overlays are applied to all three passes for register-appropriate output
+- `ResonanceReviewerAgent` — identifies 0–3 near-miss moments where the draft implies depth but retreats before engaging. Expands avoidance moments with targeted prose additions; re-generates the back-cover summary to reflect the revised draft. Cross-provider review (GPT-4o reads what Claude wrote)
+- `CoverArtAgent` — generates a cover image via gpt-image-1 using the `image_prompt` from the selected proposal. Title and byline are composited onto the image using Pillow
+- `BookAssemblerAgent` — assembles a PDF (WeasyPrint) and EPUB (ebooklib) from the final prose draft and cover art
+- LLM and ImageClient provider registries for extensible backend support
+- Rubric retry loop with configurable pass threshold, max retries, and min retries
+- Quality presets: `draft`, `standard`, `high`, `very_high`
+- Offline stylometric counter (`storymesh stylometrics`) for per-run tic frequency diagnostics
+- Rich-formatted CLI and Python API
 
 ## Architecture
 
@@ -45,17 +32,18 @@ The pipeline is built as a LangGraph `StateGraph` with this topology:
 ```text
 START
   → genre_normalizer
+  → voice_profile_selector         ← selects literary_restraint / cozy_warmth / genre_active
   → book_fetcher
   → book_ranker
   → theme_extractor
   → proposal_draft
   → rubric_judge
   → [conditional]
-      ├── PASS → synopsis_writer → cover_art → END
-      └── FAIL → proposal_draft (max 2 retries)
+      ├── PASS → story_writer → resonance_reviewer → cover_art → book_assembler → END
+      └── FAIL → proposal_draft (max retries configurable per quality preset)
 ```
 
-Stages 0–5 and 7 currently perform real work. Stage 6 (`synopsis_writer`) is registered as a no-op placeholder. The rubric retry loop is wired via a conditional edge; a failing rubric score triggers re-entry into `proposal_draft` with targeted feedback injected into the prompt.
+All stages perform real work. The rubric retry loop is wired via a conditional edge; a failing rubric score triggers re-entry into `proposal_draft` with targeted feedback injected into the prompt. `resonance_reviewer` only runs at `high` and `very_high` quality presets.
 
 ### Stage 0: GenreNormalizerAgent
 
@@ -72,7 +60,21 @@ Other behaviors:
 - Reads taxonomy data from `src/storymesh/data/genre_map.json` and `src/storymesh/data/tone_map.json`
 - Passes 3 and 4 share the same LLM client, model, and temperature (both are lightweight classification tasks)
 - Produces a strict `GenreNormalizerAgentOutput` including debug traces and preserved narrative context
-- `InferredGenre.default_tones` is informational only and does **not** feed into the tone-merge pipeline. Revisit when downstream agents (ProposalDraft, SynopsisWriter) need richer tone data from implied genres.
+- `InferredGenre.default_tones` is informational only and does **not** feed into the tone-merge pipeline
+
+### Stage 0.5: VoiceProfileSelectorAgent
+
+Status: implemented
+
+Runs immediately after `genre_normalizer` and before `book_fetcher`. Classifies the user's prompt, normalized genres, and tone words into one of three voice profiles using a Haiku classifier at T=0:
+
+| Profile | Intended for | Key behaviors |
+|---|---|---|
+| `literary_restraint` | dark, mystery, literary, dread, psychological | Current default prose style; subtext over statement |
+| `cozy_warmth` | bedtime, cute, comfy, gentle, quietly wondrous | Direct emotion-naming; ritualistic repetition; soft anthropomorphism |
+| `genre_active` | action, adventure, pulp, high-energy fanfic | Kinetic over interior; dialogue-forward; sentence economy |
+
+The selected profile flows through pipeline state and is consumed by `StoryWriterAgent` (all three passes) and `ResonanceReviewerAgent` (revision and summary passes). If no API key is configured, the node defaults to `literary_restraint` without making any LLM calls. The profile can also be pinned via `voice_profile_override` in `storymesh.config.yaml` to bypass the classifier.
 
 ### Stage 1: BookFetcherAgent
 
@@ -148,34 +150,58 @@ Evaluates the selected `StoryProposal` from Stage 4 against six craft quality di
 - **D-5 Structural Surprise** (weight 0.10): Is there at least one structural or tonal element that subverts the expected arc for the genre combination?
 - **D-6 User Intent Fidelity** (weight 0.10): Does the proposal faithfully honour the user's original creative brief?
 
-A cliché penalty of 0.05 per detected violation is subtracted from the weighted composite score. If the composite falls below the configured `pass_threshold` (default 0.7), the agent emits a structured `RubricJudgeAgentOutput` with `passed=False` and dimension-level feedback; the conditional edge re-routes to `proposal_draft` for a targeted retry (max 2 retries total).
+Scoring is an integer composite out of 10, with each dimension scored 0 (fail) / 1 (acceptable) / 2 (strong). If the composite falls below the configured `pass_threshold` (default 6), the agent emits a structured `RubricJudgeAgentOutput` with `passed=False` and dimension-level feedback; the conditional edge re-routes to `proposal_draft` for a targeted retry. A `min_retries` setting forces at least one editorial revision even when the proposal passes on the first attempt.
 
-Deliberately uses a **different LLM provider** than ProposalDraftAgent (`provider: openai`, `model: gpt-4o`) to prevent the evaluator from inheriting the generator's blind spots.
+Deliberately uses a **different LLM provider** than ProposalDraftAgent (`provider: openai`, `model: gpt-4o`) to prevent the evaluator from inheriting the generator's blind spots. The prompt is calibrated as antagonistic: it is instructed to find weaknesses, with anchors like "score of 2 is rare" and "most proposals score 5–7."
 
-### Stage 6: SynopsisWriterAgent
+### Stage 6: StoryWriterAgent
 
-Status: scaffolded only
+Status: implemented
 
-The state fields, graph node, and versioning hooks exist, but synopsis synthesis has not been implemented yet.
+Produces a complete short story in three sequential LLM passes:
+
+1. **Outline pass** (T=0.5): Expands the `StoryProposal`'s `key_scenes` into 6–10 `SceneOutline` objects. Each outline carries an `opens_with` sentence used verbatim by the draft pass — preventing generic AI opening lines. Voice profile exemplars replace the default few-shot examples at this stage.
+
+2. **Draft pass** (T=0.8): Writes the full prose using scene outlines as structure. All craft principles (sentence rhythm, subtext, concrete detail, temporal irregularity) are enforced via the prompt. Voice profile `craft_overlay` and `avoid_overlay` are injected into the system prompt, producing register-appropriate prose without duplicating the full prompt for each profile.
+
+3. **Summary pass** (T=0.4): Writes ~300-word back-cover marketing copy from the completed draft. Writing after the draft ensures it accurately reflects what was written rather than what was planned. Voice profile `summary_overlay` adjusts register here too.
+
+### Stage 6b: ResonanceReviewerAgent
+
+Status: implemented. Only runs at `high` and `very_high` quality presets.
+
+Reviews the completed prose draft for near-miss moments — places where the story implies depth but retreats before engaging — and produces targeted expansions. Uses three internal LLM passes:
+
+1. **Review pass** (GPT-4o, T=0.4): Identifies 0–3 near-miss moments, classifying each as *restraint* (earned silence) or *avoidance* (missed opportunity). Using a different provider than the writer avoids shared blind spots.
+
+2. **Revision pass** (Claude, T=0.7): Expands avoidance moments in-place within the existing draft, matching the original voice. Adds roughly 50–150 words per moment. The voice profile `craft_overlay` is forwarded as a register reminder.
+
+3. **Summary pass** (Claude, T=0.4): Re-generates the back-cover summary from the revised draft so it reflects the final text.
+
+The node replaces `story_writer_output` in the pipeline state with the revised draft and summary, so downstream nodes (`cover_art`, `book_assembler`) consume the revised text without any changes to their code.
 
 ### Stage 7: CoverArtAgent
 
 Status: implemented
 
-Generates a cover image for the selected `StoryProposal` using the gpt-image-2 model via the OpenAI Images API.
+Generates a cover image for the selected `StoryProposal` using the gpt-image-1 model via the OpenAI Images API.
 
-The `image_prompt` is authored by `ProposalDraftAgent` (Stage 4) as part of each candidate proposal and carried through to the winning proposal. It describes the intended mood, composition, and visual style as flat 2D cover art — framed explicitly to prevent the model from generating a 3D book-object photograph.
-
-Before the prompt reaches the API, `CoverArtAgent` appends a flat-canvas enforcement suffix that instructs the model to produce art filling the entire canvas with no book object, no perspective frame, and no text or lettering. Title and byline ("A StoryMesh Production") are composited onto the raw PNG programmatically via Pillow, giving reliable typography independent of the model's text rendering. If Pillow is not installed or the image cannot be decoded, the raw PNG is returned unchanged.
+Before the prompt reaches the API, `CoverArtAgent` appends a flat-canvas enforcement suffix that instructs the model to produce art filling the entire canvas with no book object, no perspective frame, and no text or lettering. Title and byline ("A StoryMesh Production") are composited onto the raw PNG programmatically via Pillow, giving reliable typography independent of the model's text rendering.
 
 Configuration options (all in the `cover_art:` agent block of `storymesh.config.yaml`):
 
 - `image_provider`: image generation backend (default `openai`)
-- `image_model`: model identifier (default `gpt-image-2`)
-- `image_size`: any resolution satisfying gpt-image-2 constraints; portrait `1024x1792` is the default for book covers
+- `image_model`: model identifier (default `gpt-image-1`)
+- `image_size`: portrait `1024x1792` is the default for book covers
 - `image_quality`: `auto`, `low`, `medium`, or `high` (default `auto`)
 
-The PNG is written to `<run_dir>/cover_art.png` using `b64_json` response format to avoid a second HTTP round-trip. A JSON sidecar (`cover_art_output.json`) is also persisted with prompt metadata and model configuration. If `OPENAI_API_KEY` is absent or `image_provider` is unconfigured, the node runs as a noop and no image is generated.
+If `OPENAI_API_KEY` is absent, the node runs as a noop.
+
+### Stage 8: BookAssemblerAgent
+
+Status: implemented
+
+Assembles the final short story into a PDF (via WeasyPrint) and EPUB (via ebooklib) using the prose draft, scene list, back-cover summary, and cover art PNG from earlier stages. No LLM calls. Runs as a noop if neither WeasyPrint nor ebooklib is installed.
 
 ## Requirements
 
@@ -192,7 +218,7 @@ Optional extras:
 - `storymesh[all-providers]`
 - `storymesh[langgraph-studio]`
 
-Core dependencies are declared in [pyproject.toml](/mnt/c/Users/Kali/Documents/Devel/StoryMesh/pyproject.toml).
+Core dependencies are declared in [pyproject.toml](pyproject.toml).
 
 ## Setup
 
@@ -259,28 +285,33 @@ Example output:
 
 ```
 ╭──────────────────────────────────────────────────────────────╮
-│ StoryMesh v0.8.0  Run abc123def456                           │
+│ StoryMesh v0.9.0  Run abc123def456                           │
 │ Input: "dark post-apocalyptic detective mystery"             │
 ╰──────────────────────────────────────────────────────────────╯
 
- Stage                   Status    Time     Artifact
- ────────────────────────────────────────────────────────────────────────
- genre_normalizer        ✓ done    0.03s    ~/.storymesh/runs/abc.../genre_normalizer_output.json
- book_fetcher            ✓ done    1.24s    ~/.storymesh/runs/abc.../book_fetcher_output.json
- book_ranker             ✓ done    0.01s    ~/.storymesh/runs/abc.../book_ranker_output.json
- theme_extractor         ✓ done    3.21s    ~/.storymesh/runs/abc.../theme_extractor_output.json
- proposal_draft          ✓ done    8.74s    ~/.storymesh/runs/abc.../proposal_draft_output.json
- rubric_judge            ✓ done    4.12s    ~/.storymesh/runs/abc.../rubric_judge_output.json
- synopsis_writer         ○ noop    0.00s    —
- cover_art               ✓ done    3.54s    ~/.storymesh/runs/abc.../cover_art_output.json
- ────────────────────────────────────────────────────────────────────────
-                         Total: 17.70s
+ Stage                    Status    Time      Artifact
+ ───────────────────────────────────────────────────────────────────────────
+ genre_normalizer         ✓ done    0.03s     ~/.storymesh/runs/abc.../genre_normalizer_output.json
+ book_fetcher             ✓ done    1.24s     ~/.storymesh/runs/abc.../book_fetcher_output.json
+ book_ranker              ✓ done    0.01s     ~/.storymesh/runs/abc.../book_ranker_output.json
+ theme_extractor          ✓ done    3.21s     ~/.storymesh/runs/abc.../theme_extractor_output.json
+ proposal_draft           ✓ done    8.74s     ~/.storymesh/runs/abc.../proposal_draft_output.json
+ rubric_judge             ✓ done    4.12s     ~/.storymesh/runs/abc.../rubric_judge_output.json
+ story_writer             ✓ done    22.40s    ~/.storymesh/runs/abc.../story_writer_output.json
+ resonance_reviewer       ✓ done    18.33s    ~/.storymesh/runs/abc.../resonance_reviewer_output.json
+ cover_art                ✓ done    3.54s     ~/.storymesh/runs/abc.../cover_art_output.json
+ book_assembler           ✓ done    0.88s     ~/.storymesh/runs/abc.../book_assembler_output.json
+ ───────────────────────────────────────────────────────────────────────────
+                          Total: 62.50s
 
-╭─ Synopsis ───────────────────────────────────────────────────╮
-│ Placeholder synopsis for 'dark post-apocalyptic detective    │
-│ mystery'. SynopsisWriterAgent is not yet implemented.        │
-╰──────────────────────────────────────────────────────────────╯
+╭─ Synopsis ───────────────────────────────────────────────────────────╮
+│ In the weeks after the flood receded, Mara Voss returned to what     │
+│ she knew. The records were gone. The precinct was a waterline stain  │
+│ on brick. She kept working anyway.                                   │
+╰──────────────────────────────────────────────────────────────────────╯
 
+PDF:  ~/.storymesh/runs/abc123def456/story.pdf
+EPUB: ~/.storymesh/runs/abc123def456/story.epub
 Artifacts saved to: ~/.storymesh/runs/abc123def456/
 ```
 
@@ -305,6 +336,15 @@ storymesh inspect-run                          # most recent run
 storymesh inspect-run <run_id>                 # specific run
 storymesh inspect-run <run_id> --llm all       # include full LLM prompts and responses
 storymesh inspect-run <run_id> --html out.html # export a self-contained HTML report
+```
+
+Count prose tics in a story draft (offline, no LLM calls):
+
+```bash
+storymesh stylometrics                  # most recent run, JSON output
+storymesh stylometrics <run_id>         # specific run
+storymesh stylometrics --pretty         # human-readable table
+storymesh stylometrics --all            # all runs in the store
 ```
 
 Regenerate the cover art for a previous run without re-running the full pipeline:
@@ -343,11 +383,23 @@ StoryMesh persists run artifacts under `~/.storymesh`. Artifacts are written as 
 ~/.storymesh/
 ├── runs/
 │   └── <run_id>/
-│       ├── run_metadata.json         ← written before graph invocation
+│       ├── run_metadata.json                   ← written before graph invocation
+│       ├── llm_calls.jsonl                     ← per-call log (agent, prompt, response)
 │       ├── genre_normalizer_output.json
+│       ├── voice_profile_selector_output.json
 │       ├── book_fetcher_output.json
-│       └── book_ranker_output.json
-└── stages/                           ← stage-level cache (content-addressed)
+│       ├── book_ranker_output.json
+│       ├── theme_extractor_output.json
+│       ├── proposal_draft_output.json
+│       ├── rubric_judge_output.json
+│       ├── story_writer_output.json
+│       ├── resonance_reviewer_output.json
+│       ├── cover_art_output.json
+│       ├── cover_art.png
+│       ├── book_assembler_output.json
+│       ├── story.pdf
+│       └── story.epub
+└── stages/                                     ← stage-level cache (content-addressed)
 ```
 
 Open Library responses are cached under the configured cache root, typically:
@@ -383,19 +435,23 @@ Useful files:
 - `src/storymesh/cli.py`
 - `src/storymesh/config.py`
 
-## Known Gaps
+## Known Gaps and Limitations
 
-- Stage 6 (`synopsis_writer`) is a no-op placeholder; the final synopsis is a stub until `SynopsisWriterAgent` is implemented.
-- `ThemeExtractorAgent`, `ProposalDraftAgent`, and `RubricJudgeAgent` all require a configured API key; without one, those stages run as noops.
-- `ProposalDraftAgent` relies on `ThemeExtractorAgentOutput` being present; if Stage 3 runs as a noop, Stage 4 also runs as a noop.
-- `RubricJudgeAgent` relies on `ProposalDraftAgentOutput` being present; if Stage 4 runs as a noop, Stage 5 also runs as a noop.
-- `CoverArtAgent` requires `OPENAI_API_KEY`; without one, Stage 7 runs as a noop and no cover image is generated.
+- LLM-required stages (`ThemeExtractorAgent`, `ProposalDraftAgent`, `RubricJudgeAgent`, `VoiceProfileSelectorAgent`, `StoryWriterAgent`, `ResonanceReviewerAgent`) degrade to noops when the relevant API key is absent.
+- `CoverArtAgent` requires `OPENAI_API_KEY`; without one, Stage 7 runs as a noop.
+- `BookAssemblerAgent` requires WeasyPrint (PDF) and ebooklib (EPUB); without them it runs as a noop.
+- **Rubric-judge aesthetic bias**: the current rubric rewards literary-fiction qualities regardless of voice profile. Proposals for `cozy_warmth` or `genre_active` stories will be scored against literary criteria, which may cause the retry loop to pull them back toward literary aesthetic. This is a known v1 limitation; per-profile rubric conditioning is deferred.
+- **ThemeExtractorAgent's dialectical framework** assumes every story argues a thesis via genre tension. This works well for literary and genre fiction but produces over-philosophical proposals for cozy or action genres.
 
 ## Roadmap
 
-- ~~Implement `ProposalDraftAgent` to select and develop the best narrative seed into a full proposal~~
+- ~~Implement `ProposalDraftAgent` with multi-sample drafting and critic selection~~
 - ~~Activate rubric-based retry logic with real pass/fail signal~~
-- ~~Implement `CoverArtAgent` for gpt-image-2 cover image generation from the proposal's image prompt~~
-- Implement final synopsis synthesis (`SynopsisWriterAgent`)
-- ~~Expand provider support beyond the current Anthropic implementation~~
-- OpenAI (`gpt-4o-mini` default) now supported for text LLMs; configure via `provider: openai` in `storymesh.config.yaml`
+- ~~Implement `StoryWriterAgent` for three-pass prose generation~~
+- ~~Implement `ResonanceReviewerAgent` for near-miss detection and targeted expansion~~
+- ~~Implement `CoverArtAgent` for gpt-image-1 cover image generation~~
+- ~~Implement `BookAssemblerAgent` for PDF and EPUB output~~
+- ~~Add `VoiceProfileSelectorAgent` to produce genre-appropriate prose~~
+- ~~Add offline stylometric counter (`storymesh stylometrics`)~~
+- Per-profile rubric conditioning (v2: `cozy_warmth` and `genre_active` proposals scored against appropriate criteria)
+- Per-profile theme extraction (v2: lighter extraction path for non-literary genres)

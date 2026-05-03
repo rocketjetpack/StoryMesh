@@ -801,14 +801,14 @@ class TestRubricRetryTopology:
 class TestGenreNormalizerRoute:
     """Tests for _genre_normalizer_route and the node's error handling."""
 
-    def test_routes_to_book_fetcher_when_output_is_present(self) -> None:
-        """A populated genre_normalizer_output routes to book_fetcher."""
+    def test_routes_to_voice_profile_selector_when_output_is_present(self) -> None:
+        """A populated genre_normalizer_output routes to voice_profile_selector."""
         from storymesh.orchestration.graph import _genre_normalizer_route
 
         state: StoryMeshState = {
             "genre_normalizer_output": object(),  # type: ignore[typeddict-item]
         }
-        assert _genre_normalizer_route(state) == "book_fetcher"
+        assert _genre_normalizer_route(state) == "voice_profile_selector"
 
     def test_routes_to_end_when_output_is_none(self) -> None:
         """genre_normalizer_output=None must route to END."""
