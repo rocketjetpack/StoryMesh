@@ -10,7 +10,9 @@ import yaml
 from storymesh.prompts.loader import (
     PromptFormattingError,
     PromptTemplate,
+    get_prompt_style,
     load_prompt,
+    set_prompt_style,
 )
 
 # ---------------------------------------------------------------------------
@@ -115,10 +117,67 @@ class TestLoadPrompt:
     def test_format_user_after_load(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         _write_prompt_yaml(tmp_path / "test_agent.yaml", user="Classify: {tokens}")
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
         pt = load_prompt("test_agent")
         result = pt.format_user(tokens="rebellion 2085")
         assert "rebellion 2085" in result
+
+    def test_loads_style_specific_prompt(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        styles_dir = tmp_path / "styles" / "slim"
+        styles_dir.mkdir(parents=True)
+        _write_prompt_yaml(styles_dir / "test_agent.yaml", system="Slim system")
+        monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
+
+        pt = load_prompt("test_agent", style="slim")
+        assert pt.system == "Slim system"
+
+    def test_style_falls_back_to_default_style_dir(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        default_dir = tmp_path / "styles" / "default"
+        default_dir.mkdir(parents=True)
+        _write_prompt_yaml(default_dir / "test_agent.yaml", system="Default style system")
+        monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
+
+        pt = load_prompt("test_agent", style="slim")
+        assert pt.system == "Default style system"
+
+    def test_style_falls_back_to_root_prompt(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _write_prompt_yaml(tmp_path / "test_agent.yaml", system="Root system")
+        monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
+
+        pt = load_prompt("test_agent", style="slim")
+        assert pt.system == "Root system"
+
+    def test_active_prompt_style_is_used(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        styles_dir = tmp_path / "styles" / "slim"
+        styles_dir.mkdir(parents=True)
+        _write_prompt_yaml(styles_dir / "test_agent.yaml", system="Active slim system")
+        monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
+
+        original_style = get_prompt_style()
+        try:
+            set_prompt_style("slim")
+            pt = load_prompt("test_agent")
+        finally:
+            set_prompt_style(original_style)
+
+        assert pt.system == "Active slim system"
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +187,7 @@ class TestLoadPrompt:
 class TestLoadPromptErrors:
     def test_missing_file_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
         with pytest.raises(FileNotFoundError, match="nonexistent_agent"):
             load_prompt("nonexistent_agent")
 
@@ -135,6 +195,7 @@ class TestLoadPromptErrors:
         path = tmp_path / "bad_agent.yaml"
         path.write_text(yaml.dump({"user": "some template"}))
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
         with pytest.raises(ValueError, match="system"):
             load_prompt("bad_agent")
@@ -143,6 +204,7 @@ class TestLoadPromptErrors:
         path = tmp_path / "bad_agent.yaml"
         path.write_text(yaml.dump({"system": "some system prompt"}))
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
         with pytest.raises(ValueError, match="user"):
             load_prompt("bad_agent")
@@ -151,6 +213,7 @@ class TestLoadPromptErrors:
         path = tmp_path / "bad_agent.yaml"
         path.write_text(yaml.dump({"system": "", "user": "template"}))
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
         with pytest.raises(ValueError, match="system"):
             load_prompt("bad_agent")
@@ -159,6 +222,7 @@ class TestLoadPromptErrors:
         path = tmp_path / "bad_agent.yaml"
         path.write_text(yaml.dump({"system": "valid", "user": ""}))
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
         with pytest.raises(ValueError, match="user"):
             load_prompt("bad_agent")
@@ -167,6 +231,7 @@ class TestLoadPromptErrors:
         path = tmp_path / "bad_agent.yaml"
         path.write_text("- just\n- a\n- list\n")
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
         with pytest.raises(ValueError, match="mapping"):
             load_prompt("bad_agent")
@@ -175,9 +240,14 @@ class TestLoadPromptErrors:
         path = tmp_path / "bad_agent.yaml"
         path.write_text("system: [\ninvalid yaml")
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
         with pytest.raises(ValueError, match="Invalid YAML"):
             load_prompt("bad_agent")
+
+    def test_invalid_style_name_raises(self) -> None:
+        with pytest.raises(ValueError, match="path separators"):
+            load_prompt("genre_normalizer", style="../slim")
 
 
 # ---------------------------------------------------------------------------
@@ -440,3 +510,15 @@ class TestRubricJudgePrompt:
         )
         assert "dark post-apocalyptic mystery" in result
         assert "The Last Inquest" in result
+
+
+class TestSlimPromptStyle:
+    def test_slim_style_loads_style_specific_prompt(self) -> None:
+        pt = load_prompt("story_writer_draft", style="slim")
+        assert "serve the story rather than the prompt" in (
+            pt.system + "\n" + pt._user_template
+        ).lower()
+
+    def test_slim_style_falls_back_for_missing_prompt(self) -> None:
+        pt = load_prompt("story_writer_summary", style="slim")
+        assert "back-cover copy" in pt.system.lower()

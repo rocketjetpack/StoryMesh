@@ -283,6 +283,7 @@ def build_graph(
     min_retries: int = 0,
     skip_resonance_review: bool = True,
     voice_profile_override: str | None = None,
+    prompt_style: str = "default",
 ) -> Any:  # noqa: ANN401  # CompiledStateGraph generics not resolvable under mypy strict.
     """Construct and compile the StoryMesh pipeline StateGraph.
 
@@ -325,11 +326,17 @@ def build_graph(
         voice_profile_override: Optional profile ID to force for the run
             without calling the classifier LLM. Useful for testing or
             forcing a specific prose register.
+        prompt_style: Prompt style directory to activate for this graph build.
+            ``"default"`` preserves the current prompt set.
 
     Returns:
         A compiled LangGraph StateGraph ready for ``.stream()`` or
         ``.invoke()``.
     """
+    from storymesh.prompts.loader import set_prompt_style  # noqa: PLC0415
+
+    set_prompt_style(prompt_style)
+
     resolved_max_retries = max_retries if max_retries is not None else _DEFAULT_MAX_RUBRIC_RETRIES
     # ── Stage 0: GenreNormalizerAgent ─────────────────────────────────────
     genre_cfg = get_agent_config("genre_normalizer")

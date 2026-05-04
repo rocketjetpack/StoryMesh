@@ -21,6 +21,7 @@ def generate_synopsis(
     max_retries: int | None = None,
     min_retries: int = 0,
     skip_resonance_review: bool = True,
+    prompt_style: str | None = None,
 ) -> GenerationResult:
     """High-level API function to generate a fiction synopsis from the given prompt.
 
@@ -32,6 +33,8 @@ def generate_synopsis(
         can proceed. Default 0.
     :param skip_resonance_review: When True (default), skip the resonance reviewer
         stage. Set to False by ``high`` and ``very_high`` quality presets.
+    :param prompt_style: Optional prompt style name. When ``None``, uses the
+        configured default style.
     :return: A GenerationResult containing the generated synopsis and related metadata.
     """
     pipeline = StoryMeshPipeline(
@@ -39,5 +42,6 @@ def generate_synopsis(
         max_retries=max_retries,
         min_retries=min_retries,
         skip_resonance_review=skip_resonance_review,
+        prompt_style=prompt_style,
     )
     return pipeline.generate(user_prompt)

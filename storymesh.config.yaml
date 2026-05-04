@@ -17,6 +17,9 @@ llm:
   default_max_tokens: 2048
   default_temperature: 1.0
 
+prompts:
+  style: default
+
 # ------
 # Per-Agent overrides
 # ------

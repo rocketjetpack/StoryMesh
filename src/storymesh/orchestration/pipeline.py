@@ -34,6 +34,7 @@ class StoryMeshPipeline:
         max_retries: int | None = None,
         min_retries: int = 0,
         skip_resonance_review: bool = True,
+        prompt_style: str | None = None,
     ) -> None:
         # Graph is built on the first generate() call to defer config loading.
         self._graph: Any = None
@@ -44,6 +45,8 @@ class StoryMeshPipeline:
         self._max_retries = max_retries
         self._min_retries = min_retries
         self._skip_resonance_review = skip_resonance_review
+        self._prompt_style = prompt_style
+        self._resolved_prompt_style: str | None = None
 
     def generate(self, user_prompt: str) -> GenerationResult:
         """Run the StoryMesh pipeline for the given prompt.
@@ -58,17 +61,26 @@ class StoryMeshPipeline:
         :rtype: GenerationResult
         """
         if self._graph is None:
-            from storymesh.config import get_config, warn_missing_provider_keys  # noqa: PLC0415
+            from storymesh.config import (  # noqa: PLC0415
+                get_config,
+                get_prompt_style,
+                warn_missing_provider_keys,
+            )
             from storymesh.orchestration.graph import build_graph  # noqa: PLC0415
 
             warn_missing_provider_keys(get_config())
+            resolved_prompt_style = self._prompt_style or get_prompt_style()
+            self._resolved_prompt_style = resolved_prompt_style
             self._graph = build_graph(
                 artifact_store=self._artifact_store,
                 pass_threshold=self._pass_threshold,
                 max_retries=self._max_retries,
                 min_retries=self._min_retries,
                 skip_resonance_review=self._skip_resonance_review,
+                prompt_style=resolved_prompt_style,
             )
+        else:
+            resolved_prompt_style = self._resolved_prompt_style or "default"
 
         # Generate run_id before invocation so metadata is on disk even if the
         # graph crashes mid-run (enables partial-run post-mortem inspection).
@@ -82,6 +94,7 @@ class StoryMeshPipeline:
             "pipeline_version": storymesh_version,
             "timestamp": run_timestamp,
             "run_id": run_id,
+            "prompt_style": resolved_prompt_style,
         })
 
         initial_state: StoryMeshState = {
@@ -130,6 +143,7 @@ class StoryMeshPipeline:
             "timestamp": run_timestamp,
             "run_id": run_id,
             "stage_timings": stage_timings,
+            "prompt_style": resolved_prompt_style,
         })
 
         assembler_output = final_state.get("book_assembler_output")
@@ -141,6 +155,7 @@ class StoryMeshPipeline:
             "run_dir": str(self._artifact_store.runs_dir / run_id),
             "pdf_path": assembler_output.pdf_path if assembler_output else "",
             "epub_path": assembler_output.epub_path if assembler_output else "",
+            "prompt_style": resolved_prompt_style,
         }
 
         # If genre normalization failed, the graph short-circuits to END and

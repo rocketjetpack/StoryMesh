@@ -352,3 +352,17 @@ def get_agent_config(agent_name: str) -> dict[str, Any]:
     result.setdefault("max_tokens", llm_defaults.get("default_max_tokens"))
 
     return result
+
+
+def get_prompt_style() -> str:
+    """Return the configured prompt style name."""
+    config = get_config()
+    prompts_section = config.get("prompts", {})
+    style = prompts_section.get("style", "default")
+    if not isinstance(style, str) or not style.strip():
+        logger.warning(
+            "Invalid prompts.style value %r in config; using 'default'.",
+            style,
+        )
+        return "default"
+    return style.strip()

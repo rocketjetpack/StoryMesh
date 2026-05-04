@@ -64,6 +64,13 @@ def generate(
             "'very_high' (2 mandatory revisions, threshold=9).",
         ),
     ] = "standard",
+    prompt_style: Annotated[
+        str | None,
+        typer.Option(
+            "--prompt-style",
+            help="Prompt style to use. Defaults to the configured prompts.style value.",
+        ),
+    ] = None,
 ) -> None:
     """Generate an original fiction synopsis from the given prompt."""
     if quality not in _QUALITY_PRESETS:
@@ -81,11 +88,13 @@ def generate(
         max_retries=max_retries,
         min_retries=min_retries,
         skip_resonance_review=not enable_resonance,
+        prompt_style=prompt_style,
     )
 
     meta = result.metadata
     run_id: str = str(meta.get("run_id", "unknown"))
     version: str = str(meta.get("pipeline_version", "?"))
+    active_prompt_style: str = str(meta.get("prompt_style", "default"))
     stage_timings_raw = meta.get("stage_timings", {})
     stage_timings: dict[str, float] = stage_timings_raw if isinstance(stage_timings_raw, dict) else {}
     run_dir = Path(str(meta.get("run_dir", "")))
@@ -94,7 +103,8 @@ def generate(
     console.print(
         Panel(
             f"[bold]StoryMesh v{version}[/bold]  Run [dim]{run_id}[/dim]\n"
-            f'Input: "[italic]{user_prompt}[/italic]"',
+            f'Input: "[italic]{user_prompt}[/italic]"\n'
+            f"Prompt style: [dim]{active_prompt_style}[/dim]",
             expand=False,
         )
     )
