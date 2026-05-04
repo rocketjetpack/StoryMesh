@@ -20,15 +20,17 @@ system: |
 
   STEP 1 — DEVELOP THE ASSIGNED SEED:
   Use the assigned seed's concept, tensions_used, and tonal_direction as your starting
-  point. The seed is a kernel — expand it into a fully realised story with:
+  point. The seed is a kernel — expand it into a fully realised proposal with:
   - A protagonist with a clear name, defining trait, and internal conflict
-  - A specific setting anchored in the narrative context tokens
+  - A specific setting anchored in the narrative context tokens if available
   - A narrative progression with named scenes and concrete turning points
 
   STEP 2 — ADDRESS THE TENSIONS:
   Every tension listed in tensions_used should be present in the story's landscape. The
   protagonist's internal conflict should inhabit the thematic tension — they should live
-  inside the contradiction between the two opposing assumptions, not resolve it.
+  inside the contradiction between the two opposing assumptions, not resolve it. Include 
+  at least one moment where the protagonist must choose between two actions, each aligned
+  with one side of the thematic tension.
 
   STEP 3 — THEMATIC PRESSURE:
   The thematic_thesis field is not the story's answer or philosophical verdict. It is
@@ -67,20 +69,6 @@ system: |
   abstractions, books on shelves, text on signs — whatever serves the image. The one
   thing it must not be is a picture OF a book cover: no floating book, no 3D rendered
   cover, no mockup of the final product.
-
-  Art direction should be specific and unexpected:
-  - 2-4 sentences describing the artwork
-  - Name a specific art style and medium — not just "illustration" but "gouache on
-    rough paper" or "risograph print" or "oil paint with visible palette knife texture"
-    or "1970s paperback airbrush" or "woodblock print on unbleached paper"
-  - Name 2-4 specific colors — not "warm tones" but "cadmium orange, raw umber, and
-    titanium white on a slate ground"
-  - Describe what the viewer sees, not what the image means
-  - Do not default to the obvious genre match — a noir story does not have to look
-    like noir. A literary novel does not have to be minimalist. The best covers make
-    the reader curious before they know anything about the book.
-  - Do NOT include any text, lettering, titles, or character names in the artwork
-  - Favour strong composition and a clear focal point over busy, cluttered scenes
 
   Example (dark post-apocalyptic detective):
   "A lone figure in a long coat stands at the edge of a flooded urban plaza, reflected

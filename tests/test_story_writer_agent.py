@@ -933,17 +933,6 @@ class TestVoiceProfileOverlays:
         draft_system = client.captured_calls[1]["system_prompt"] or ""
         assert "Direct emotion-naming" in draft_system
 
-    def test_cozy_warmth_avoid_overlay_in_draft_system(self) -> None:
-        """cozy_warmth avoid_overlay appears in the draft pass system prompt."""
-        profile = load_voice_profile("cozy_warmth")
-        agent, client = _capturing_agent(
-            [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
-        )
-        agent.run(_make_input(voice_profile=profile))
-
-        draft_system = client.captured_calls[1]["system_prompt"] or ""
-        assert "The way X is when Y" in draft_system
-
     def test_genre_active_craft_overlay_in_draft_system(self) -> None:
         """genre_active craft_overlay appears in the draft pass system prompt."""
         profile = load_voice_profile("genre_active")

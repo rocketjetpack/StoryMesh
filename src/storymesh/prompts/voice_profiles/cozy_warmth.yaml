@@ -43,29 +43,28 @@ genre_keywords:
   - picture_book
 
 craft_overlay: |
-  10. Direct emotion-naming is permitted and often preferable.
+  12. Direct emotion-naming is permitted and often preferable.
      "Wren felt warm all the way to her toes" is a complete sentence. It does
      not need to be performed by a comparator or enacted through physical symptom.
      Reserve action-based emotion for moments where the action genuinely reveals
      more than the name would.
 
-  11. Repetition is form, not failure.
+  13. Repetition is form, not failure.
      In cozy and bedtime narratives, repeating a phrase, a refrain, or a sensory
      anchor is comforting and intentional. Do not vary for variation's sake.
      Let the repeated thing deepen each time it returns.
 
-  12. Softness is not vagueness.
+  14. Softness is not vagueness.
      A gentle story is still specific. Name the exact colour of the blanket, the
      exact sound the fire makes, the exact way the character folds their hands.
      Warmth lives in the specific detail, not in soft adjectives.
 
-  13. Pattern and fulfilment.
+  15. Pattern and fulfilment.
      Cozy narratives often satisfy by completing a gentle pattern: the lost thing
      is found, the worry dissolves, the creature arrives at home. Let the
      resolution feel earned and quiet, not dramatic.
 
 avoid_overlay: |
-  - "The way X is when Y" simile structures — they create cognitive friction that works against warmth
   - Philosophical paragraph cappers ("This was what it meant to be...")
   - Dark, decaying, or sterile imagery (ruins, collapse, decay, blood, cold procedural detail)
   - Sentence-fragment paragraphs used as dramatic beats
