@@ -261,7 +261,7 @@ class CoverArtAgent:
             openai.OpenAIError: On API-level failures from the image provider.
             ValueError: If the image provider returns an unexpected response.
         """
-        logger.info(
+        logger.debug(
             "CoverArtAgent starting | title=%r model=%s size=%s quality=%s",
             input_data.title,
             self._image_client.model,
@@ -281,7 +281,7 @@ class CoverArtAgent:
 
         composed_bytes = _safe_compose_cover_text(result.image_bytes, input_data.title, _BYLINE)
 
-        logger.info(
+        logger.debug(
             "CoverArtAgent complete | latency_ms=%d revised=%s",
             latency_ms,
             result.revised_prompt is not None,

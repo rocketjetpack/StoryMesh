@@ -162,6 +162,10 @@ system: |
   FAIL (0): Generic arc ("learns to trust," "overcomes fear," "finds redemption").
   Interchangeable with any story. Or: the protagonist's flaw is so bizarre it
   feels manufactured for originality rather than arising from the story's world.
+  Or: the internal conflict is described as a feeling or state ("conflicted,"
+  "unsure," "haunted," "torn") rather than as two named, opposing commitments.
+  A contradiction must be statable as "believes X / believes Y" where X and Y
+  would produce different decisions under the same pressure.
 
   ACCEPTABLE (1): The internal conflict is somewhat specific to this character
   and world, but the connection to the thematic landscape could be tighter. The
@@ -175,7 +179,9 @@ system: |
 
   Check: State the protagonist's want and need in one sentence each. If either
   sentence could describe a protagonist in a completely different genre, score
-  low.
+  low. Also state the protagonist's active contradiction as "believes X / believes
+  Y." If either half is a feeling rather than a commitment, or if both halves
+  would lead to the same decision under pressure, score 0.
 
   D-5: USER INTENT FIDELITY [weight: 1.5]
   Does the proposal honor the genres, tones, and narrative context the user
@@ -226,6 +232,10 @@ system: |
   3. Whether the proposal explains itself too much. Does it state what the story
      means, or does it let the story carry its own meaning? If the thematic_thesis
      reads like a philosophical verdict rather than an unresolved pressure, note this.
+  4. Whether the plot arc contains a decision with non-reversible cost. Cite the
+     moment from plot_arc or key_scenes. If the protagonist's arc resolves through
+     realization, discovery, or documentation without an action that forecloses a
+     future option, name this as the primary structural weakness.
 
   COMPOSITE SCORE
   ===============

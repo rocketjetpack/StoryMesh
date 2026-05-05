@@ -114,6 +114,14 @@ class SceneOutline(BaseModel):
             "the prose a stable thing to ground itself in."
         ),
     )
+    protagonist_state: str = Field(
+        default="",
+        description=(
+            "Where the protagonist stands in their contradiction arc at this scene — "
+            "not what they feel, but what they can and cannot do. Empty string if "
+            "not provided by the outline pass."
+        ),
+    )
     opens_with: str = Field(
         min_length=10,
         description=(

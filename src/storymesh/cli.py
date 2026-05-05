@@ -1,9 +1,15 @@
+import random
 import shutil
+import threading
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any
 
+import orjson
 import typer
 from rich.console import Console
+from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 
@@ -18,6 +24,7 @@ from storymesh.core.run_inspector import (
     StageStatus,
 )
 from storymesh.exceptions import RunNotFoundError
+from storymesh.llm.base import current_run_id
 from storymesh.versioning import AGENT_VERSIONS, SCHEMA_VERSIONS
 from storymesh.versioning import __version__ as storymesh_version
 
@@ -46,6 +53,319 @@ _STAGE_NAMES = [
     "cover_art",           # Stage 7
     "book_assembler",      # Stage 8
 ]
+
+_BASELINE_SYSTEM_PROMPT = """\
+You are a fiction writer. Write one complete short story in a single pass.
+
+Priorities:
+1. Satisfy the user's request faithfully.
+2. Tell a coherent, specific story with natural prose.
+3. Aim for approximately the requested target length.
+4. Prefer concrete action, image, dialogue, and scene over abstract explanation.
+5. Let the story carry its themes implicitly rather than explaining them directly.
+
+Return ONLY a valid JSON object with this shape:
+{
+  "full_draft": "<the complete short story>"
+}
+"""
+
+_BASELINE_USER_TEMPLATE = """\
+USER PROMPT: "{user_prompt}"
+
+TARGET LENGTH: approximately {target_words} words
+
+Write a complete short story that fulfills the user's request. The prose should
+feel natural and human-written. Return only the JSON object.
+"""
+
+
+def _build_blinded_eval_packet(
+    *,
+    run_id: str,
+    user_prompt: str,
+    storymesh_draft: str,
+    storymesh_word_count: int,
+    baseline_draft: str,
+    baseline_word_count: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Create a randomized A/B packet plus a separate answer key."""
+    candidates = [
+        {
+            "id": "A",
+            "source": "storymesh",
+            "full_draft": storymesh_draft,
+            "word_count": storymesh_word_count,
+        },
+        {
+            "id": "B",
+            "source": "baseline",
+            "full_draft": baseline_draft,
+            "word_count": baseline_word_count,
+        },
+    ]
+    random.SystemRandom().shuffle(candidates)
+
+    blinded_candidates = [
+        {
+            "id": candidate["id"],
+            "full_draft": candidate["full_draft"],
+            "word_count": candidate["word_count"],
+        }
+        for candidate in candidates
+    ]
+
+    packet = {
+        "packet_version": "1.0",
+        "run_id": run_id,
+        "user_prompt": user_prompt,
+        "instructions": (
+            "Two candidate stories were generated from the same user prompt. "
+            "Evaluate them without assuming which system produced which story."
+        ),
+        "candidates": blinded_candidates,
+    }
+    answer_key = {
+        "packet_version": "1.0",
+        "run_id": run_id,
+        "mapping": {
+            candidate["id"]: candidate["source"] for candidate in candidates
+        },
+    }
+    return packet, answer_key
+
+
+def _format_duration(seconds: float) -> str:
+    """Render seconds as a compact human-friendly duration string."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, rem = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{int(minutes)}m {int(rem):02d}s"
+    hours, rem = divmod(minutes, 60)
+    return f"{int(hours)}h {int(rem):02d}m"
+
+
+def _run_with_live_status[T](label: str, fn: Callable[[], T]) -> tuple[T, float]:
+    """Run a callable in a worker thread while showing elapsed time in the CLI."""
+    result_box: dict[str, Any] = {}
+    error_box: dict[str, BaseException] = {}
+
+    def _target() -> None:
+        try:
+            result_box["value"] = fn()
+        except BaseException as exc:  # noqa: BLE001
+            error_box["error"] = exc
+
+    thread = threading.Thread(target=_target, daemon=True)
+    t0 = time.perf_counter()
+    thread.start()
+
+    with console.status(f"{label} [dim]{_format_duration(0.0)}[/dim]") as status:
+        while thread.is_alive():
+            elapsed = time.perf_counter() - t0
+            status.update(f"{label} [dim]{_format_duration(elapsed)}[/dim]")
+            thread.join(timeout=0.1)
+
+    elapsed = time.perf_counter() - t0
+    if "error" in error_box:
+        raise error_box["error"]
+    return result_box["value"], elapsed
+
+
+def _find_active_run_dir(store: ArtifactStore, started_at: float) -> Path | None:
+    """Best-effort detection of the run directory being created right now."""
+    for run_id in store.list_run_ids():
+        candidate = store.runs_dir / run_id
+        try:
+            if candidate.stat().st_mtime >= started_at - 1.0:
+                return candidate
+        except FileNotFoundError:
+            continue
+    return None
+
+
+def _read_last_llm_agent(run_dir: Path) -> str | None:
+    """Return the agent name from the last llm_calls.jsonl line, if any."""
+    path = run_dir / "llm_calls.jsonl"
+    if not path.exists():
+        return None
+    lines = path.read_bytes().splitlines()
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            raw = orjson.loads(line)
+            if isinstance(raw, dict):
+                return str(raw.get("agent", "")) or None
+        except Exception:
+            continue
+    return None
+
+
+def _infer_stage_statuses(run_dir: Path | None) -> tuple[dict[str, str], str | None]:
+    """Infer per-stage statuses from artifact files and recent LLM activity."""
+    statuses = {stage: "pending" for stage in _STAGE_NAMES}
+    if run_dir is None:
+        return statuses, None
+
+    for stage in _STAGE_NAMES:
+        if (run_dir / f"{stage}_output.json").exists():
+            statuses[stage] = "done"
+
+    active_stage = _read_last_llm_agent(run_dir)
+    if active_stage not in statuses:
+        active_stage = None
+
+    if active_stage is None:
+        for stage in _STAGE_NAMES:
+            if statuses[stage] != "done":
+                active_stage = stage
+                break
+
+    if active_stage is not None and statuses.get(active_stage) != "done":
+        statuses[active_stage] = "running"
+
+    return statuses, active_stage
+
+
+def _render_live_stage_table(
+    *,
+    label: str,
+    elapsed_seconds: float,
+    statuses: dict[str, str],
+    active_stage: str | None,
+) -> Table:
+    """Build the live per-stage status table shown during generation."""
+    table = Table(
+        show_header=True,
+        header_style="bold",
+        pad_edge=False,
+        padding=(0, 1),
+        title=f"{label} ({_format_duration(elapsed_seconds)})",
+    )
+    table.add_column("Stage", min_width=22)
+    table.add_column("Status", min_width=12)
+
+    for stage in _STAGE_NAMES:
+        status = statuses.get(stage, "pending")
+        if status == "done":
+            status_text = "[green]done[/green]"
+        elif status == "running":
+            status_text = "[yellow]running[/yellow]"
+        else:
+            status_text = "[dim]pending[/dim]"
+        stage_label = stage
+        if stage == active_stage and status != "done":
+            stage_label = f"{stage} [dim](active)[/dim]"
+        table.add_row(stage_label, status_text)
+
+    return table
+
+
+def _run_with_stage_progress[T](label: str, fn: Callable[[], T]) -> tuple[T, float]:
+    """Run StoryMesh with a live per-stage table and elapsed-time heartbeat."""
+    result_box: dict[str, Any] = {}
+    error_box: dict[str, BaseException] = {}
+    store = ArtifactStore()
+
+    def _target() -> None:
+        try:
+            result_box["value"] = fn()
+        except BaseException as exc:  # noqa: BLE001
+            error_box["error"] = exc
+
+    thread = threading.Thread(target=_target, daemon=True)
+    started_at = time.time()
+    t0 = time.perf_counter()
+    thread.start()
+
+    with Live(console=console, refresh_per_second=8, transient=True) as live:
+        while thread.is_alive():
+            run_dir = _find_active_run_dir(store, started_at)
+            statuses, active_stage = _infer_stage_statuses(run_dir)
+            elapsed = time.perf_counter() - t0
+            live.update(
+                _render_live_stage_table(
+                    label=label,
+                    elapsed_seconds=elapsed,
+                    statuses=statuses,
+                    active_stage=active_stage,
+                )
+            )
+            thread.join(timeout=0.125)
+
+    elapsed = time.perf_counter() - t0
+    if "error" in error_box:
+        raise error_box["error"]
+    return result_box["value"], elapsed
+
+
+def _load_llm_usage_summary(
+    store: ArtifactStore,
+    run_id: str,
+    *,
+    include_agents: set[str] | None = None,
+    exclude_agents: set[str] | None = None,
+) -> dict[str, int]:
+    """Summarize rough LLM usage from ``llm_calls.jsonl`` for one run."""
+    raw = store.load_run_file(run_id, "llm_calls.jsonl")
+    if raw is None:
+        return {
+            "calls": 0,
+            "approx_prompt_tokens": 0,
+            "approx_response_tokens": 0,
+            "approx_total_tokens": 0,
+            "parse_failures": 0,
+            "latency_ms": 0,
+        }
+
+    calls = 0
+    prompt_tokens = 0
+    response_tokens = 0
+    total_tokens = 0
+    parse_failures = 0
+    latency_ms = 0
+
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        record = orjson.loads(line)
+        if not isinstance(record, dict):
+            continue
+        agent = str(record.get("agent", ""))
+        if include_agents is not None and agent not in include_agents:
+            continue
+        if exclude_agents is not None and agent in exclude_agents:
+            continue
+        calls += 1
+        prompt_tokens += int(record.get("approx_prompt_tokens", 0) or 0)
+        response_tokens += int(record.get("approx_response_tokens", 0) or 0)
+        total_tokens += int(record.get("approx_total_tokens", 0) or 0)
+        latency_ms += int(record.get("latency_ms", 0) or 0)
+        if not bool(record.get("parse_success", False)):
+            parse_failures += 1
+
+    return {
+        "calls": calls,
+        "approx_prompt_tokens": prompt_tokens,
+        "approx_response_tokens": response_tokens,
+        "approx_total_tokens": total_tokens,
+        "parse_failures": parse_failures,
+        "latency_ms": latency_ms,
+    }
+
+
+def _render_usage_line(label: str, usage: dict[str, int]) -> str:
+    """Format one compact CLI line for rough LLM usage."""
+    latency = _format_duration(usage["latency_ms"] / 1000) if usage["latency_ms"] else "0.0s"
+    return (
+        f"{label}: {usage['calls']} call(s), "
+        f"~{usage['approx_prompt_tokens']:,} prompt / "
+        f"~{usage['approx_response_tokens']:,} response / "
+        f"~{usage['approx_total_tokens']:,} total tokens, "
+        f"{latency} model time"
+    )
 
 
 @app.command()
@@ -82,13 +402,16 @@ def generate(
         raise typer.Exit(code=1)
 
     pass_threshold, max_retries, min_retries, enable_resonance = _QUALITY_PRESETS[quality]
-    result = generate_synopsis(
-        user_prompt,
-        pass_threshold=pass_threshold,
-        max_retries=max_retries,
-        min_retries=min_retries,
-        skip_resonance_review=not enable_resonance,
-        prompt_style=prompt_style,
+    result, wall_clock = _run_with_stage_progress(
+        "StoryMesh pipeline",
+        lambda: generate_synopsis(
+            user_prompt,
+            pass_threshold=pass_threshold,
+            max_retries=max_retries,
+            min_retries=min_retries,
+            skip_resonance_review=not enable_resonance,
+            prompt_style=prompt_style,
+        ),
     )
 
     meta = result.metadata
@@ -151,9 +474,285 @@ def generate(
 
     if run_dir != Path("") and run_dir.exists():
         console.print(f"Artifacts saved to: [dim]{run_dir}[/dim]")
+        store = ArtifactStore()
+        usage = _load_llm_usage_summary(store, run_id)
+        if usage["calls"]:
+            console.print(_render_usage_line("LLM usage (approx)", usage))
+        console.print(f"Wall clock: [dim]{_format_duration(wall_clock)}[/dim]")
+
+
+@app.command()
+def compare(
+    user_prompt: str = typer.Argument(
+        ...,
+        help="Describe the fiction you want to compare StoryMesh against a single-call baseline for.",
+    ),
+    quality: Annotated[
+        str,
+        typer.Option(
+            "--quality",
+            "-q",
+            help="Quality preset for the StoryMesh run: 'draft', 'standard', 'high', or 'very_high'.",
+        ),
+    ] = "standard",
+    prompt_style: Annotated[
+        str | None,
+        typer.Option(
+            "--prompt-style",
+            help="Prompt style for the StoryMesh run. Defaults to the configured prompts.style value.",
+        ),
+    ] = None,
+    baseline_provider: Annotated[
+        str | None,
+        typer.Option(
+            "--baseline-provider",
+            help="Override provider for the single-call baseline. Defaults to story_writer provider.",
+        ),
+    ] = None,
+    baseline_model: Annotated[
+        str | None,
+        typer.Option(
+            "--baseline-model",
+            help="Override model for the single-call baseline. Defaults to story_writer model.",
+        ),
+    ] = None,
+    baseline_temperature: Annotated[
+        float | None,
+        typer.Option(
+            "--baseline-temperature",
+            help="Override temperature for the single-call baseline. Defaults to story_writer draft_temperature.",
+        ),
+    ] = None,
+    baseline_max_tokens: Annotated[
+        int | None,
+        typer.Option(
+            "--baseline-max-tokens",
+            help="Override max_tokens for the single-call baseline. Defaults to story_writer draft_max_tokens.",
+        ),
+    ] = None,
+) -> None:
+    """Run StoryMesh and a one-shot baseline for the same prompt."""
+    if quality not in _QUALITY_PRESETS:
+        valid = ", ".join(sorted(_QUALITY_PRESETS))
+        console.print(
+            f"[bold red]Error:[/bold red] Unknown quality preset {quality!r}. "
+            f"Valid options: {valid}"
+        )
+        raise typer.Exit(code=1)
+
+    pass_threshold, max_retries, min_retries, enable_resonance = _QUALITY_PRESETS[quality]
+    result, storymesh_wall_clock = _run_with_stage_progress(
+        "StoryMesh pipeline",
+        lambda: generate_synopsis(
+            user_prompt,
+            pass_threshold=pass_threshold,
+            max_retries=max_retries,
+            min_retries=min_retries,
+            skip_resonance_review=not enable_resonance,
+            prompt_style=prompt_style,
+        ),
+    )
+
+    meta = result.metadata
+    run_id = str(meta.get("run_id", ""))
+    if not run_id:
+        console.print("[bold red]Error:[/bold red] StoryMesh run did not produce a run_id.")
+        raise typer.Exit(code=1)
+
+    store = ArtifactStore()
+    try:
+        story_output = _load_story_writer_output(store, run_id)
+        storymesh_draft = str(story_output.get("full_draft", "")).strip()
+        storymesh_word_count = int(story_output.get("word_count", 0))
+
+        if not storymesh_draft or storymesh_word_count <= 0:
+            raise RuntimeError(
+                "StoryMesh run did not produce a usable story draft for comparison."
+            )
+
+        baseline, baseline_wall_clock = _run_with_live_status(
+            "Running single-call baseline...",
+            lambda: _run_single_call_baseline(
+                store=store,
+                run_id=run_id,
+                user_prompt=user_prompt,
+                target_words=storymesh_word_count,
+                provider_override=baseline_provider,
+                model_override=baseline_model,
+                temperature_override=baseline_temperature,
+                max_tokens_override=baseline_max_tokens,
+            ),
+        )
+    except RuntimeError as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    comparison_data = {
+        "user_prompt": user_prompt,
+        "quality": quality,
+        "storymesh": {
+            "run_id": run_id,
+            "prompt_style": meta.get("prompt_style", "default"),
+            "word_count": storymesh_word_count,
+            "final_synopsis": result.final_synopsis,
+        },
+        "baseline": {
+            "provider": baseline["provider"],
+            "model": baseline["model"],
+            "temperature": baseline["temperature"],
+            "max_tokens": baseline["max_tokens"],
+            "target_words": storymesh_word_count,
+            "word_count": baseline["word_count"],
+            "wall_clock_seconds": round(baseline_wall_clock, 3),
+        },
+    }
+    store.save_run_file(run_id, "comparison.json", comparison_data)
+    blinded_packet, answer_key = _build_blinded_eval_packet(
+        run_id=run_id,
+        user_prompt=user_prompt,
+        storymesh_draft=storymesh_draft,
+        storymesh_word_count=storymesh_word_count,
+        baseline_draft=str(baseline["full_draft"]),
+        baseline_word_count=int(baseline["word_count"]),
+    )
+    store.save_run_file(run_id, "blinded_eval_packet.json", blinded_packet)
+    store.save_run_file(run_id, "blinded_eval_key.json", answer_key)
+
+    run_dir = Path(str(meta.get("run_dir", "")))
+    console.print(
+        Panel(
+            f"[bold]StoryMesh vs Single-Call Baseline[/bold]\n"
+            f'Input: "[italic]{user_prompt}[/italic]"\n'
+            f"Run: [dim]{run_id}[/dim]\n"
+            f"StoryMesh words: [dim]{storymesh_word_count}[/dim]\n"
+            f"Baseline words: [dim]{baseline['word_count']}[/dim]\n"
+            f"Baseline model: [dim]{baseline['provider']} / {baseline['model']}[/dim]",
+            expand=False,
+        )
+    )
+    console.print()
+    console.print(f"Comparison artifacts saved to: [dim]{run_dir}[/dim]")
+    console.print(f"  - [dim]{run_dir / 'story_writer_output.json'}[/dim]")
+    console.print(f"  - [dim]{run_dir / 'baseline_output.json'}[/dim]")
+    console.print(f"  - [dim]{run_dir / 'comparison.json'}[/dim]")
+    console.print(f"  - [dim]{run_dir / 'blinded_eval_packet.json'}[/dim]")
+    console.print(f"  - [dim]{run_dir / 'blinded_eval_key.json'}[/dim]")
+    storymesh_usage = _load_llm_usage_summary(
+        store,
+        run_id,
+        exclude_agents={"compare_baseline"},
+    )
+    baseline_usage = _load_llm_usage_summary(
+        store,
+        run_id,
+        include_agents={"compare_baseline"},
+    )
+    if storymesh_usage["calls"]:
+        console.print(_render_usage_line("StoryMesh LLM usage (approx)", storymesh_usage))
+    if baseline_usage["calls"]:
+        console.print(_render_usage_line("Baseline LLM usage (approx)", baseline_usage))
+    console.print(
+        "Wall clock: "
+        f"[dim]StoryMesh {_format_duration(storymesh_wall_clock)}[/dim], "
+        f"[dim]baseline {_format_duration(baseline_wall_clock)}[/dim]"
+    )
 
 
 _RERUN_SUPPORTED_STAGES = {"cover_art", "book_assembler"}
+
+
+def _load_story_writer_output(store: ArtifactStore, run_id: str) -> dict[str, Any]:
+    """Load story_writer_output.json for a completed run."""
+    raw = store.load_run_file(run_id, "story_writer_output.json")
+    if raw is None:
+        raise RuntimeError(
+            f"No story_writer_output.json found for run {run_id!r}."
+        )
+    data = orjson.loads(raw)
+    if not isinstance(data, dict):
+        raise RuntimeError(
+            f"story_writer_output.json for run {run_id!r} is not a JSON object."
+        )
+    return data
+
+
+def _run_single_call_baseline(
+    *,
+    store: ArtifactStore,
+    run_id: str,
+    user_prompt: str,
+    target_words: int,
+    provider_override: str | None,
+    model_override: str | None,
+    temperature_override: float | None,
+    max_tokens_override: int | None,
+) -> dict[str, Any]:
+    """Generate one baseline story via a single LLM call and persist it."""
+    from storymesh.config import get_agent_config  # noqa: PLC0415
+    from storymesh.orchestration.graph import _build_llm_client  # noqa: PLC0415
+
+    story_writer_cfg = get_agent_config("story_writer")
+    baseline_cfg = dict(story_writer_cfg)
+    if provider_override is not None:
+        baseline_cfg["provider"] = provider_override
+    if model_override is not None:
+        baseline_cfg["model"] = model_override
+
+    temperature = (
+        temperature_override
+        if temperature_override is not None
+        else float(story_writer_cfg.get("draft_temperature", story_writer_cfg.get("temperature", 0.8)))
+    )
+    max_tokens = (
+        max_tokens_override
+        if max_tokens_override is not None
+        else int(story_writer_cfg.get("draft_max_tokens", story_writer_cfg.get("max_tokens", 8000)))
+    )
+
+    llm_client = _build_llm_client(
+        baseline_cfg,
+        agent_name="compare_baseline",
+        artifact_store=store,
+    )
+    if llm_client is None:
+        raise RuntimeError(
+            "No LLM client available for the single-call baseline. "
+            "Check provider configuration and API keys."
+        )
+
+    user_prompt_text = _BASELINE_USER_TEMPLATE.format(
+        user_prompt=user_prompt,
+        target_words=target_words,
+    )
+
+    token = current_run_id.set(run_id)
+    try:
+        response = llm_client.complete_json(
+            user_prompt_text,
+            system_prompt=_BASELINE_SYSTEM_PROMPT,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+    finally:
+        current_run_id.reset(token)
+
+    full_draft = str(response.get("full_draft", "")).strip()
+    if not full_draft:
+        raise RuntimeError("Single-call baseline returned an empty draft.")
+
+    baseline_output = {
+        "provider": baseline_cfg.get("provider"),
+        "model": baseline_cfg.get("model"),
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "target_words": target_words,
+        "full_draft": full_draft,
+        "word_count": len(full_draft.split()),
+        "system_prompt": _BASELINE_SYSTEM_PROMPT,
+        "user_prompt": user_prompt_text,
+    }
+    store.save_run_file(run_id, "baseline_output.json", baseline_output)
+    return baseline_output
 
 
 @app.command()
@@ -633,12 +1232,18 @@ def _render_llm_summary(report: RunInspection) -> None:
     table.add_column("Model", min_width=24)
     table.add_column("Attempt", min_width=7)
     table.add_column("Latency (ms)", min_width=12)
+    table.add_column("Approx Tokens", min_width=13)
     table.add_column("Parse OK", min_width=8)
 
     for call in report.llm_calls:
         latency = f"{call.latency_ms:.0f}" if call.latency_ms is not None else "—"
+        approx_tokens = (
+            str(call.approx_total_tokens)
+            if call.approx_total_tokens is not None
+            else "—"
+        )
         parse_ok = "[green]✓[/green]" if call.parse_success else "[red]✗[/red]"
-        table.add_row(call.agent, call.model, str(call.attempt), latency, parse_ok)
+        table.add_row(call.agent, call.model, str(call.attempt), latency, approx_tokens, parse_ok)
 
     console.print(table)
     console.print()

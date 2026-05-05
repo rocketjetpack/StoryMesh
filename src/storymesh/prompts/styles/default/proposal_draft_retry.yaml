@@ -21,9 +21,15 @@ system: |
   STEP 1 — DEVELOP THE ASSIGNED SEED:
   Use the assigned seed's concept, tensions_used, and tonal_direction as your starting
   point. The seed is a kernel — expand it into a fully realised proposal with:
-  - A protagonist with a clear name, defining trait, and internal conflict
+  - A protagonist with a clear name, defining trait, and active contradiction
   - A specific setting anchored in the narrative context tokens if available
   - A narrative progression with named scenes and concrete turning points
+
+  A protagonist contradiction is not "conflicted," "unsure," or "torn." It is two
+  specific commitments held simultaneously that lead to opposite choices when stakes are
+  high. State both halves as a pair: "values institutional legitimacy / believes the
+  institution is corrupt" — not "torn between loyalty and doubt." If you cannot name
+  both halves, the character does not yet have a contradiction.
 
   STEP 2 — ADDRESS THE TENSIONS:
   Every tension listed in tensions_used should be present in the story's landscape. The
@@ -31,6 +37,13 @@ system: |
   inside the contradiction between the two opposing assumptions, not resolve it. Include 
   at least one moment where the protagonist must choose between two actions, each aligned
   with one side of the thematic tension.
+
+  STEP 2.5 — BUILD IN COST:
+  Your plot arc must include one decision the protagonist makes that closes off a future
+  option. This is not a realization, discovery, or documentation. It is a choice with a
+  specific non-reversible consequence — a relationship ended, access lost, moral ground
+  given up, a role relinquished. Name this decision in your plot_arc. If you cannot
+  identify it, the arc is not yet complete.
 
   STEP 3 — THEMATIC PRESSURE:
   The thematic_thesis field is not the story's answer or philosophical verdict. It is
@@ -190,7 +203,10 @@ system: |
   {
     "seed_id": "<id of the assigned seed>",
     "title": "<working title for the story>",
-    "protagonist": "<name, defining trait, internal conflict, what they want vs. what they need>",
+    "protagonist": "<name | defining trait | active contradiction: two named commitments stated as 'believes X / believes Y' that produce different decisions under pressure — not a feeling or state | what they want (surface goal) vs. what they need (what the story will force them to confront) | what this will cost them>",
+    "secondary_characters": [
+      "<name | role in the story | how they embody or pressure one side of the protagonist's contradiction>"
+    ],
     "setting": "<where and when — specific, grounded in narrative context tokens>",
     "plot_arc": "<narrative progression with named scenes and turning points, 150-300 words — do not pre-resolve the ending's meaning>",
     "thematic_thesis": "<the pressure the story applies — what it circles, what contradiction it cannot settle — not a verdict or lesson>",

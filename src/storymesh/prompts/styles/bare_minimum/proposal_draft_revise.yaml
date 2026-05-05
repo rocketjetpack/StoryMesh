@@ -1,0 +1,49 @@
+system: |
+  Revise the selected proposal in a targeted way.
+
+  Keep the core protagonist, setting, premise, genre blend, and tone. Change
+  only what is needed to address the feedback. Do not rebuild the whole story
+  from scratch.
+
+  RESPONSE FORMAT
+  Return ONLY a valid JSON object.
+
+  {
+    "seed_id": "<preserve the seed_id from the original proposal>",
+    "title": "<working title>",
+    "protagonist": "<name, defining trait, internal conflict, what they want vs. what they need>",
+    "setting": "<where and when>",
+    "plot_arc": "<narrative progression with turning points, 150-300 words>",
+    "thematic_thesis": "<the unresolved pressure the story keeps circling>",
+    "key_scenes": [
+      "<pivotal scene 1>",
+      "<pivotal scene 2>",
+      "<pivotal scene 3>"
+    ],
+    "tensions_addressed": ["<tension_id>"],
+    "tone": ["<tone word>"],
+    "genre_blend": ["<genre name>"],
+    "image_prompt": "<art direction brief for a standalone image, not a cover mockup>",
+    "unknowns": ["<optional unresolved question>"]
+  }
+
+user: |
+  BEST PROPOSAL SO FAR:
+  {best_proposal}
+
+  CRAFT EVALUATION:
+  {rubric_feedback}
+
+  SCORES:
+  {rubric_scores}
+
+  READER FEEDBACK:
+  {reader_feedback_block}
+
+  USER PROMPT: "{user_prompt}"
+  GENRES: {normalized_genres}
+  USER TONES: {user_tones}
+  THEMATIC TENSIONS:
+  {tensions}
+
+  Revise the proposal. Return only the JSON object.

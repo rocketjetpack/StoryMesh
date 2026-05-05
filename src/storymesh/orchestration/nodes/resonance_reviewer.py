@@ -71,7 +71,7 @@ def make_resonance_reviewer_node(
             raise RuntimeError(msg)
 
         if skip:
-            logger.info(
+            logger.debug(
                 "ResonanceReviewerAgent: skipped (quality preset below high)."
             )
             return {}

@@ -108,14 +108,19 @@ class TestFormatUser:
 
 class TestLoadPrompt:
     def test_loads_valid_yaml(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        _write_prompt_yaml(tmp_path / "test_agent.yaml")
+        default_dir = tmp_path / "styles" / "default"
+        default_dir.mkdir(parents=True)
+        _write_prompt_yaml(default_dir / "test_agent.yaml")
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
+        monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
         pt = load_prompt("test_agent")
         assert pt.system == "You are a test assistant."
 
     def test_format_user_after_load(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        _write_prompt_yaml(tmp_path / "test_agent.yaml", user="Classify: {tokens}")
+        default_dir = tmp_path / "styles" / "default"
+        default_dir.mkdir(parents=True)
+        _write_prompt_yaml(default_dir / "test_agent.yaml", user="Classify: {tokens}")
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
         monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
@@ -147,17 +152,16 @@ class TestLoadPrompt:
         pt = load_prompt("test_agent", style="slim")
         assert pt.system == "Default style system"
 
-    def test_style_falls_back_to_root_prompt(
+    def test_style_missing_and_default_missing_raises(
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        _write_prompt_yaml(tmp_path / "test_agent.yaml", system="Root system")
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
         monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
 
-        pt = load_prompt("test_agent", style="slim")
-        assert pt.system == "Root system"
+        with pytest.raises(FileNotFoundError, match="test_agent"):
+            load_prompt("test_agent", style="slim")
 
     def test_active_prompt_style_is_used(
         self,
@@ -192,7 +196,9 @@ class TestLoadPromptErrors:
             load_prompt("nonexistent_agent")
 
     def test_missing_system_key_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        path = tmp_path / "bad_agent.yaml"
+        default_dir = tmp_path / "styles" / "default"
+        default_dir.mkdir(parents=True)
+        path = default_dir / "bad_agent.yaml"
         path.write_text(yaml.dump({"user": "some template"}))
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
         monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
@@ -201,7 +207,9 @@ class TestLoadPromptErrors:
             load_prompt("bad_agent")
 
     def test_missing_user_key_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        path = tmp_path / "bad_agent.yaml"
+        default_dir = tmp_path / "styles" / "default"
+        default_dir.mkdir(parents=True)
+        path = default_dir / "bad_agent.yaml"
         path.write_text(yaml.dump({"system": "some system prompt"}))
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
         monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
@@ -210,7 +218,9 @@ class TestLoadPromptErrors:
             load_prompt("bad_agent")
 
     def test_empty_system_value_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        path = tmp_path / "bad_agent.yaml"
+        default_dir = tmp_path / "styles" / "default"
+        default_dir.mkdir(parents=True)
+        path = default_dir / "bad_agent.yaml"
         path.write_text(yaml.dump({"system": "", "user": "template"}))
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
         monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
@@ -219,7 +229,9 @@ class TestLoadPromptErrors:
             load_prompt("bad_agent")
 
     def test_empty_user_value_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        path = tmp_path / "bad_agent.yaml"
+        default_dir = tmp_path / "styles" / "default"
+        default_dir.mkdir(parents=True)
+        path = default_dir / "bad_agent.yaml"
         path.write_text(yaml.dump({"system": "valid", "user": ""}))
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
         monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
@@ -228,7 +240,9 @@ class TestLoadPromptErrors:
             load_prompt("bad_agent")
 
     def test_non_dict_yaml_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        path = tmp_path / "bad_agent.yaml"
+        default_dir = tmp_path / "styles" / "default"
+        default_dir.mkdir(parents=True)
+        path = default_dir / "bad_agent.yaml"
         path.write_text("- just\n- a\n- list\n")
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
         monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")
@@ -237,7 +251,9 @@ class TestLoadPromptErrors:
             load_prompt("bad_agent")
 
     def test_invalid_yaml_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        path = tmp_path / "bad_agent.yaml"
+        default_dir = tmp_path / "styles" / "default"
+        default_dir.mkdir(parents=True)
+        path = default_dir / "bad_agent.yaml"
         path.write_text("system: [\ninvalid yaml")
         monkeypatch.setattr("storymesh.prompts.loader._PROMPTS_DIR", tmp_path)
         monkeypatch.setattr("storymesh.prompts.loader._STYLES_DIR", tmp_path / "styles")

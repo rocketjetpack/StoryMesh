@@ -97,6 +97,9 @@ class LLMCallRecord:
         raw_response: Complete raw response text from the model.
         parse_success: Whether the response parsed as valid JSON.
         latency_ms: Wall-clock milliseconds for the call, or ``None`` if not recorded.
+        approx_prompt_tokens: Rough prompt token estimate, or ``None``.
+        approx_response_tokens: Rough response token estimate, or ``None``.
+        approx_total_tokens: Sum of rough prompt/response token estimates, or ``None``.
     """
 
     ts: str
@@ -109,6 +112,9 @@ class LLMCallRecord:
     raw_response: str
     parse_success: bool
     latency_ms: float | None
+    approx_prompt_tokens: int | None = None
+    approx_response_tokens: int | None = None
+    approx_total_tokens: int | None = None
 
 
 @dataclass(frozen=True)
@@ -388,6 +394,9 @@ class RunInspector:
                         raw_response=str(raw.get("raw_response", "")),
                         parse_success=bool(raw.get("parse_success", False)),
                         latency_ms=_as_float(raw.get("latency_ms")),
+                        approx_prompt_tokens=_as_int(raw.get("approx_prompt_tokens")),
+                        approx_response_tokens=_as_int(raw.get("approx_response_tokens")),
+                        approx_total_tokens=_as_int(raw.get("approx_total_tokens")),
                     )
                 )
             except Exception:
@@ -411,6 +420,17 @@ def _as_float(value: object) -> float | None:
         return None
     try:
         return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_int(value: object) -> int | None:
+    """Convert a value to int, returning None if conversion fails."""
+    if value is None:
+        return None
+    try:
+        converted: int = int(value)  # type: ignore[call-overload]
+        return converted
     except (TypeError, ValueError):
         return None
 

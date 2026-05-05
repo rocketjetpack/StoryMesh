@@ -23,8 +23,8 @@ system: |
      message.
 
   FIELD GUIDANCE
-  - protagonist: name, defining trait, internal conflict, what they want, what
-    they need
+  - protagonist: name, defining trait, active contradiction (two named commitments as
+    'believes X / believes Y'), what they want, what they need, what this will cost them
   - setting: specific place/time grounded in the narrative context when possible
   - plot_arc: concrete progression with turning points; do not pre-explain the
     ending's meaning
@@ -49,7 +49,10 @@ system: |
   {
     "seed_id": "<id of the assigned seed>",
     "title": "<working title for the story>",
-    "protagonist": "<name, defining trait, internal conflict, what they want vs. what they need>",
+    "protagonist": "<name | defining trait | active contradiction: 'believes X / believes Y' | what they want vs. what they need | what this will cost them>",
+    "secondary_characters": [
+      "<name | role | how they pressure one side of the protagonist's contradiction>"
+    ],
     "setting": "<where and when — specific, grounded in narrative context tokens>",
     "plot_arc": "<narrative progression with named scenes and turning points, 150-300 words — do not pre-resolve the ending's meaning>",
     "thematic_thesis": "<the pressure the story applies — what it circles, what contradiction it cannot settle — not a verdict or lesson>",

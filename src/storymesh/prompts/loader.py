@@ -5,9 +5,9 @@ Reads YAML prompt files from the prompts directory and returns
 PromptTemplate instances that provide access to the system prompt
 and a formattable user prompt template.
 
-Prompt files may live either at the package root
-(``src/storymesh/prompts/<name>.yaml``) or under a style directory
-(``src/storymesh/prompts/styles/<style>/<name>.yaml``).
+Prompt files live under style directories such as
+``src/storymesh/prompts/styles/default/<name>.yaml`` and
+``src/storymesh/prompts/styles/<style>/<name>.yaml``.
 
 Each agent prompt file has 'system' and 'user' keys. The system prompt is
 returned as-is. The user prompt is a template with Python str.format()
@@ -92,13 +92,12 @@ def get_prompt_style() -> str:
 
 
 def _resolve_prompt_path(agent_name: str, style: str) -> Path:
-    """Resolve the on-disk path for a prompt file, with fallback."""
+    """Resolve the on-disk path for a prompt file, with default-style fallback."""
     candidates = [_STYLES_DIR / style / f"{agent_name}.yaml"]
     if style != _DEFAULT_PROMPT_STYLE:
         candidates.append(
             _STYLES_DIR / _DEFAULT_PROMPT_STYLE / f"{agent_name}.yaml"
         )
-    candidates.append(_PROMPTS_DIR / f"{agent_name}.yaml")
 
     for path in candidates:
         if path.is_file():
@@ -113,9 +112,9 @@ def _resolve_prompt_path(agent_name: str, style: str) -> Path:
 def load_prompt(agent_name: str, *, style: str | None = None) -> PromptTemplate:
     """Load a prompt YAML file and return a PromptTemplate.
 
-    Expects a file named '{agent_name}.yaml' either in the active prompt-style
-    directory or at the prompts package root, containing 'system' and 'user'
-    keys with non-empty string values.
+    Expects a file named '{agent_name}.yaml' in the active prompt-style
+    directory or, when missing there, in ``styles/default/``, containing
+    'system' and 'user' keys with non-empty string values.
 
     Args:
         agent_name: The agent name, used to locate the YAML file.

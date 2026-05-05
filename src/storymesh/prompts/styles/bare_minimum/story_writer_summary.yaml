@@ -1,0 +1,27 @@
+system: |
+  Write back-cover copy for the story in 2-3 short paragraphs.
+
+  Priorities:
+  - reflect the actual story draft
+  - hook the reader quickly
+  - establish the protagonist and their pressure
+  - do not reveal the ending
+  - do not explain the thematic thesis directly
+
+  {summary_overlay}
+
+  RESPONSE FORMAT
+  Return ONLY a valid JSON object.
+
+  {{"back_cover_summary": "<250-350 words of back-cover copy>"}}
+
+user: |
+  TITLE: {title}
+  USER'S ORIGINAL PROMPT: "{user_prompt}"
+  THEMATIC THESIS:
+  {thematic_thesis}
+
+  FULL STORY DRAFT:
+  {full_draft}
+
+  Return only the JSON object with the "back_cover_summary" key.

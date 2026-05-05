@@ -99,7 +99,7 @@ class ResonanceReviewerAgent:
         """
         original_word_count = len(input_data.full_draft.split())
 
-        logger.info(
+        logger.debug(
             "ResonanceReviewerAgent starting | title=%r words=%d",
             input_data.proposal_title,
             original_word_count,
@@ -107,7 +107,7 @@ class ResonanceReviewerAgent:
 
         # ── Pass 1: Review (cross-provider) ───────────────────────────────
         all_moments = self._run_review_pass(input_data)
-        logger.info(
+        logger.debug(
             "ResonanceReviewerAgent review complete | moments_found=%d",
             len(all_moments),
         )
@@ -116,14 +116,14 @@ class ResonanceReviewerAgent:
         avoidance_moments = [m for m in all_moments if m.classification == "avoidance"]
         restraint_count = len(all_moments) - len(avoidance_moments)
 
-        logger.info(
+        logger.debug(
             "ResonanceReviewerAgent classification | avoidance=%d restraint=%d",
             len(avoidance_moments),
             restraint_count,
         )
 
         if not avoidance_moments:
-            logger.info("ResonanceReviewerAgent: no avoidance moments — draft unchanged.")
+            logger.debug("ResonanceReviewerAgent: no avoidance moments — draft unchanged.")
             return ResonanceReviewerAgentOutput(
                 near_miss_moments=[],
                 revised_draft=input_data.full_draft,
@@ -161,7 +161,7 @@ class ResonanceReviewerAgent:
         revised_word_count = len(revised_draft.split())
         word_delta = revised_word_count - original_word_count
 
-        logger.info(
+        logger.debug(
             "ResonanceReviewerAgent revision complete | word_delta=%+d",
             word_delta,
         )
@@ -175,7 +175,7 @@ class ResonanceReviewerAgent:
             summary_overlay=summary_overlay,
         )
 
-        logger.info("ResonanceReviewerAgent summary re-run complete.")
+        logger.debug("ResonanceReviewerAgent summary re-run complete.")
 
         debug: dict[str, Any] = {
             "review_temperature": self._review_temperature,

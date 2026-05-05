@@ -91,6 +91,18 @@ def _sanitize_json_strings(text: str) -> str:
             result.append(ch)
     return "".join(result)
 
+
+def _approx_token_count(text: str) -> int:
+    """Return a rough token estimate from character length.
+
+    Uses a simple heuristic of ~4 characters per token. This is not intended
+    to match provider billing exactly; it exists for lightweight diagnostics
+    and CLI progress summaries across providers.
+    """
+    if not text:
+        return 0
+    return max(1, round(len(text) / 4))
+
 class LLMClient(ABC):
     """
     This class provides a vendor agnostic interface for LLM completions.
@@ -269,6 +281,9 @@ class LLMClient(ABC):
         if self._on_call is None:
             return
         run_id = current_run_id.get()
+        system_text = system_prompt or ""
+        prompt_tokens = _approx_token_count(system_text) + _approx_token_count(user_prompt)
+        response_tokens = _approx_token_count(raw_response)
         record: dict[str, Any] = {
             "ts": datetime.now(tz=UTC).isoformat(),
             "run_id": run_id,
@@ -276,11 +291,14 @@ class LLMClient(ABC):
             "model": self.model,
             "temperature": temperature,
             "attempt": attempt,
-            "system_prompt": system_prompt or "",
+            "system_prompt": system_text,
             "user_prompt": user_prompt,
             "raw_response": raw_response,
             "parse_success": parse_success,
             "latency_ms": latency_ms,
+            "approx_prompt_tokens": prompt_tokens,
+            "approx_response_tokens": response_tokens,
+            "approx_total_tokens": prompt_tokens + response_tokens,
         }
         try:
             self._on_call(run_id, record)

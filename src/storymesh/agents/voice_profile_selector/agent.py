@@ -65,7 +65,7 @@ class VoiceProfileSelectorAgent:
             A frozen VoiceProfileSelectorAgentOutput with the selected profile.
             Never raises — falls back to literary_restraint on any failure.
         """
-        logger.info(
+        logger.debug(
             "VoiceProfileSelectorAgent starting | genres=%s tones=%s",
             input_data.normalized_genres,
             input_data.user_tones,
@@ -111,7 +111,7 @@ class VoiceProfileSelectorAgent:
 
         voice_profile = _load_profile_with_fallback(selected_id)
 
-        logger.info(
+        logger.debug(
             "VoiceProfileSelectorAgent complete | selected=%r defaulted=%s",
             voice_profile.id,
             defaulted_to_fallback,

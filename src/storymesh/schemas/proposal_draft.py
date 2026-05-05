@@ -91,8 +91,16 @@ class StoryProposal(BaseModel):
     protagonist: str = Field(
         min_length=10,
         description=(
-            "The main character: name, defining trait, internal conflict, "
-            "and what they want vs. what they need."
+            "The main character: name, defining trait, active contradiction "
+            "(two named commitments stated as 'believes X / believes Y'), "
+            "what they want vs. what they need, and what this will cost them."
+        ),
+    )
+    secondary_characters: list[str] = Field(
+        default_factory=list,
+        description=(
+            "1-2 secondary characters described as: name | role in the story | "
+            "how they embody or pressure one side of the protagonist's contradiction."
         ),
     )
     setting: str = Field(

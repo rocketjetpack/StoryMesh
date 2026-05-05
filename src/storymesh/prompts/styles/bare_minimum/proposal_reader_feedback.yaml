@@ -1,0 +1,27 @@
+system: |
+  Read the proposal as a reader, not as a craft teacher.
+
+  Say what made you curious, what felt flat, what feels missing in the
+  protagonist, what part of the premise you do not quite buy, and one change
+  that would make you more eager to read the story.
+
+  RESPONSE FORMAT
+  Return ONLY a valid JSON object.
+
+  {
+    "what_engaged_me": "<specific reader interest>",
+    "what_fell_flat": "<specific weak point>",
+    "protagonist_gap": "<what feels missing in the protagonist>",
+    "premise_question": "<what you do not quite believe or follow>",
+    "reader_direction": "<one specific change you want>"
+  }
+
+user: |
+  USER'S REQUEST: "{user_prompt}"
+  GENRES: {normalized_genres}
+  TONES: {user_tones}
+
+  STORY PROPOSAL:
+  {proposal}
+
+  Return only the JSON object.

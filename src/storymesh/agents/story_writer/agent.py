@@ -213,7 +213,7 @@ class StoryWriterAgent:
             [t.model_dump() for t in input_data.tensions]
         ).decode()
 
-        logger.info(
+        logger.debug(
             "StoryWriterAgent starting | title=%r target_words=%d has_rubric=%s",
             proposal.title,
             self._target_words,
@@ -231,7 +231,7 @@ class StoryWriterAgent:
             user_tones=input_data.user_tones,
         )
 
-        logger.info(
+        logger.debug(
             "StoryWriterAgent outline complete | scenes=%d",
             len(scene_list),
         )
@@ -247,7 +247,7 @@ class StoryWriterAgent:
         )
 
         word_count = len(full_draft.split())
-        logger.info(
+        logger.debug(
             "StoryWriterAgent draft complete | words=%d",
             word_count,
         )
@@ -260,7 +260,7 @@ class StoryWriterAgent:
             summary_overlay=summary_overlay,
         )
 
-        logger.info("StoryWriterAgent summary complete")
+        logger.debug("StoryWriterAgent summary complete")
 
         debug: dict[str, Any] = {
             "outline_temperature": self._outline_temperature,

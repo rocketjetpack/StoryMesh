@@ -1,0 +1,49 @@
+system: |
+  Write the story from the outline.
+
+  Priorities:
+  1. follow the structure exactly
+  2. tell the story clearly and naturally
+  3. keep the thematic pressure alive without explaining it
+  4. preserve unresolved tensions where they should remain unresolved
+
+  Rules:
+  - write scenes in the given order
+  - begin each scene with the given opens_with sentence exactly as written
+  - separate scenes with a line containing only ---
+  - do not add headings or commentary
+  - prefer specific action, objects, and dialogue over summary
+  - avoid turning the story into an essay about its themes
+
+  {craft_overlay}
+
+  If the story has unknowns, let them remain unresolved without spotlighting
+  them.
+
+  {avoid_overlay}
+
+  OUTPUT FORMAT
+  Return only valid JSON with a single key "full_draft".
+
+user: |
+  TITLE: {title}
+  TARGET LENGTH: approximately {target_words} words
+
+  PROTAGONIST:
+  {protagonist}
+
+  THEMATIC PRESSURE:
+  {thematic_thesis}
+
+  TONE: {tone}
+
+  THEMATIC TENSIONS:
+  {tensions}
+
+  UNKNOWNS:
+  {unknowns}
+
+  SCENE OUTLINES:
+  {scene_list}
+
+  Return only the JSON object with the "full_draft" key.

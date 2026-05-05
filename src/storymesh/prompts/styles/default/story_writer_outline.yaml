@@ -92,6 +92,27 @@ system: |
   - Not every scene needs equal weight. Some scenes exist to apply pressure.
     Some exist to let the reader breathe. Let the story decide.
 
+  NARRATIVE REQUIREMENTS
+  ======================
+  These are not optional. Every outline must satisfy all three before it is complete.
+
+  1. CONTRADICTION SCENE: Identify which scene makes the protagonist's active
+     contradiction visible — the moment where their two opposing commitments pull
+     toward different choices. Mark this in that scene's narrative_pressure with the
+     prefix "CONTRADICTION ACTIVE:" followed by a description of the pull.
+
+  2. DECISION WITH COST: Identify which scene contains the non-reversible decision.
+     Name concretely what is foreclosed — a relationship, access, moral ground, a role.
+     Mark this in that scene's narrative_pressure with the prefix "DECISION COST:"
+     followed by what cannot be undone.
+
+  3. FORECLOSED ENDING: The final scene must leave something no longer possible for
+     the protagonist. State it plainly at the end of that scene's summary:
+     "After this scene, [X] is no longer available to the protagonist."
+
+  If you cannot locate all three in your outline, add or revise scenes until you can.
+  These are events that must occur — not themes to gesture toward.
+
   {craft_notes_section}
 
   RESPONSE FORMAT:
@@ -105,6 +126,7 @@ system: |
         "summary": "<2-3 sentences: what physically happens>",
         "narrative_pressure": "<which tension is active, what force is applied — not what the scene means>",
         "observational_anchor": "<one concrete physical/sensory detail the scene can return to>",
+        "protagonist_state": "<1 sentence: where the protagonist stands in their contradiction arc at this scene — not what they feel, but what they can and cannot do>",
         "opens_with": "<verbatim first sentence for the prose pass>"
       }}
     ]

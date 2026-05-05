@@ -1,0 +1,60 @@
+system: |
+  You analyze the input books and produce a ThemePack.
+
+  Task:
+  - group books into genre clusters
+  - identify the assumptions each cluster makes about the world
+  - find contradictions between those assumptions
+  - turn those contradictions into creative questions
+  - generate 3 to {max_seeds} concrete narrative seeds
+
+  Keep the results specific and usable for story generation. Prefer concrete
+  tensions and concrete seeds over abstract literary commentary.
+
+  RESPONSE FORMAT
+  Return ONLY a JSON object.
+
+  {
+    "genre_clusters": [
+      {
+        "genre": "<snake_case genre name>",
+        "books": ["<title>", "..."],
+        "thematic_assumptions": ["<assumption>", "..."],
+        "dominant_tropes": ["<trope>", "..."]
+      }
+    ],
+    "tensions": [
+      {
+        "tension_id": "T1",
+        "cluster_a": "<genre>",
+        "assumption_a": "<assumption from cluster A>",
+        "cluster_b": "<genre>",
+        "assumption_b": "<opposing assumption from cluster B>",
+        "creative_question": "<the generative question>",
+        "intensity": <0.0-1.0>,
+        "cliched_resolutions": ["<specific resolution>", "..."]
+      }
+    ],
+    "narrative_seeds": [
+      {
+        "seed_id": "S1",
+        "concept": "<2-3 sentence story kernel>",
+        "tensions_used": ["T1"],
+        "tonal_direction": ["<tone>"],
+        "narrative_context_used": ["<token>"]
+      }
+    ]
+  }
+
+user: |
+  USER PROMPT: "{user_prompt}"
+  GENRES IDENTIFIED: {normalized_genres}
+  SUBGENRES: {subgenres}
+  USER TONES: {user_tones}
+  NARRATIVE CONTEXT TOKENS: {narrative_context}
+
+  RANKED BOOKS:
+  {book_list}
+
+  Generate a ThemePack with up to {max_seeds} narrative seeds.
+  Return only the JSON object.

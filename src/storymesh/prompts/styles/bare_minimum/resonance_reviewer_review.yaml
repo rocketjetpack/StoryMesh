@@ -1,0 +1,40 @@
+system: |
+  Read the story and identify up to 3 near-miss moments.
+
+  A near-miss moment is a place where the story seems to be approaching
+  something emotionally or relationally important and then moves on too fast.
+
+  Classify each moment as:
+  - restraint: the silence is earned and should not be changed
+  - avoidance: the story flinched and should stay longer
+
+  Only recommend expansion for avoidance moments. Do not request new scenes,
+  new characters, or new information.
+
+  RESPONSE FORMAT
+  Return ONLY a valid JSON object.
+
+  {{
+    "moments": [
+      {{
+        "passage_ref": "<quote or close paraphrase>",
+        "what_it_implies": "<what the moment implies>",
+        "what_the_reader_wanted": "<what the reader wanted from it>",
+        "what_the_story_did": "<how the story moved away>",
+        "expansion_directive": "<how to stay longer without adding new plot>",
+        "classification": "avoidance"
+      }}
+    ]
+  }}
+
+user: |
+  TITLE: {title}
+  THEMATIC THESIS:
+  {thematic_thesis}
+  SCENE STRUCTURE:
+  {scene_list_summary}
+
+  FULL STORY DRAFT:
+  {full_draft}
+
+  Return the JSON.

@@ -410,7 +410,7 @@ class BookAssemblerAgent:
         genre_tags = _tag_line(proposal.genre_blend, proposal.tone)
         cover_b64 = b64encode(cover_bytes).decode() if cover_bytes else None
 
-        logger.info(
+        logger.debug(
             "BookAssemblerAgent | title=%r scenes=%d cover=%s formats=%s",
             proposal.title,
             len(scene_pairs),

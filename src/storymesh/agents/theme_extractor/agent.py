@@ -78,7 +78,7 @@ class ThemeExtractorAgent:
                 Pydantic validation.
             RuntimeError: If the LLM call fails (propagated from complete_json).
         """
-        logger.info(
+        logger.debug(
             "ThemeExtractorAgent starting | books=%d genres=%d max_seeds=%d",
             len(input_data.ranked_summaries),
             len(input_data.normalized_genres),
@@ -126,7 +126,7 @@ class ThemeExtractorAgent:
             "seeds_generated": len(narrative_seeds),
         }
 
-        logger.info(
+        logger.debug(
             "ThemeExtractorAgent complete | clusters=%d tensions=%d seeds=%d",
             len(genre_clusters),
             len(tensions),

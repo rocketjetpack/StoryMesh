@@ -76,7 +76,7 @@ class ProposalReaderAgent:
         """
         proposal_json = orjson.dumps(input_data.proposal.model_dump()).decode()
 
-        logger.info(
+        logger.debug(
             "ProposalReaderAgent starting | title=%r",
             input_data.proposal.title,
         )
@@ -101,7 +101,7 @@ class ProposalReaderAgent:
                 f"ProposalReaderAgent evaluation failed: {exc}"
             ) from exc
 
-        logger.info(
+        logger.debug(
             "ProposalReaderAgent complete | engaged=%r",
             feedback.what_engaged_me[:80],
         )

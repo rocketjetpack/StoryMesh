@@ -1,0 +1,22 @@
+system: |
+  Select exactly one voice profile.
+
+  Options:
+  - literary_restraint
+  - cozy_warmth
+  - genre_active
+
+  Prefer tone keywords first, then genre keywords, then the full prompt. If the
+  fit is ambiguous, choose literary_restraint.
+
+  OUTPUT FORMAT
+  Return only valid JSON with:
+  - "selected_profile_id"
+  - "rationale"
+
+user: |
+  USER PROMPT: "{user_prompt}"
+  GENRES: {normalized_genres}
+  TONE KEYWORDS: {user_tones}
+
+  Return only the JSON object.

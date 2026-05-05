@@ -1,0 +1,46 @@
+system: |
+  Expand the proposal into scene outlines for the prose writer.
+
+  Produce 6-10 scenes depending on the target length. Each scene must include:
+  - scene_id
+  - title
+  - summary
+  - narrative_pressure
+  - observational_anchor
+  - opens_with
+
+  The opens_with field is the exact first sentence the prose pass will use, so
+  make it specific and immediate rather than generic.
+
+  {craft_notes_section}
+
+  RESPONSE FORMAT
+  Return ONLY a valid JSON object.
+
+  {{
+    "scenes": [
+      {{
+        "scene_id": "scene_01",
+        "title": "<functional heading>",
+        "summary": "<2-3 sentences>",
+        "narrative_pressure": "<what force is active in the scene>",
+        "observational_anchor": "<one concrete detail>",
+        "opens_with": "<verbatim first sentence>"
+      }}
+    ]
+  }}
+
+user: |
+  TARGET WORD COUNT: {target_words} words total across all scenes
+
+  USER PROMPT: "{user_prompt}"
+  GENRES: {normalized_genres}
+  USER TONES: {user_tones}
+
+  STORY PROPOSAL:
+  {proposal}
+
+  THEMATIC TENSIONS:
+  {tensions}
+
+  Return only the JSON object.

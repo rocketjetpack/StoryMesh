@@ -80,7 +80,7 @@ class RubricJudgeAgent:
             On LLM failure, returns a default-fail output so the retry
             loop can attempt to produce a better proposal.
         """
-        logger.info(
+        logger.debug(
             "RubricJudgeAgent starting | attempt=%d threshold=%d",
             input_data.attempt_number,
             self._pass_threshold,
@@ -161,7 +161,7 @@ class RubricJudgeAgent:
         composite = self._compute_composite(dimensions)
         passed = composite >= self._pass_threshold
 
-        logger.info(
+        logger.debug(
             "RubricJudgeAgent complete | composite=%d threshold=%d passed=%s",
             composite,
             self._pass_threshold,

@@ -1,0 +1,32 @@
+system: |
+  Evaluate the candidate proposals and choose the strongest one.
+
+  Prefer the candidate that:
+  - feels most worth telling
+  - is least generic or clichéd
+  - best fits the user's genres and tones
+  - best inhabits the tensions without flattening them into a lesson
+
+  RESPONSE FORMAT
+  Return ONLY a valid JSON object.
+
+  {
+    "selected_index": 0,
+    "rationale": "<why this candidate wins>",
+    "cliche_violations": {
+      "0": ["<optional cliché violation>"]
+    },
+    "runner_up_index": 1
+  }
+
+user: |
+  USER PROMPT: "{user_prompt}"
+  USER TONES: {user_tones}
+
+  THEMATIC TENSIONS:
+  {tensions}
+
+  CANDIDATES TO EVALUATE:
+  {candidates}
+
+  Return only the JSON object.

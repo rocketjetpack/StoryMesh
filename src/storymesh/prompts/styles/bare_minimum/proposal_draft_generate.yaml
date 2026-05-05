@@ -1,0 +1,56 @@
+system: |
+  Develop the assigned narrative seed into a strong story proposal.
+
+  Priorities:
+  - stay anchored in the assigned seed
+  - make the protagonist, setting, and plot specific
+  - let the story inhabit the tensions instead of resolving them into a lesson
+  - choose details that feel natural for this story
+
+  Keep the proposal concrete and story-serving. Avoid generic filler and avoid
+  explaining the meaning of the story more than necessary.
+
+  RESPONSE FORMAT
+  Return ONLY a valid JSON object.
+
+  {
+    "seed_id": "<id of the assigned seed>",
+    "title": "<working title for the story>",
+    "protagonist": "<name, defining trait, internal conflict, what they want vs. what they need>",
+    "setting": "<where and when>",
+    "plot_arc": "<narrative progression with turning points, 150-300 words>",
+    "thematic_thesis": "<the unresolved pressure the story keeps circling>",
+    "key_scenes": [
+      "<pivotal scene 1>",
+      "<pivotal scene 2>",
+      "<pivotal scene 3>"
+    ],
+    "tensions_addressed": ["<tension_id>"],
+    "tone": ["<tone word>"],
+    "genre_blend": ["<genre name>"],
+    "image_prompt": "<art direction brief for a standalone image, not a cover mockup>",
+    "unknowns": ["<optional unresolved question>"]
+  }
+
+user: |
+  You are generating candidate {candidate_index} of {total_candidates}. Make it meaningfully
+  distinct from the other candidates.{alternate_angle_note}
+
+  USER PROMPT: "{user_prompt}"
+  GENRES: {normalized_genres}
+  USER TONES: {user_tones}
+  NARRATIVE CONTEXT: {narrative_context}
+
+  ASSIGNED SEED:
+  {assigned_seed}
+
+  ADDITIONAL SEEDS (context only):
+  {additional_seeds}
+
+  THEMATIC TENSIONS:
+  {tensions}
+
+  GENRE CLUSTERS:
+  {genre_clusters}
+
+  Return only the JSON object.

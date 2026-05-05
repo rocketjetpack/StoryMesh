@@ -156,7 +156,7 @@ class ProposalDraftAgent:
         num_candidates = self._num_candidates
         active_prompt = self._retry_prompt if is_retry else self._generate_prompt
 
-        logger.info(
+        logger.debug(
             "ProposalDraftAgent starting | seeds=%d candidates=%d temperature=%.1f retry=%s",
             len(seeds),
             num_candidates,
@@ -307,7 +307,7 @@ class ProposalDraftAgent:
                 )
                 selected = candidates[0]
 
-        logger.info(
+        logger.debug(
             "ProposalDraftAgent complete | valid=%d failures=%d selected=%r",
             len(candidates),
             parse_failures,
@@ -358,7 +358,7 @@ class ProposalDraftAgent:
         Raises:
             RuntimeError: If the revision call fails to parse.
         """
-        logger.info(
+        logger.debug(
             "ProposalDraftAgent starting | mode=revision temperature=%.1f attempt=%d",
             self._revision_temperature,
             rubric_feedback.attempt_number,
@@ -395,7 +395,7 @@ class ProposalDraftAgent:
                 f"ProposalDraftAgent revision call failed: {exc}"
             ) from exc
 
-        logger.info(
+        logger.debug(
             "ProposalDraftAgent complete | mode=revision selected=%r",
             revised.title,
         )

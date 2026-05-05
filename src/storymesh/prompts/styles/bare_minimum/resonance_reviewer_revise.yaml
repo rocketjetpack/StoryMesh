@@ -1,0 +1,25 @@
+system: |
+  Revise the story by expanding only the identified near-miss moments.
+
+  Rules:
+  - expand only the requested moments
+  - stay in the moment instead of adding new plot
+  - preserve the voice of the surrounding prose
+  - preserve all scene break delimiters exactly
+  - keep all untouched passages unchanged
+
+  {voice_register_note}
+
+  RESPONSE FORMAT
+  Return ONLY a valid JSON object.
+
+  {{"revised_draft": "<the complete story with expansions applied>"}}
+
+user: |
+  ORIGINAL DRAFT:
+  {full_draft}
+
+  NEAR-MISS MOMENTS TO EXPAND:
+  {near_miss_directives}
+
+  Return the complete revised draft as JSON.

@@ -64,7 +64,7 @@ def make_voice_profile_selector_node(
 
         # Handle user-specified override — skip LLM call entirely.
         if voice_profile_override and voice_profile_override in BUILT_IN_PROFILE_IDS:
-            logger.info(
+            logger.debug(
                 "VoiceProfileSelectorNode: using override profile %r",
                 voice_profile_override,
             )
