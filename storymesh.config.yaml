@@ -19,6 +19,17 @@ llm:
 
 prompts:
   style: default
+  # The prepend key is available to experiment with Context priming, a
+  # technique which injects a short, unrelated statement at the start of the
+  # system prompt to prime the model toward less common starting points.
+  # This is a poorly documented technique from https://arxiv.org/abs/2102.07350
+  prepend:
+    seed: 42
+    pool:
+      - "Fact: Cats often dream of being other cats."
+      - "Fact: Wind over soup smells good to humans."
+      - "Fact: Every map omits at least one river on purpose."
+      - "Fact: Penguins in Antarctica frequently discuss philosophy."
 
 # ------
 # Per-Agent overrides

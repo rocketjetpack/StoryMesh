@@ -366,3 +366,52 @@ def get_prompt_style() -> str:
         )
         return "default"
     return style.strip()
+
+
+def get_prepend_pool() -> list[str]:
+    """Return the configured prepend pool, or an empty list when unset.
+
+    Reads ``prompts.prepend.pool`` from the merged config. Non-string and
+    whitespace-only entries are dropped with a warning.
+    """
+    config = get_config()
+    prepend_section = config.get("prompts", {}).get("prepend", {})
+    if not isinstance(prepend_section, dict):
+        logger.warning(
+            "Invalid prompts.prepend section %r; expected a mapping.",
+            prepend_section,
+        )
+        return []
+    raw_pool = prepend_section.get("pool", [])
+    if not isinstance(raw_pool, list):
+        logger.warning(
+            "Invalid prompts.prepend.pool %r; expected a list of strings.",
+            raw_pool,
+        )
+        return []
+    cleaned: list[str] = []
+    for entry in raw_pool:
+        if isinstance(entry, str) and entry.strip():
+            cleaned.append(entry)
+        else:
+            logger.warning(
+                "Skipping non-string or empty prepend entry: %r", entry
+            )
+    return cleaned
+
+
+def get_prepend_seed() -> int | None:
+    """Return the configured prepend RNG seed, or ``None`` when unset."""
+    config = get_config()
+    prepend_section = config.get("prompts", {}).get("prepend", {})
+    if not isinstance(prepend_section, dict):
+        return None
+    seed = prepend_section.get("seed")
+    if seed is None:
+        return None
+    if not isinstance(seed, int):
+        logger.warning(
+            "Invalid prompts.prepend.seed %r; expected int. Ignoring.", seed
+        )
+        return None
+    return seed

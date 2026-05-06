@@ -148,7 +148,7 @@ def _compose_cover_text(image_bytes: bytes, title: str, byline: str) -> bytes:
     line_h = int(title_font_size * 1.25)
     band_h = len(title_lines) * line_h + padding * 2
 
-    draw.rectangle([(0, 0), (w, band_h)], fill=(0, 0, 0, 170))
+    draw.rectangle(((0, 0), (w, band_h)), fill=(0, 0, 0, 170))
 
     y = padding
     for line in title_lines:
@@ -163,7 +163,7 @@ def _compose_cover_text(image_bytes: bytes, title: str, byline: str) -> bytes:
     byline_font = _load_font(byline_font_size)
     byline_band_h = byline_font_size + padding * 2
 
-    draw.rectangle([(0, h - byline_band_h), (w, h)], fill=(0, 0, 0, 170))
+    draw.rectangle(((0, h - byline_band_h), (w, h)), fill=(0, 0, 0, 170))
 
     byline_w = int(draw.textlength(byline, font=byline_font))
     bx = (w - byline_w) // 2

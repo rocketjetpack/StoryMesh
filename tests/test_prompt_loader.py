@@ -10,8 +10,11 @@ import yaml
 from storymesh.prompts.loader import (
     PromptFormattingError,
     PromptTemplate,
+    get_prepend_pool,
     get_prompt_style,
     load_prompt,
+    sample_prepend,
+    set_prepend_pool,
     set_prompt_style,
 )
 
@@ -537,3 +540,108 @@ class TestSlimPromptStyle:
     def test_slim_style_falls_back_for_missing_prompt(self) -> None:
         pt = load_prompt("story_writer_summary", style="slim")
         assert "back-cover copy" in pt.system.lower()
+
+
+# ---------------------------------------------------------------------------
+# PromptTemplate — prepend token + pool sampling
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=False)
+def _isolated_prepend_pool() -> object:
+    """Snapshot and restore the global prepend pool around a test."""
+    saved = get_prepend_pool()
+    try:
+        yield
+    finally:
+        set_prepend_pool(saved)
+
+
+class TestPrependToken:
+    def test_no_token_means_system_unchanged(
+        self, _isolated_prepend_pool: object
+    ) -> None:
+        set_prepend_pool(["NEVER USED"])
+        pt = PromptTemplate(system="No token here.", user_template="u {x}")
+        assert pt.system == "No token here."
+        assert pt.last_prepend is None
+
+    def test_empty_pool_drops_token_and_leading_blank_lines(
+        self, _isolated_prepend_pool: object
+    ) -> None:
+        set_prepend_pool([])
+        pt = PromptTemplate(
+            system="{prepend}\n\nReal system body.",
+            user_template="u {x}",
+        )
+        # Empty replacement plus the leading blank line are stripped.
+        assert pt.system == "Real system body."
+        assert pt.last_prepend is None
+
+    def test_non_empty_pool_substitutes_sampled_value(
+        self, _isolated_prepend_pool: object
+    ) -> None:
+        set_prepend_pool(["ALPHA"], seed=1)
+        pt = PromptTemplate(
+            system="{prepend}\n\nBody.", user_template="u {x}"
+        )
+        result = pt.system
+        assert result.startswith("ALPHA\n\nBody.")
+        assert pt.last_prepend == "ALPHA"
+
+    def test_format_system_explicit_overrides_pool(
+        self, _isolated_prepend_pool: object
+    ) -> None:
+        set_prepend_pool(["POOLED"], seed=1)
+        pt = PromptTemplate(
+            system="{prepend}\n\nBody.", user_template="u {x}"
+        )
+        assert pt.format_system(prepend="EXPLICIT").startswith("EXPLICIT\n\nBody.")
+        assert pt.last_prepend == "EXPLICIT"
+
+    def test_format_system_explicit_empty_string_drops_token(
+        self, _isolated_prepend_pool: object
+    ) -> None:
+        set_prepend_pool(["POOLED"], seed=1)
+        pt = PromptTemplate(
+            system="{prepend}\n\nBody.", user_template="u {x}"
+        )
+        # Caller asked for empty explicitly — do not sample.
+        assert pt.format_system(prepend="") == "Body."
+        assert pt.last_prepend is None
+
+    def test_seed_produces_reproducible_samples(
+        self, _isolated_prepend_pool: object
+    ) -> None:
+        pool = ["one", "two", "three", "four", "five"]
+        set_prepend_pool(pool, seed=42)
+        first = [sample_prepend() for _ in range(5)]
+        set_prepend_pool(pool, seed=42)
+        second = [sample_prepend() for _ in range(5)]
+        assert first == second
+
+    def test_sample_prepend_returns_empty_string_when_pool_empty(
+        self, _isolated_prepend_pool: object
+    ) -> None:
+        set_prepend_pool([])
+        assert sample_prepend() == ""
+
+    def test_set_prepend_pool_strips_blank_entries(
+        self, _isolated_prepend_pool: object
+    ) -> None:
+        set_prepend_pool(["valid", "", "   ", "also valid"])
+        assert get_prepend_pool() == ["valid", "also valid"]
+
+    def test_system_prompt_with_json_braces_unaffected(
+        self, _isolated_prepend_pool: object
+    ) -> None:
+        # Real prompts contain literal {} from JSON examples — make sure the
+        # prepend substitution does not trip over them.
+        set_prepend_pool(["X"], seed=1)
+        body = 'Return JSON: {"key": "value", "nested": {"a": 1}}'
+        pt = PromptTemplate(
+            system="{prepend}\n\n" + body, user_template="u {x}"
+        )
+        result = pt.system
+        assert result.endswith(body)
+        assert pt.last_prepend == "X"

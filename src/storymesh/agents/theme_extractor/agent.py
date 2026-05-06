@@ -108,9 +108,18 @@ class ThemeExtractorAgent:
             max_seeds=self._max_seeds,
         )
 
+        # Reading .system samples from the prepend pool (if configured and the
+        # template carries the {prepend} token); capture once so we can audit it.
+        formatted_system = self._prompt_template.system
+        sampled_prepend = self._prompt_template.last_prepend
+        if sampled_prepend:
+            logger.debug(
+                "ThemeExtractorAgent prepend sampled: %r", sampled_prepend
+            )
+
         response = self._llm_client.complete_json(
             formatted_user,
-            system_prompt=self._prompt_template.system,
+            system_prompt=formatted_system,
             temperature=self._temperature,
             max_tokens=self._max_tokens,
         )
@@ -124,6 +133,7 @@ class ThemeExtractorAgent:
             "clusters_found": len(genre_clusters),
             "tensions_found": len(tensions),
             "seeds_generated": len(narrative_seeds),
+            "prepend_used": sampled_prepend,
         }
 
         logger.debug(

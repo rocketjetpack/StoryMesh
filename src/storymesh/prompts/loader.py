@@ -16,6 +16,9 @@ placeholders that are populated at runtime.
 
 from __future__ import annotations
 
+import random
+import re
+from collections.abc import Iterable
 from pathlib import Path
 
 import yaml
@@ -25,6 +28,11 @@ _STYLES_DIR = _PROMPTS_DIR / "styles"
 _DEFAULT_PROMPT_STYLE = "default"
 _active_prompt_style = _DEFAULT_PROMPT_STYLE
 
+_PREPEND_TOKEN = "{prepend}"
+_LEADING_BLANK_LINES_RE = re.compile(r"^[ \t]*\n+")
+_prepend_pool: list[str] = []
+_prepend_rng: random.Random = random.Random()
+
 
 class PromptFormattingError(Exception):
     """Raised when a prompt template cannot be formatted with the provided arguments."""
@@ -33,8 +41,11 @@ class PromptFormattingError(Exception):
 class PromptTemplate:
     """Container for a system prompt and a formattable user prompt template.
 
-    Attributes:
-        system: The static system prompt string, returned as-is.
+    The system template may contain a literal ``{prepend}`` token. When the
+    process-wide prepend pool is non-empty, reading ``self.system`` samples a
+    random string from the pool and substitutes it. Templates without the token
+    are returned unchanged. The most recent sample is exposed via
+    ``self.last_prepend`` for logging.
     """
 
     def __init__(self, *, system: str, user_template: str) -> None:
@@ -44,8 +55,42 @@ class PromptTemplate:
         if not isinstance(user_template, str) or not user_template.strip():
             raise ValueError("User prompt template must be a non-empty string.")
 
-        self.system = system
+        self._system_template = system
         self._user_template = user_template
+        self.last_prepend: str | None = None
+
+    @property
+    def system(self) -> str:
+        """Return the system prompt with prepend token resolved.
+
+        If the template contains ``{prepend}``: samples from the configured pool
+        (or uses an empty replacement when the pool is empty). If the template
+        has no token, returns it unchanged.
+        """
+        return self.format_system()
+
+    def format_system(self, prepend: str | None = None) -> str:
+        """Format the system template, optionally substituting ``{prepend}``.
+
+        Args:
+            prepend: Explicit value to substitute for ``{prepend}``. When
+                ``None``, samples from the process-wide prepend pool (an empty
+                string is used if the pool is unset).
+
+        Returns:
+            The resolved system prompt. When the template contains no
+            ``{prepend}`` token, returns it unchanged regardless of *prepend*.
+        """
+        if _PREPEND_TOKEN not in self._system_template:
+            self.last_prepend = None
+            return self._system_template
+
+        resolved = sample_prepend() if prepend is None else prepend
+        self.last_prepend = resolved or None
+        substituted = self._system_template.replace(_PREPEND_TOKEN, resolved)
+        if not resolved:
+            substituted = _LEADING_BLANK_LINES_RE.sub("", substituted, count=1)
+        return substituted
 
     def format_user(self, **kwargs: object) -> str:
         """Format the user prompt template with the provided keyword arguments.
@@ -89,6 +134,36 @@ def set_prompt_style(style: str) -> None:
 def get_prompt_style() -> str:
     """Return the active process-wide prompt style."""
     return _active_prompt_style
+
+
+def set_prepend_pool(pool: Iterable[str], *, seed: int | None = None) -> None:
+    """Set the process-wide prepend pool.
+
+    The pool is sampled by :func:`sample_prepend` and (transitively) by
+    :meth:`PromptTemplate.format_system` whenever a system template contains a
+    literal ``{prepend}`` token. Empty / whitespace-only entries are dropped.
+    Calling with an empty iterable disables sampling.
+
+    Args:
+        pool: Strings to sample from.
+        seed: Optional RNG seed. When provided, sampling is reproducible —
+            useful for tests and audited reruns.
+    """
+    global _prepend_pool, _prepend_rng  # noqa: PLW0603
+    _prepend_pool = [s for s in pool if isinstance(s, str) and s.strip()]
+    _prepend_rng = random.Random(seed) if seed is not None else random.Random()
+
+
+def sample_prepend() -> str:
+    """Return a random prepend from the configured pool, or ``""`` if unset."""
+    if not _prepend_pool:
+        return ""
+    return _prepend_rng.choice(_prepend_pool)
+
+
+def get_prepend_pool() -> list[str]:
+    """Return a copy of the currently configured prepend pool."""
+    return list(_prepend_pool)
 
 
 def _resolve_prompt_path(agent_name: str, style: str) -> Path:

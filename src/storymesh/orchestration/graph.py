@@ -333,9 +333,14 @@ def build_graph(
         A compiled LangGraph StateGraph ready for ``.stream()`` or
         ``.invoke()``.
     """
-    from storymesh.prompts.loader import set_prompt_style  # noqa: PLC0415
+    from storymesh.config import get_prepend_pool, get_prepend_seed  # noqa: PLC0415
+    from storymesh.prompts.loader import (  # noqa: PLC0415
+        set_prepend_pool,
+        set_prompt_style,
+    )
 
     set_prompt_style(prompt_style)
+    set_prepend_pool(get_prepend_pool(), seed=get_prepend_seed())
 
     resolved_max_retries = max_retries if max_retries is not None else _DEFAULT_MAX_RUBRIC_RETRIES
     # ── Stage 0: GenreNormalizerAgent ─────────────────────────────────────
