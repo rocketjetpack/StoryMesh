@@ -97,6 +97,15 @@ class StoryMeshState(TypedDict, total=False):
     best_proposal_index: int
     """Index into proposal_history of the highest-scoring attempt across all rounds."""
 
+    # ── Email delivery ─────────────────────────────────────────────────────
+    email_recipient_override: str | None
+    """Per-run recipient address set via ``--email`` CLI flag.
+
+    When present this overrides the ``email.recipient`` value in
+    ``storymesh.config.yaml`` for the current run only.  ``None`` means
+    use the config default (which may itself be empty, disabling delivery).
+    """
+
     # ── Error tracking ─────────────────────────────────────────────────────
     errors: list[str]
     """Non-fatal errors logged by any node during execution."""

@@ -48,7 +48,11 @@ class StoryMeshPipeline:
         self._prompt_style = prompt_style
         self._resolved_prompt_style: str | None = None
 
-    def generate(self, user_prompt: str) -> GenerationResult:
+    def generate(
+        self,
+        user_prompt: str,
+        email_recipient: str | None = None,
+    ) -> GenerationResult:
         """Run the StoryMesh pipeline for the given prompt.
 
         On the first call, compiles the LangGraph pipeline (which loads
@@ -57,6 +61,11 @@ class StoryMeshPipeline:
 
         :param user_prompt: Free-text description of the desired fiction.
         :type user_prompt: str
+        :param email_recipient: Optional email address to deliver the assembled
+            book to after the book assembler stage completes.  Overrides the
+            ``email.recipient`` value in ``storymesh.config.yaml`` for this run
+            only.  Pass ``None`` (default) to rely solely on the config.
+        :type email_recipient: str | None
         :return: A GenerationResult containing the synopsis and metadata.
         :rtype: GenerationResult
         """
@@ -102,6 +111,7 @@ class StoryMeshPipeline:
             "pipeline_version": storymesh_version,
             "run_id": run_id,
             "rubric_retry_count": 0,
+            "email_recipient_override": email_recipient,
             "genre_normalizer_output": None,
             "book_fetcher_output": None,
             "book_ranker_output": None,
@@ -186,17 +196,22 @@ class StoryMeshPipeline:
         )
 
 
-def regenerate_book_assembler(run_id: str | None = None) -> tuple[str, str]:
+def regenerate_book_assembler(
+    run_id: str | None = None,
+    email_recipient: str | None = None,
+) -> tuple[str, str]:
     """Re-run BookAssemblerAgent for a previous pipeline run.
 
     Loads ``story_writer_output.json``, ``proposal_draft_output.json``, and
     optionally ``cover_art_output.json`` from the run directory, re-renders
     the PDF and EPUB using the current ``storymesh.config.yaml`` settings, and
-    overwrites ``output.pdf`` and ``output.epub`` in the same run directory.
+    saves them as ``{Title_Case_Snake}.pdf/.epub`` in the same run directory.
 
     Args:
         run_id: Run to regenerate for. Pass ``None`` (default) to target the
             most recent run.
+        email_recipient: Optional email address to deliver the regenerated
+            book to.  Overrides ``email.recipient`` in config for this call.
 
     Returns:
         A tuple of ``(pdf_path, epub_path)`` — absolute paths to the generated
@@ -266,14 +281,27 @@ def regenerate_book_assembler(run_id: str | None = None) -> tuple[str, str]:
         )
     )
 
+    import contextlib  # noqa: PLC0415
+
+    from storymesh.config import get_email_config  # noqa: PLC0415
+    from storymesh.core.email_delivery import (  # noqa: PLC0415
+        EmailConfig,
+        deliver_book,
+        title_to_filename,
+    )
+
+    filename_stem = title_to_filename(raw_result.title)
+
     pdf_path = ""
     epub_path = ""
     if raw_result.pdf_bytes:
-        store.save_run_binary(resolved_id, "output.pdf", raw_result.pdf_bytes)
-        pdf_path = str(store.runs_dir / resolved_id / "output.pdf")
+        pdf_filename = f"{filename_stem}.pdf"
+        store.save_run_binary(resolved_id, pdf_filename, raw_result.pdf_bytes)
+        pdf_path = str(store.runs_dir / resolved_id / pdf_filename)
     if raw_result.epub_bytes:
-        store.save_run_binary(resolved_id, "output.epub", raw_result.epub_bytes)
-        epub_path = str(store.runs_dir / resolved_id / "output.epub")
+        epub_filename = f"{filename_stem}.epub"
+        store.save_run_binary(resolved_id, epub_filename, raw_result.epub_bytes)
+        epub_path = str(store.runs_dir / resolved_id / epub_filename)
 
     output = BookAssemblerAgentOutput(
         pdf_path=pdf_path,
@@ -284,6 +312,27 @@ def regenerate_book_assembler(run_id: str | None = None) -> tuple[str, str]:
         schema_version=BOOK_ASSEMBLER_SCHEMA_VERSION,
     )
     persist_node_output(store, resolved_id, "book_assembler", output)
+
+    # Email delivery — fires when a recipient is available.
+    email_cfg = EmailConfig.from_dict(get_email_config())
+    resolved_recipient = email_recipient or email_cfg.recipient
+    if resolved_recipient:
+        from pathlib import Path  # noqa: PLC0415
+
+        cover_image_bytes: bytes | None = None
+        if cover_output is not None:
+            with contextlib.suppress(OSError):
+                cover_image_bytes = Path(cover_output.image_path).read_bytes()
+
+        deliver_book(
+            title=raw_result.title,
+            synopsis=story_output.back_cover_summary,
+            cover_image_bytes=cover_image_bytes,
+            pdf_path=pdf_path,
+            epub_path=epub_path,
+            recipient=resolved_recipient,
+            email_config=email_cfg,
+        )
 
     return pdf_path, epub_path
 

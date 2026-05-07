@@ -30,6 +30,7 @@ prompts:
       - "Fact: Wind over soup smells good to humans."
       - "Fact: Every map omits at least one river on purpose."
       - "Fact: Penguins in Antarctica frequently discuss philosophy."
+      - "Fact: Baked beans are a soup, not a stew."
 
 # ------
 # Per-Agent overrides
@@ -153,6 +154,23 @@ cache:
 # ------
 logging:
   level: INFO
+
+# ------
+# Email Delivery (optional)
+# ------
+# When recipient is set, a rich HTML email with the PDF (and optionally EPUB)
+# attached is sent automatically after every book assembly.
+# Credentials can be set here or via environment variables:
+#   STORYMESH_SMTP_USER     — overrides smtp_user
+#   STORYMESH_SMTP_PASSWORD — overrides smtp_password
+email:
+  smtp_host: ""       # e.g. smtp.gmail.com
+  smtp_port: 587      # 587 for STARTTLS (recommended), 465 for SSL
+  smtp_user: ""       # sender account / login (or set STORYMESH_SMTP_USER)
+  smtp_password: ""   # app password or SMTP password (or set STORYMESH_SMTP_PASSWORD)
+  from_address: ""    # defaults to smtp_user when blank
+  recipient: ""       # delivery address; leave blank to disable email delivery
+  include_epub: false # set true to attach the EPUB alongside the PDF
 
 # ------
 # LangSmith Observability (optional)

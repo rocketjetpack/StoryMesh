@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from storymesh.agents.book_assembler.agent import BookAssemblerAgent
+from storymesh.core.email_delivery import EmailConfig, deliver_book, title_to_filename
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.book_assembler import BookAssemblerAgentInput, BookAssemblerAgentOutput
+from storymesh.schemas.cover_art import CoverArtAgentOutput
 from storymesh.versioning.schemas import BOOK_ASSEMBLER_SCHEMA_VERSION
 
 if TYPE_CHECKING:
@@ -20,6 +23,7 @@ logger = logging.getLogger(__name__)
 def make_book_assembler_node(
     agent: BookAssemblerAgent,
     artifact_store: ArtifactStore | None = None,
+    email_config: EmailConfig | None = None,
 ) -> Callable[[StoryMeshState], dict[str, Any]]:
     """Return a LangGraph-compatible node function for BookAssemblerAgent (Stage 8).
 
@@ -27,6 +31,9 @@ def make_book_assembler_node(
         agent: A fully constructed BookAssemblerAgent instance.
         artifact_store: Optional store for artifact persistence.
             Pass None (default) to skip persistence (e.g. in unit tests).
+        email_config: Optional resolved email configuration. When present and
+            a recipient is configured (via config or per-run state override),
+            the assembled book is emailed after file persistence.
 
     Returns:
         A node callable with signature StoryMeshState -> dict[str, Any].
@@ -72,16 +79,21 @@ def make_book_assembler_node(
 
         raw = agent.run(input_data)
 
+        # Derive title-based filename stem for disk and email attachments.
+        filename_stem = title_to_filename(raw.title)
+
         # Persist PDF and EPUB binaries; build output with the resulting paths.
         pdf_path = ""
         epub_path = ""
         if artifact_store is not None:
             if raw.pdf_bytes:
-                artifact_store.save_run_binary(run_id, "output.pdf", raw.pdf_bytes)
-                pdf_path = str(artifact_store.runs_dir / run_id / "output.pdf")
+                pdf_filename = f"{filename_stem}.pdf"
+                artifact_store.save_run_binary(run_id, pdf_filename, raw.pdf_bytes)
+                pdf_path = str(artifact_store.runs_dir / run_id / pdf_filename)
             if raw.epub_bytes:
-                artifact_store.save_run_binary(run_id, "output.epub", raw.epub_bytes)
-                epub_path = str(artifact_store.runs_dir / run_id / "output.epub")
+                epub_filename = f"{filename_stem}.epub"
+                artifact_store.save_run_binary(run_id, epub_filename, raw.epub_bytes)
+                epub_path = str(artifact_store.runs_dir / run_id / epub_filename)
 
         output = BookAssemblerAgentOutput(
             pdf_path=pdf_path,
@@ -97,6 +109,48 @@ def make_book_assembler_node(
 
             persist_node_output(artifact_store, run_id, "book_assembler", output)
 
+        # Email delivery — fires when a recipient is configured.
+        if email_config is not None and artifact_store is not None:
+            recipient = (
+                state.get("email_recipient_override") or email_config.recipient
+            )
+            if recipient:
+                cover_image_bytes = _load_cover_image(cover_art_output)
+                deliver_book(
+                    title=raw.title,
+                    synopsis=story_writer_output.back_cover_summary,
+                    cover_image_bytes=cover_image_bytes,
+                    pdf_path=pdf_path,
+                    epub_path=epub_path,
+                    recipient=recipient,
+                    email_config=email_config,
+                )
+
         return {"book_assembler_output": output}
 
     return book_assembler_node
+
+
+def _load_cover_image(cover_art_output: CoverArtAgentOutput | None) -> bytes | None:
+    """Read cover image bytes from disk given a CoverArtAgentOutput.
+
+    Returns ``None`` when the output is absent or the image file cannot
+    be read, so email delivery gracefully falls back to the typographic
+    cover header.
+
+    Args:
+        cover_art_output: CoverArtAgentOutput instance or None.
+
+    Returns:
+        Raw PNG bytes, or None.
+    """
+    if cover_art_output is None:
+        return None
+    image_path: str = cover_art_output.image_path
+    if not image_path:
+        return None
+    try:
+        return Path(image_path).read_bytes()
+    except OSError as exc:
+        logger.warning("Could not read cover image for email: %s", exc)
+        return None

@@ -415,3 +415,18 @@ def get_prepend_seed() -> int | None:
         )
         return None
     return seed
+
+
+def get_email_config() -> dict[str, Any]:
+    """Return the email delivery configuration section.
+
+    Reads from the ``email`` top-level key in the merged storymesh config.
+    Returns an empty dict when the section is absent (email delivery disabled).
+
+    Returns:
+        Dict of email settings. Keys: ``smtp_host``, ``smtp_port``,
+        ``smtp_user``, ``smtp_password``, ``from_address``, ``recipient``,
+        ``include_epub``.
+    """
+    config = get_config()
+    return dict(config.get("email", {}))

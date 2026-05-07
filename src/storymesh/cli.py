@@ -391,6 +391,14 @@ def generate(
             help="Prompt style to use. Defaults to the configured prompts.style value.",
         ),
     ] = None,
+    email: Annotated[
+        str | None,
+        typer.Option(
+            "--email",
+            help="Email address to deliver the assembled PDF (and EPUB if configured) to. "
+            "Overrides email.recipient in storymesh.config.yaml for this run.",
+        ),
+    ] = None,
 ) -> None:
     """Generate an original fiction synopsis from the given prompt."""
     if quality not in _QUALITY_PRESETS:
@@ -411,6 +419,7 @@ def generate(
             min_retries=min_retries,
             skip_resonance_review=not enable_resonance,
             prompt_style=prompt_style,
+            email_recipient=email,
         ),
     )
 
@@ -765,6 +774,15 @@ def rerun(
         None,
         help="Run ID to target. Omit to use the most recent run.",
     ),
+    email: Annotated[
+        str | None,
+        typer.Option(
+            "--email",
+            help="Email address to deliver the assembled PDF (and EPUB if configured) to. "
+            "Only applies when stage is 'book_assembler'. "
+            "Overrides email.recipient in storymesh.config.yaml for this run.",
+        ),
+    ] = None,
 ) -> None:
     """Re-run a single pipeline stage for a previous run."""
     if stage not in _RERUN_SUPPORTED_STAGES:
@@ -790,7 +808,7 @@ def rerun(
         from storymesh import regenerate_book_assembler  # noqa: PLC0415
 
         try:
-            pdf_path, epub_path = regenerate_book_assembler(run_id)
+            pdf_path, epub_path = regenerate_book_assembler(run_id, email_recipient=email)
         except (RuntimeError, ValueError) as exc:
             console.print(f"[bold red]Error:[/bold red] {exc}")
             raise typer.Exit(code=1) from exc

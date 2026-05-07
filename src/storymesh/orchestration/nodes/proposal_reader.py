@@ -99,7 +99,7 @@ def make_proposal_reader_node(
             from storymesh.core.artifacts import persist_node_output  # noqa: PLC0415
 
             persist_node_output(
-                artifact_store, state["run_id"], "proposal_reader", output
+                artifact_store, state["run_id"], "proposal_reader_feedback", output
             )
 
         return {"proposal_reader_output": output}

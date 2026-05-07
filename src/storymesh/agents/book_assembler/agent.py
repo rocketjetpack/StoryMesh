@@ -65,7 +65,7 @@ _PDF_CSS = """\
     margin: 22mm 18mm 25mm 22mm;
     @bottom-center {
         content: counter(page);
-        font-size: 9pt;
+        font-size: 3.2mm;
         color: #888;
         font-family: Georgia, "Times New Roman", serif;
     }
@@ -83,7 +83,7 @@ _PDF_CSS = """\
 
 body {
     font-family: Georgia, "Times New Roman", serif;
-    font-size: 11pt;
+    font-size: 3.9mm;
     line-height: 1.6;
     color: #111;
     text-align: justify;
@@ -119,13 +119,13 @@ body {
     padding-right: 18mm;
 }
 .cover-text-page h1 {
-    font-size: 26pt;
+    font-size: 9.2mm;
     font-weight: 400;
     letter-spacing: 0.04em;
     margin-bottom: 8mm;
 }
 .cover-text-page .byline {
-    font-size: 10pt;
+    font-size: 3.5mm;
     font-style: italic;
     letter-spacing: 0.08em;
     color: #b0a898;
@@ -140,19 +140,19 @@ body {
     padding-bottom: 20mm;
 }
 .title-page h1 {
-    font-size: 20pt;
+    font-size: 7.1mm;
     font-weight: 400;
     letter-spacing: 0.04em;
     margin-bottom: 5mm;
 }
 .title-page .byline {
-    font-size: 10pt;
+    font-size: 3.5mm;
     font-style: italic;
     color: #555;
     margin-bottom: 6mm;
 }
 .title-page .genre-tags {
-    font-size: 8.5pt;
+    font-size: 3.0mm;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: #888;
@@ -165,7 +165,7 @@ body {
     padding-top: 6mm;
 }
 .synopsis-page h2 {
-    font-size: 9pt;
+    font-size: 3.2mm;
     font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.18em;
@@ -175,7 +175,7 @@ body {
 }
 .synopsis-page p {
     font-style: italic;
-    font-size: 10.5pt;
+    font-size: 3.7mm;
     line-height: 1.7;
     text-indent: 0;
 }
@@ -185,7 +185,7 @@ body {
     break-before: page;
 }
 .scene-title {
-    font-size: 11pt;
+    font-size: 3.9mm;
     font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.14em;

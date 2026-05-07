@@ -22,6 +22,7 @@ def generate_synopsis(
     min_retries: int = 0,
     skip_resonance_review: bool = True,
     prompt_style: str | None = None,
+    email_recipient: str | None = None,
 ) -> GenerationResult:
     """High-level API function to generate a fiction synopsis from the given prompt.
 
@@ -35,6 +36,9 @@ def generate_synopsis(
         stage. Set to False by ``high`` and ``very_high`` quality presets.
     :param prompt_style: Optional prompt style name. When ``None``, uses the
         configured default style.
+    :param email_recipient: Optional email address to deliver the assembled book to
+        after the book assembler stage completes.  Overrides ``email.recipient``
+        in ``storymesh.config.yaml`` for this call only.
     :return: A GenerationResult containing the generated synopsis and related metadata.
     """
     pipeline = StoryMeshPipeline(
@@ -44,4 +48,4 @@ def generate_synopsis(
         skip_resonance_review=skip_resonance_review,
         prompt_style=prompt_style,
     )
-    return pipeline.generate(user_prompt)
+    return pipeline.generate(user_prompt, email_recipient=email_recipient)
