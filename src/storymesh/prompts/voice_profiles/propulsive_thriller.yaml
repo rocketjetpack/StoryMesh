@@ -1,0 +1,64 @@
+# Voice Profile: propulsive_thriller
+
+id: propulsive_thriller
+description: >-
+  Suspense-forward prose built around pressure, reversals, pursuit, deadlines,
+  danger, and consequential action. Tighter and more grounded than broad
+  adventure, less reflective than literary restraint.
+
+tone_keywords:
+  - tense
+  - propulsive
+  - urgent
+  - kinetic
+  - suspenseful
+  - sharp
+  - dangerous
+  - fast_paced
+  - relentless
+
+genre_keywords:
+  - thriller
+  - crime
+  - mystery
+  - adventure
+  - science_fiction
+  - action
+  - horror
+
+craft_overlay: |
+  12. Pressure first.
+     Every scene should contain a concrete pressure: time, pursuit, exposure,
+     injury, betrayal, terrain, scarcity, leverage, or a choice that must be
+     made before the character is ready.
+
+  13. Shorten under threat.
+     During action, danger, and decisions, reduce subordinate clauses. Let the
+     sentence speed match the character's available attention.
+
+  14. Information must change action.
+     A revelation should alter the route, risk, alliance, tactic, or clock. Do
+     not let information remain purely contemplative for long.
+
+  15. Aftermath earns interiority.
+     Reflection is strongest in the breath after movement, not in place of
+     movement. Give the reader consequence before interpretation.
+
+avoid_overlay: |
+  - Pausing a high-pressure scene for extended thematic analysis
+  - Letting the protagonist think through every implication before acting
+  - Replacing danger with document review unless the document changes the clock
+  - Ending action scenes on static symbolic images instead of consequence
+  - Making every beat ambiguous when the thriller engine needs a hard choice
+
+exemplars:
+  - "The elevator stopped three floors early and the lights went out."
+  - "Rafi had ninety seconds, a dead phone, and the wrong key."
+  - "The second shot missed because Elena was already falling."
+  - "By the time the train crossed the bridge, everyone on it had chosen a side."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This story is suspense-forward. The copy should establish pressure quickly:
+  clock, threat, pursuit, or impossible choice. Keep sentences lean. End on a
+  hard consequence or narrowing option, not on misty irresolution.

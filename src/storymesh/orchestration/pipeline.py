@@ -106,10 +106,15 @@ class StoryMeshPipeline:
             "prompt_style": resolved_prompt_style,
         })
 
+        # Capture pipeline start as a perf_counter value so the book_assembler
+        # node can compute elapsed runtime for the run-info page.
+        pipeline_start_time = time.perf_counter()
+
         initial_state: StoryMeshState = {
             "user_prompt": user_prompt,
             "pipeline_version": storymesh_version,
             "run_id": run_id,
+            "pipeline_start_time": pipeline_start_time,
             "rubric_retry_count": 0,
             "email_recipient_override": email_recipient,
             "genre_normalizer_output": None,
@@ -130,7 +135,7 @@ class StoryMeshPipeline:
         stage_timings: dict[str, float] = {}
         final_state: dict[str, Any] = dict(initial_state)
 
-        prev_time = time.perf_counter()
+        prev_time = pipeline_start_time
         for chunk in self._graph.stream(initial_state, stream_mode="updates"):
             now = time.perf_counter()
             for node_name, node_update in chunk.items():
@@ -223,6 +228,7 @@ def regenerate_book_assembler(
     """
     from storymesh.agents.book_assembler.agent import BookAssemblerAgent  # noqa: PLC0415
     from storymesh.config import get_agent_config  # noqa: PLC0415
+    from storymesh.core.llm_usage import load_llm_usage_summary  # noqa: PLC0415
     from storymesh.schemas.book_assembler import (  # noqa: PLC0415
         BookAssemblerAgentInput,
         BookAssemblerAgentOutput,
@@ -272,12 +278,33 @@ def regenerate_book_assembler(
         output_formats=assembler_cfg.get("output_formats", ["pdf", "epub"]),
     )
 
+    # Reconstruct run-info page inputs from on-disk artifacts so a regenerated
+    # book carries the same Generation Details page as the original output.
+    regen_user_prompt: str | None = None
+    regen_runtime_seconds: float | None = None
+    raw_meta = store.load_run_file(resolved_id, "run_metadata.json")
+    if raw_meta is not None:
+        meta = orjson.loads(raw_meta)
+        if isinstance(meta, dict):
+            prompt_value = meta.get("user_prompt")
+            if isinstance(prompt_value, str) and prompt_value.strip():
+                regen_user_prompt = prompt_value
+            timings = meta.get("stage_timings")
+            if isinstance(timings, dict) and timings:
+                regen_runtime_seconds = sum(
+                    float(v) for v in timings.values() if isinstance(v, (int, float))
+                )
+    regen_token_usage = load_llm_usage_summary(store, resolved_id)
+
     raw_result = agent.run(
         BookAssemblerAgentInput(
             story_writer_output=story_output,
             proposal=proposal_output.proposal,
             cover_art_output=cover_output,
             run_id=resolved_id,
+            user_prompt=regen_user_prompt,
+            runtime_seconds=regen_runtime_seconds,
+            token_usage=regen_token_usage,
         )
     )
 

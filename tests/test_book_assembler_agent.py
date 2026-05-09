@@ -10,6 +10,8 @@ from unittest.mock import MagicMock, patch
 from storymesh.agents.book_assembler.agent import (
     BookAssemblerAgent,
     BookRawOutput,
+    _format_runtime,
+    _has_run_info,
     _prose_to_html,
     _tag_line,
 )
@@ -540,3 +542,272 @@ class TestBookAssemblerAgentConstructor:
     def test_empty_formats_defaults_to_both(self) -> None:
         agent = BookAssemblerAgent(output_formats=None)
         assert set(agent._output_formats) == {"pdf", "epub"}
+
+
+# ── Run-info page ──────────────────────────────────────────────────────────────
+
+
+class TestFormatRuntime:
+    def test_under_one_minute(self) -> None:
+        assert _format_runtime(7.4) == "00:07"
+
+    def test_minutes_and_seconds(self) -> None:
+        assert _format_runtime(125.0) == "02:05"
+
+    def test_hours_minutes_seconds(self) -> None:
+        assert _format_runtime(3725.0) == "1:02:05"
+
+    def test_zero(self) -> None:
+        assert _format_runtime(0.0) == "00:00"
+
+
+class TestHasRunInfo:
+    def test_all_present(self) -> None:
+        assert _has_run_info("prompt", 1.0, {"approx_total_tokens": 1}) is True
+
+    def test_missing_prompt(self) -> None:
+        assert _has_run_info(None, 1.0, {"approx_total_tokens": 1}) is False
+
+    def test_blank_prompt(self) -> None:
+        assert _has_run_info("   ", 1.0, {"approx_total_tokens": 1}) is False
+
+    def test_missing_runtime(self) -> None:
+        assert _has_run_info("prompt", None, {"approx_total_tokens": 1}) is False
+
+    def test_missing_tokens(self) -> None:
+        assert _has_run_info("prompt", 1.0, None) is False
+
+
+class TestRunInfoPageHtml:
+    _TOKEN_USAGE: dict[str, int] = {
+        "calls": 4,
+        "approx_prompt_tokens": 12345,
+        "approx_response_tokens": 6789,
+        "approx_total_tokens": 19134,
+        "parse_failures": 0,
+        "latency_ms": 0,
+    }
+
+    def test_run_info_page_rendered_when_all_fields_present(self) -> None:
+        agent = _make_agent()
+        html = agent._build_html(
+            title="T",
+            genre_tags="",
+            back_cover_summary="Synopsis.",
+            scene_pairs=[("S", "Prose.")],
+            cover_b64=None,
+            user_prompt="A noir mystery in a flooded city.",
+            runtime_seconds=125.0,
+            token_usage=self._TOKEN_USAGE,
+        )
+        assert 'class="run-info-page"' in html
+        assert "Generation Details" in html
+        assert "A noir mystery in a flooded city." in html
+        assert "02:05" in html
+        assert "12,345" in html
+        assert "6,789" in html
+        assert "19,134" in html
+
+    def test_run_info_page_omitted_when_prompt_missing(self) -> None:
+        agent = _make_agent()
+        html = agent._build_html(
+            title="T",
+            genre_tags="",
+            back_cover_summary="Synopsis.",
+            scene_pairs=[("S", "Prose.")],
+            cover_b64=None,
+            user_prompt=None,
+            runtime_seconds=125.0,
+            token_usage=self._TOKEN_USAGE,
+        )
+        assert 'class="run-info-page"' not in html
+        assert "Generation Details" not in html
+
+    def test_run_info_page_omitted_when_runtime_missing(self) -> None:
+        agent = _make_agent()
+        html = agent._build_html(
+            title="T",
+            genre_tags="",
+            back_cover_summary="Synopsis.",
+            scene_pairs=[("S", "Prose.")],
+            cover_b64=None,
+            user_prompt="A prompt.",
+            runtime_seconds=None,
+            token_usage=self._TOKEN_USAGE,
+        )
+        assert 'class="run-info-page"' not in html
+
+    def test_run_info_page_omitted_by_default(self) -> None:
+        """Legacy call sites that don't pass run-info kwargs must still work."""
+        agent = _make_agent()
+        html = agent._build_html(
+            title="T",
+            genre_tags="",
+            back_cover_summary="Synopsis.",
+            scene_pairs=[("S", "Prose.")],
+            cover_b64=None,
+        )
+        assert 'class="run-info-page"' not in html
+
+    def test_html_escapes_prompt(self) -> None:
+        agent = _make_agent()
+        html = agent._build_html(
+            title="T",
+            genre_tags="",
+            back_cover_summary="Synopsis.",
+            scene_pairs=[("S", "Prose.")],
+            cover_b64=None,
+            user_prompt="Tom & Jerry <hide>",
+            runtime_seconds=10.0,
+            token_usage=self._TOKEN_USAGE,
+        )
+        assert "Tom &amp; Jerry &lt;hide&gt;" in html
+
+    def test_run_info_page_between_title_and_synopsis(self) -> None:
+        agent = _make_agent()
+        html = agent._build_html(
+            title="My Title",
+            genre_tags="",
+            back_cover_summary="A great synopsis text.",
+            scene_pairs=[("S", "Prose.")],
+            cover_b64=None,
+            user_prompt="A prompt.",
+            runtime_seconds=10.0,
+            token_usage=self._TOKEN_USAGE,
+        )
+        title_idx = html.index('class="title-page"')
+        run_info_idx = html.index('class="run-info-page"')
+        synopsis_idx = html.index('class="synopsis-page"')
+        assert title_idx < run_info_idx < synopsis_idx
+
+
+class TestRunInfoEpubChapter:
+    _TOKEN_USAGE: dict[str, int] = {
+        "approx_prompt_tokens": 100,
+        "approx_response_tokens": 200,
+        "approx_total_tokens": 300,
+    }
+
+    def _make_fake_epub_module(self) -> MagicMock:
+        mock_epub = MagicMock()
+
+        def _fake_write_epub(path: str, book: Any, options: Any = None) -> None:  # noqa: ANN401
+            Path(path).write_bytes(b"PK fake")
+
+        mock_epub.write_epub.side_effect = _fake_write_epub
+        return mock_epub
+
+    def test_run_info_chapter_added_when_fields_present(self) -> None:
+        mock_epub = self._make_fake_epub_module()
+        mock_ebooklib = MagicMock()
+        mock_ebooklib.epub = mock_epub
+
+        agent = _make_agent()
+        with patch.dict(sys.modules, {"ebooklib": mock_ebooklib}):
+            agent._build_epub(
+                title="T",
+                run_id="r",
+                genre_tags="",
+                back_cover_summary="S",
+                scene_pairs=[("S", "P")],
+                cover_bytes=None,
+                user_prompt="A prompt.",
+                runtime_seconds=10.0,
+                token_usage=self._TOKEN_USAGE,
+            )
+
+        # Inspect the EpubHtml constructions: we expect a "Generation Details"
+        # chapter to have been registered with file_name="run_info.xhtml".
+        epub_html_calls = mock_epub.EpubHtml.call_args_list
+        run_info_calls = [
+            c for c in epub_html_calls
+            if c.kwargs.get("file_name") == "run_info.xhtml"
+        ]
+        assert len(run_info_calls) == 1
+
+    def test_run_info_chapter_omitted_when_fields_missing(self) -> None:
+        mock_epub = self._make_fake_epub_module()
+        mock_ebooklib = MagicMock()
+        mock_ebooklib.epub = mock_epub
+
+        agent = _make_agent()
+        with patch.dict(sys.modules, {"ebooklib": mock_ebooklib}):
+            agent._build_epub(
+                title="T",
+                run_id="r",
+                genre_tags="",
+                back_cover_summary="S",
+                scene_pairs=[("S", "P")],
+                cover_bytes=None,
+            )
+
+        epub_html_calls = mock_epub.EpubHtml.call_args_list
+        run_info_calls = [
+            c for c in epub_html_calls
+            if c.kwargs.get("file_name") == "run_info.xhtml"
+        ]
+        assert run_info_calls == []
+
+
+class TestRunMethodPropagation:
+    """Verify ``run()`` propagates run-info fields into PDF and EPUB."""
+
+    def _mock_modules(self) -> tuple[MagicMock, MagicMock]:
+        mock_wp = MagicMock()
+        mock_wp.HTML.return_value.write_pdf.return_value = b"%PDF fake"
+
+        mock_epub_mod = MagicMock()
+
+        def _fake_write_epub(path: str, book: Any, options: Any = None) -> None:  # noqa: ANN401
+            Path(path).write_bytes(b"PK fake")
+
+        mock_epub_mod.write_epub.side_effect = _fake_write_epub
+
+        mock_ebl = MagicMock()
+        mock_ebl.epub = mock_epub_mod
+        return mock_wp, mock_ebl
+
+    def test_run_sets_has_run_info_page_true(self) -> None:
+        mock_wp, mock_ebl = self._mock_modules()
+        inp = BookAssemblerAgentInput(
+            story_writer_output=_make_story_writer_output(),
+            proposal=_make_proposal(),
+            run_id="r",
+            user_prompt="A prompt.",
+            runtime_seconds=12.5,
+            token_usage={
+                "approx_prompt_tokens": 1,
+                "approx_response_tokens": 1,
+                "approx_total_tokens": 2,
+            },
+        )
+        with patch.dict(sys.modules, {"weasyprint": mock_wp, "ebooklib": mock_ebl}):
+            result = _make_agent().run(inp)
+        assert result.debug.get("has_run_info_page") is True
+
+    def test_run_sets_has_run_info_page_false_when_fields_absent(self) -> None:
+        mock_wp, mock_ebl = self._mock_modules()
+        with patch.dict(sys.modules, {"weasyprint": mock_wp, "ebooklib": mock_ebl}):
+            result = _make_agent().run(_make_input())
+        assert result.debug.get("has_run_info_page") is False
+
+    def test_html_passed_to_weasyprint_contains_prompt(self) -> None:
+        mock_wp, mock_ebl = self._mock_modules()
+        inp = BookAssemblerAgentInput(
+            story_writer_output=_make_story_writer_output(),
+            proposal=_make_proposal(),
+            run_id="r",
+            user_prompt="UNIQUE_PROMPT_TOKEN",
+            runtime_seconds=1.0,
+            token_usage={
+                "approx_prompt_tokens": 1,
+                "approx_response_tokens": 1,
+                "approx_total_tokens": 2,
+            },
+        )
+        with patch.dict(sys.modules, {"weasyprint": mock_wp, "ebooklib": mock_ebl}):
+            _make_agent().run(inp)
+
+        call_kwargs = mock_wp.HTML.call_args
+        html_arg = call_kwargs[1].get("string") or call_kwargs[0][0]
+        assert "UNIQUE_PROMPT_TOKEN" in html_arg

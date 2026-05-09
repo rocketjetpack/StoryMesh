@@ -1,0 +1,64 @@
+# Voice Profile: surreal_lyrical
+
+id: surreal_lyrical
+description: >-
+  Dreamlike, image-led prose with elastic causality, sensory transitions,
+  mythic pressure, and intimate strangeness. Use for dreams, hallucination,
+  surreal spaces, ritual logic, grief made physical, and lyric transformations.
+
+tone_keywords:
+  - surreal
+  - dream
+  - dreamlike
+  - lyrical
+  - uncanny
+  - hallucinatory
+  - mythic
+  - liminal
+  - strange
+  - intimate
+
+genre_keywords:
+  - fantasy
+  - horror
+  - literary_fiction
+  - science_fiction
+  - speculative
+  - gothic
+
+craft_overlay: |
+  12. Let logic change texture.
+     Surreal prose does not need to explain every transition. Image, sound,
+     bodily sensation, repetition, and emotional association can move the story
+     when literal causality would flatten it.
+
+  13. Make images do different jobs.
+     Some images clarify, some disturb, some seduce, some mislead. Do not turn
+     every image into a neat metaphor for the theme.
+
+  14. Keep a human hand on the thread.
+     However strange the space becomes, the reader needs appetite, fear, desire,
+     grief, humor, touch, or choice to hold onto.
+
+  15. Vary the music.
+     Lyric prose can be direct, abrupt, ugly, funny, or plain. Do not make every
+     sentence equally soft or shimmering.
+
+avoid_overlay: |
+  - Explaining dream logic immediately after presenting it
+  - Using "as if" as the default engine for every strange image
+  - Mistaking vagueness for mystery
+  - Making surreal passages sound like polished exposition
+  - Resolving strangeness into a single tidy interpretation
+
+exemplars:
+  - "The room had grown a second ceiling while Nera was answering the phone."
+  - "Every mirror in the hotel showed breakfast instead of faces."
+  - "The song came back with wet sleeves and a mouth full of moths."
+  - "In the orchard, the dead stood alphabetically and would not speak out of turn."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This story is surreal or lyrical. The copy can use one strange concrete image
+  as its entry point, but it should remain readable. Do not over-explain the
+  rules of the dream; give the reader a person and a pressure.

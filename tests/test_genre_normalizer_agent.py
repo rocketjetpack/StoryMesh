@@ -67,6 +67,12 @@ def _test_genre_map() -> dict:
             "subgenres": [],
             "default_tones": ["passionate", "warm", "emotional"],
         },
+        "literary fiction": {
+            "alternates": ["literary"],
+            "genres": ["literary_fiction"],
+            "subgenres": [],
+            "default_tones": ["introspective", "nuanced"],
+        },
     }
 
 
@@ -550,3 +556,50 @@ class TestPass4HolisticInference:
         # Still available as a full InferredGenre object
         assert len(result.inferred_genres) == 1
         assert result.inferred_genres[0].canonical_genre == "science_fiction"
+
+    def test_pass4_inferred_genres_are_additive_when_explicit_genre_exists(
+        self, store: MappingStore,
+    ) -> None:
+        """Strong Pass 4 inferences are appended even when Pass 1 found a broad genre."""
+        import json
+
+        from storymesh.llm.base import FakeLLMClient
+
+        pass3_response = json.dumps({"classifications": [
+            {"token": "living starship", "type": "narrative_context", "is_stopword": False},
+            {"token": "ancestral crimes", "type": "narrative_context", "is_stopword": False},
+        ]})
+        pass4_response = json.dumps({"inferred_genres": [
+            {
+                "canonical_genre": "science_fiction",
+                "subgenres": ["space_opera"],
+                "default_tones": ["speculative"],
+                "rationale": "A living starship implies science fiction.",
+                "confidence": 0.85,
+            },
+            {
+                "canonical_genre": "horror",
+                "subgenres": ["gothic_horror"],
+                "default_tones": ["haunted"],
+                "rationale": "Ancestral crimes aboard a living ship imply horror.",
+                "confidence": 0.75,
+            },
+        ]})
+        client = FakeLLMClient(responses=[pass3_response, pass4_response])
+        agent_with_llm = GenreNormalizerAgent(store=store, llm_client=client)
+
+        result = agent_with_llm.run(GenreNormalizerAgentInput(
+            raw_genre="literary fiction about a living starship and ancestral crimes",
+        ))
+
+        assert result.normalized_genres == [
+            "literary_fiction",
+            "science_fiction",
+            "horror",
+        ]
+        assert "space_opera" in result.subgenres
+        assert "gothic_horror" in result.subgenres
+        assert result.debug["promoted_inferred_genres"] == [
+            "science_fiction",
+            "horror",
+        ]

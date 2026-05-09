@@ -1,0 +1,63 @@
+# Voice Profile: hardboiled_fragmentary
+
+id: hardboiled_fragmentary
+description: >-
+  Gritty, voice-forward crime and noir prose with compression, hard edges,
+  street-level texture, broken fragments, and dialogue that cuts. Less polished
+  than literary restraint, more bodily and immediate than cerebral investigation.
+
+tone_keywords:
+  - gritty
+  - hardboiled
+  - noir
+  - cynical
+  - raw
+  - terse
+  - streetwise
+  - bruised
+  - smoky
+  - unsentimental
+
+genre_keywords:
+  - crime
+  - mystery
+  - thriller
+  - noir
+  - western
+  - dystopian
+
+craft_overlay: |
+  12. Voice before polish.
+     Let the narration have pressure, attitude, compression, and local idiom.
+     A sentence can be rough and still be exact.
+
+  13. Dialogue does work.
+     People bargain, threaten, flirt, lie, stall, and test each other. Keep
+     exchanges sharp. Subtext is useful, but not if it sands off the voice.
+
+  14. Stay street-level.
+     Prefer rooms, routes, debts, smells, bruises, money, favors, weathered
+     habits, and bad decisions over abstract epistemology.
+
+  15. Fragments are allowed.
+     Short paragraphs, clipped observations, and incomplete thoughts can carry
+     pace when they sound like the narrator rather than like emphasis.
+
+avoid_overlay: |
+  - Overly tasteful ambiguity that removes danger or bite
+  - Institutional abstraction where a person, place, debt, or threat would do
+  - Long explanatory clauses during confrontation
+  - Noir pastiche cliches: dames, mean streets, smoke-filled rooms as default
+  - Making the protagonist merely observant instead of implicated
+
+exemplars:
+  - "The lock gave on the second kick, which meant someone wanted it to."
+  - "Nico paid in wet bills and kept his left hand under the table."
+  - "The alley smelled like fryer oil, rain, and somebody else's mistake."
+  - "By midnight, three people had lied to me and one of them was dead."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This story wants bite. Keep the copy lean, concrete, and slightly dangerous.
+  Let voice carry the hook. Avoid elegant literary irresolution when a sharper
+  threat, debt, or choice would create more pull.

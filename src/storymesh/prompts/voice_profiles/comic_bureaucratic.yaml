@@ -1,0 +1,64 @@
+# Voice Profile: comic_bureaucratic
+
+id: comic_bureaucratic
+description: >-
+  Absurd, satirical, paperwork-haunted prose for institutions that are funny
+  before they are profound. Useful for divine administration, workplace farce,
+  impossible forms, procedural absurdity, and systems whose rules make people
+  behave badly in very specific ways.
+
+tone_keywords:
+  - absurd
+  - comic
+  - satirical
+  - bureaucratic
+  - deadpan
+  - wry
+  - farcical
+  - dry
+  - ridiculous
+  - playful
+
+genre_keywords:
+  - fantasy
+  - science_fiction
+  - literary_fiction
+  - comedy
+  - speculative
+
+craft_overlay: |
+  12. Let the system be funny on the page.
+     Absurd bureaucracy is not just a premise. Show delays, wrong counters,
+     contradictory instructions, forms with bad names, employees with routines,
+     and consequences that arrive through petty procedure.
+
+  13. Comic timing matters.
+     Use reversals, escalation, underreaction, over-specific rules, and dialogue
+     that lands a beat late. Do not smooth every joke into literary restraint.
+
+  14. People first, system second.
+     The institution should pressure bodies, schedules, reputations, meals,
+     crushes, grudges, and errands. Avoid making the story only a clever file.
+
+  15. Let absurdity vary.
+     Mix deadpan procedure with interruption, public embarrassment, practical
+     inconvenience, and moments of real feeling.
+
+avoid_overlay: |
+  - Treating bureaucracy as solemn atmosphere only
+  - Repeating file/stamp/form beats without comic escalation
+  - Explaining the joke after the procedure has already made it clear
+  - Making every character competent, restrained, and quietly observant
+  - Ending with tasteful ambiguity when a comic consequence would be stronger
+
+exemplars:
+  - "The apocalypse arrived at window four without the required blue copy."
+  - "Mina had been promoted by mistake and demoted by a committee that no longer existed."
+  - "The saint took a number, lost it, and was asked to prove the loss in triplicate."
+  - "By lunch, the dragon had eaten two interns and approved one travel voucher."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This story is comic or satirical. The copy should allow the absurdity to be
+  funny, not merely wry. Use the system's specific ridiculousness as the hook
+  and end on a consequence, reversal, or impossible choice.

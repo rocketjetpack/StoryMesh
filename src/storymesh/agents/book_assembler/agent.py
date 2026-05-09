@@ -158,6 +158,46 @@ body {
     color: #888;
 }
 
+/* Run info page — pipeline metadata between title and synopsis */
+.run-info-page {
+    page: front-matter;
+    break-after: page;
+    padding-top: 6mm;
+}
+.run-info-page h2 {
+    font-size: 3.2mm;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    text-align: center;
+    color: #666;
+    margin-bottom: 7mm;
+}
+.run-info-page h3 {
+    font-size: 2.8mm;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #888;
+    margin-top: 6mm;
+    margin-bottom: 2mm;
+}
+.run-info-page .prompt-text {
+    font-style: italic;
+    font-size: 3.5mm;
+    line-height: 1.6;
+    text-align: left;
+    text-indent: 0;
+    color: #222;
+}
+.run-info-page .stat-line {
+    font-size: 3.4mm;
+    line-height: 1.6;
+    text-align: left;
+    text-indent: 0;
+    color: #222;
+}
+
 /* Synopsis page */
 .synopsis-page {
     page: front-matter;
@@ -245,7 +285,7 @@ h2.scene-title {
     color: #555;
     margin: 3em 0 1.5em;
 }
-h2.synopsis-heading {
+h2.synopsis-heading, h2.run-info-heading {
     font-size: 0.85em;
     font-weight: normal;
     text-transform: uppercase;
@@ -253,6 +293,25 @@ h2.synopsis-heading {
     text-align: center;
     color: #777;
     margin: 2.5em 0 1.2em;
+}
+h3.run-info-section {
+    font-size: 0.78em;
+    font-weight: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #888;
+    margin: 1.6em 0 0.4em;
+}
+p.prompt-text {
+    font-style: italic;
+    text-indent: 0;
+    line-height: 1.6;
+    text-align: left;
+}
+p.stat-line {
+    text-indent: 0;
+    line-height: 1.6;
+    text-align: left;
 }
 p {
     text-indent: 1.5em;
@@ -314,6 +373,41 @@ def _prose_to_html(prose: str) -> str:
         if chunk.strip()
     ]
     return "\n".join(f"<p>{_escape(p)}</p>" for p in paragraphs)
+
+
+def _format_runtime(seconds: float) -> str:
+    """Render a runtime duration as ``MM:SS`` (or ``HH:MM:SS`` past one hour).
+
+    Args:
+        seconds: Non-negative duration in seconds.
+
+    Returns:
+        Zero-padded compact duration string.
+    """
+    total = max(0, int(round(seconds)))
+    hours, rem = divmod(total, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
+def _has_run_info(
+    user_prompt: str | None,
+    runtime_seconds: float | None,
+    token_usage: dict[str, int] | None,
+) -> bool:
+    """Whether the run-info page has enough data to render.
+
+    Returns ``True`` only when all three inputs are present (and the prompt
+    is non-blank). The page is omitted otherwise so the legacy
+    ``regenerate_book_assembler`` path keeps producing clean output.
+    """
+    return (
+        bool(user_prompt and user_prompt.strip())
+        and runtime_seconds is not None
+        and token_usage is not None
+    )
 
 
 def _tag_line(proposal_genre_blend: list[str], proposal_tone: list[str]) -> str:
@@ -432,6 +526,9 @@ class BookAssemblerAgent:
                 back_cover_summary=story.back_cover_summary,
                 scene_pairs=scene_pairs,
                 cover_b64=cover_b64,
+                user_prompt=input_data.user_prompt,
+                runtime_seconds=input_data.runtime_seconds,
+                token_usage=input_data.token_usage,
             )
             debug["pdf_generated"] = pdf_bytes is not None
 
@@ -444,8 +541,17 @@ class BookAssemblerAgent:
                 back_cover_summary=story.back_cover_summary,
                 scene_pairs=scene_pairs,
                 cover_bytes=cover_bytes,
+                user_prompt=input_data.user_prompt,
+                runtime_seconds=input_data.runtime_seconds,
+                token_usage=input_data.token_usage,
             )
             debug["epub_generated"] = epub_bytes is not None
+
+        debug["has_run_info_page"] = _has_run_info(
+            input_data.user_prompt,
+            input_data.runtime_seconds,
+            input_data.token_usage,
+        )
 
         return BookRawOutput(
             pdf_bytes=pdf_bytes,
@@ -465,6 +571,9 @@ class BookAssemblerAgent:
         back_cover_summary: str,
         scene_pairs: list[tuple[str, str]],
         cover_b64: str | None,
+        user_prompt: str | None = None,
+        runtime_seconds: float | None = None,
+        token_usage: dict[str, int] | None = None,
     ) -> bytes | None:
         """Render the book as PDF bytes via WeasyPrint.
 
@@ -474,6 +583,10 @@ class BookAssemblerAgent:
             back_cover_summary: Back-cover synopsis text.
             scene_pairs: List of (scene_title, prose_text) tuples.
             cover_b64: Base64-encoded cover PNG, or None for a typographic cover.
+            user_prompt: Original user prompt; rendered onto the run-info page
+                when supplied alongside runtime and token usage.
+            runtime_seconds: Pipeline runtime; rendered when supplied.
+            token_usage: LLM token totals; rendered when supplied.
 
         Returns:
             PDF as raw bytes, or None if WeasyPrint is not installed.
@@ -493,6 +606,9 @@ class BookAssemblerAgent:
             back_cover_summary=back_cover_summary,
             scene_pairs=scene_pairs,
             cover_b64=cover_b64,
+            user_prompt=user_prompt,
+            runtime_seconds=runtime_seconds,
+            token_usage=token_usage,
         )
         return _WeasyHTML(string=html_str).write_pdf()  # type: ignore[no-any-return]
 
@@ -504,6 +620,9 @@ class BookAssemblerAgent:
         back_cover_summary: str,
         scene_pairs: list[tuple[str, str]],
         cover_b64: str | None,
+        user_prompt: str | None = None,
+        runtime_seconds: float | None = None,
+        token_usage: dict[str, int] | None = None,
     ) -> str:
         """Build the full HTML document used as WeasyPrint input.
 
@@ -541,6 +660,35 @@ class BookAssemblerAgent:
             "</div>"
         )
 
+        # Run-info page — only when prompt + runtime + tokens are all supplied.
+        run_info_html = ""
+        if _has_run_info(user_prompt, runtime_seconds, token_usage):
+            assert user_prompt is not None  # narrowed by _has_run_info
+            assert runtime_seconds is not None
+            assert token_usage is not None
+            prompt_paragraphs = "\n".join(
+                f'<p class="prompt-text">{_escape(p.strip())}</p>'
+                for p in user_prompt.split("\n\n")
+                if p.strip()
+            )
+            runtime_str = _format_runtime(runtime_seconds)
+            prompt_tok = int(token_usage.get("approx_prompt_tokens", 0))
+            response_tok = int(token_usage.get("approx_response_tokens", 0))
+            total_tok = int(token_usage.get("approx_total_tokens", 0))
+            run_info_html = (
+                '<div class="run-info-page">'
+                "<h2>Generation Details</h2>"
+                "<h3>Prompt</h3>"
+                f"{prompt_paragraphs}"
+                "<h3>Runtime</h3>"
+                f'<p class="stat-line">{runtime_str}</p>'
+                "<h3>Token Usage</h3>"
+                f'<p class="stat-line">Prompt: {prompt_tok:,}</p>'
+                f'<p class="stat-line">Response: {response_tok:,}</p>'
+                f'<p class="stat-line">Total: {total_tok:,}</p>'
+                "</div>"
+            )
+
         # Synopsis page
         synopsis_paragraphs = _prose_to_html(back_cover_summary)
         synopsis_html = (
@@ -573,6 +721,7 @@ class BookAssemblerAgent:
             "<body>\n"
             f"{cover_html}\n"
             f"{title_page_html}\n"
+            f"{run_info_html}\n"
             f"{synopsis_html}\n"
             f"{scenes_html}\n"
             "</body>\n"
@@ -590,6 +739,9 @@ class BookAssemblerAgent:
         back_cover_summary: str,
         scene_pairs: list[tuple[str, str]],
         cover_bytes: bytes | None,
+        user_prompt: str | None = None,
+        runtime_seconds: float | None = None,
+        token_usage: dict[str, int] | None = None,
     ) -> bytes | None:
         """Build an EPUB3 document and return it as raw bytes.
 
@@ -603,6 +755,10 @@ class BookAssemblerAgent:
             back_cover_summary: Synopsis text.
             scene_pairs: Ordered (title, prose) tuples.
             cover_bytes: Raw PNG bytes for the cover image, or None.
+            user_prompt: Original user prompt; rendered onto the run-info
+                chapter when supplied alongside runtime and token usage.
+            runtime_seconds: Pipeline runtime; rendered when supplied.
+            token_usage: LLM token totals; rendered when supplied.
 
         Returns:
             EPUB3 as raw bytes, or None if ebooklib is not installed.
@@ -636,6 +792,42 @@ class BookAssemblerAgent:
             chapter_title="Title Page", css=_EPUB_CSS, body=title_body
         ).encode("utf-8")
         book.add_item(title_ch)
+
+        # Run-info chapter — only when prompt + runtime + tokens are all supplied.
+        run_info_ch: Any | None = None
+        if _has_run_info(user_prompt, runtime_seconds, token_usage):
+            assert user_prompt is not None  # narrowed by _has_run_info
+            assert runtime_seconds is not None
+            assert token_usage is not None
+            prompt_paragraphs = "\n".join(
+                f'<p class="prompt-text">{_escape(p.strip())}</p>'
+                for p in user_prompt.split("\n\n")
+                if p.strip()
+            )
+            runtime_str = _format_runtime(runtime_seconds)
+            prompt_tok = int(token_usage.get("approx_prompt_tokens", 0))
+            response_tok = int(token_usage.get("approx_response_tokens", 0))
+            total_tok = int(token_usage.get("approx_total_tokens", 0))
+            run_info_body = (
+                '<h2 class="run-info-heading">Generation Details</h2>\n'
+                '<h3 class="run-info-section">Prompt</h3>\n'
+                f"{prompt_paragraphs}\n"
+                '<h3 class="run-info-section">Runtime</h3>\n'
+                f'<p class="stat-line">{runtime_str}</p>\n'
+                '<h3 class="run-info-section">Token Usage</h3>\n'
+                f'<p class="stat-line">Prompt: {prompt_tok:,}</p>\n'
+                f'<p class="stat-line">Response: {response_tok:,}</p>\n'
+                f'<p class="stat-line">Total: {total_tok:,}</p>'
+            )
+            run_info_ch = epub.EpubHtml(
+                title="Generation Details",
+                file_name="run_info.xhtml",
+                lang="en",
+            )
+            run_info_ch.content = _EPUB_CHAPTER_TEMPLATE.format(
+                chapter_title="Generation Details", css=_EPUB_CSS, body=run_info_body
+            ).encode("utf-8")
+            book.add_item(run_info_ch)
 
         # Synopsis chapter
         synopsis_body = (
@@ -673,8 +865,12 @@ class BookAssemblerAgent:
             book.add_item(ch)
             scene_chapters.append(ch)
 
-        # Navigation
-        all_chapters: list[Any] = [title_ch, synopsis_ch] + scene_chapters
+        # Navigation. Run-info chapter (when present) sits between title and synopsis.
+        front_matter: list[Any] = [title_ch]
+        if run_info_ch is not None:
+            front_matter.append(run_info_ch)
+        front_matter.append(synopsis_ch)
+        all_chapters: list[Any] = front_matter + scene_chapters
         book.toc = [
             epub.Link(ch.file_name, ch.title, f"nav_{i}")
             for i, ch in enumerate(all_chapters)

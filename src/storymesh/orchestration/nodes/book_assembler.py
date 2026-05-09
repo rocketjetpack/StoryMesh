@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from storymesh.agents.book_assembler.agent import BookAssemblerAgent
 from storymesh.core.email_delivery import EmailConfig, deliver_book, title_to_filename
+from storymesh.core.llm_usage import load_llm_usage_summary
 from storymesh.orchestration.state import StoryMeshState
 from storymesh.schemas.book_assembler import BookAssemblerAgentInput, BookAssemblerAgentOutput
 from storymesh.schemas.cover_art import CoverArtAgentOutput
@@ -70,11 +72,29 @@ def make_book_assembler_node(
         run_id: str = state.get("run_id", "")
         cover_art_output = state.get("cover_art_output")
 
+        # Compute pipeline runtime up to this stage. The book_assembler stage
+        # itself is fast (rendering only) and not yet finished here, so this
+        # is a slight underestimate of total wall clock — but it's the best
+        # value available before the page goes to PDF.
+        runtime_seconds: float | None = None
+        pipeline_start_time = state.get("pipeline_start_time")
+        if pipeline_start_time is not None:
+            runtime_seconds = time.perf_counter() - pipeline_start_time
+
+        # Aggregate token totals from llm_calls.jsonl. All upstream LLM stages
+        # have already flushed their records by the time this node runs.
+        token_usage: dict[str, int] | None = None
+        if artifact_store is not None and run_id:
+            token_usage = load_llm_usage_summary(artifact_store, run_id)
+
         input_data = BookAssemblerAgentInput(
             story_writer_output=story_writer_output,
             proposal=proposal_draft_output.proposal,
             cover_art_output=cover_art_output,
             run_id=run_id,
+            user_prompt=state.get("user_prompt"),
+            runtime_seconds=runtime_seconds,
+            token_usage=token_usage,
         )
 
         raw = agent.run(input_data)

@@ -1,0 +1,65 @@
+# Voice Profile: plainspoken_intimate
+
+id: plainspoken_intimate
+description: >-
+  Direct, human-scaled prose for grief, family, friendship, romance, memory,
+  recovery, and ordinary life under pressure. Plain sentences, concrete social
+  detail, and emotional clarity matter more than metaphor or formal poise.
+
+tone_keywords:
+  - intimate
+  - tender
+  - plainspoken
+  - honest
+  - quiet
+  - warm
+  - sad
+  - vulnerable
+  - domestic
+  - reflective
+
+genre_keywords:
+  - literary_fiction
+  - romance
+  - historical_fiction
+  - slice_of_life
+  - family
+  - contemporary
+
+craft_overlay: |
+  12. Directness is allowed.
+     Do not dodge every feeling through action. Some stories need a person to
+     say the plain thing, or to nearly say it and fail in a recognizable way.
+
+  13. Keep the scale human.
+     Meals, chores, money, illness, small rituals, texts, errands, old jokes,
+     family rules, and badly timed kindness can carry more weight than grand
+     thematic machinery.
+
+  14. Use metaphor sparingly.
+     Prefer the sentence a person might actually think after a long day. Let
+     plain speech be beautiful when it is exact.
+
+  15. Relationships are plot.
+     A changed habit, missed call, shared bed, borrowed car, apology, or refusal
+     can be the event. Do not force a mystery engine onto an intimate story.
+
+avoid_overlay: |
+  - Over-intellectualizing ordinary pain
+  - Hiding every emotion inside objects and gestures
+  - Treating quietness as lifelessness
+  - Making the ending a tasteful unresolved image when a direct human exchange
+    would be braver
+  - Using records, files, or formal procedures as a substitute for relationship
+
+exemplars:
+  - "Tessa brought the soup back because neither of them had eaten."
+  - "He still had her spare key and no good reason to keep it."
+  - "The baby slept through the argument, which made both of them speak softer."
+  - "On Fridays, June called her brother and let him lie for ten minutes."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This story is intimate and plainspoken. The copy should be direct, specific,
+  and emotionally legible without becoming sentimental. A small human action can
+  be a stronger hook than a mystery or conceptual question.

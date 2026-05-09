@@ -16,6 +16,7 @@ from rich.table import Table
 from storymesh import generate_synopsis
 from storymesh.config import get_config
 from storymesh.core.artifacts import ArtifactStore
+from storymesh.core.llm_usage import load_llm_usage_summary
 from storymesh.core.run_inspector import (
     LLMCallRecord,
     RunInspection,
@@ -301,61 +302,6 @@ def _run_with_stage_progress[T](label: str, fn: Callable[[], T]) -> tuple[T, flo
     return result_box["value"], elapsed
 
 
-def _load_llm_usage_summary(
-    store: ArtifactStore,
-    run_id: str,
-    *,
-    include_agents: set[str] | None = None,
-    exclude_agents: set[str] | None = None,
-) -> dict[str, int]:
-    """Summarize rough LLM usage from ``llm_calls.jsonl`` for one run."""
-    raw = store.load_run_file(run_id, "llm_calls.jsonl")
-    if raw is None:
-        return {
-            "calls": 0,
-            "approx_prompt_tokens": 0,
-            "approx_response_tokens": 0,
-            "approx_total_tokens": 0,
-            "parse_failures": 0,
-            "latency_ms": 0,
-        }
-
-    calls = 0
-    prompt_tokens = 0
-    response_tokens = 0
-    total_tokens = 0
-    parse_failures = 0
-    latency_ms = 0
-
-    for line in raw.splitlines():
-        if not line.strip():
-            continue
-        record = orjson.loads(line)
-        if not isinstance(record, dict):
-            continue
-        agent = str(record.get("agent", ""))
-        if include_agents is not None and agent not in include_agents:
-            continue
-        if exclude_agents is not None and agent in exclude_agents:
-            continue
-        calls += 1
-        prompt_tokens += int(record.get("approx_prompt_tokens", 0) or 0)
-        response_tokens += int(record.get("approx_response_tokens", 0) or 0)
-        total_tokens += int(record.get("approx_total_tokens", 0) or 0)
-        latency_ms += int(record.get("latency_ms", 0) or 0)
-        if not bool(record.get("parse_success", False)):
-            parse_failures += 1
-
-    return {
-        "calls": calls,
-        "approx_prompt_tokens": prompt_tokens,
-        "approx_response_tokens": response_tokens,
-        "approx_total_tokens": total_tokens,
-        "parse_failures": parse_failures,
-        "latency_ms": latency_ms,
-    }
-
-
 def _render_usage_line(label: str, usage: dict[str, int]) -> str:
     """Format one compact CLI line for rough LLM usage."""
     latency = _format_duration(usage["latency_ms"] / 1000) if usage["latency_ms"] else "0.0s"
@@ -484,7 +430,7 @@ def generate(
     if run_dir != Path("") and run_dir.exists():
         console.print(f"Artifacts saved to: [dim]{run_dir}[/dim]")
         store = ArtifactStore()
-        usage = _load_llm_usage_summary(store, run_id)
+        usage = load_llm_usage_summary(store, run_id)
         if usage["calls"]:
             console.print(_render_usage_line("LLM usage (approx)", usage))
         console.print(f"Wall clock: [dim]{_format_duration(wall_clock)}[/dim]")
@@ -646,12 +592,12 @@ def compare(
     console.print(f"  - [dim]{run_dir / 'comparison.json'}[/dim]")
     console.print(f"  - [dim]{run_dir / 'blinded_eval_packet.json'}[/dim]")
     console.print(f"  - [dim]{run_dir / 'blinded_eval_key.json'}[/dim]")
-    storymesh_usage = _load_llm_usage_summary(
+    storymesh_usage = load_llm_usage_summary(
         store,
         run_id,
         exclude_agents={"compare_baseline"},
     )
-    baseline_usage = _load_llm_usage_summary(
+    baseline_usage = load_llm_usage_summary(
         store,
         run_id,
         include_agents={"compare_baseline"},

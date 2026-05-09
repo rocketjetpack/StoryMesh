@@ -1,7 +1,7 @@
 """Pydantic schema for VoiceProfile and the load_voice_profile loader.
 
 A VoiceProfile is a named, immutable record that conditions prose generation
-across the StoryMesh pipeline. Three built-in profiles are shipped with the
+across the StoryMesh pipeline. Built-in profiles are shipped with the
 package; additional profiles can be added by placing YAML files in
 src/storymesh/prompts/voice_profiles/.
 
@@ -28,6 +28,12 @@ BUILT_IN_PROFILE_IDS: tuple[str, ...] = (
     "literary_restraint",
     "cozy_warmth",
     "genre_active",
+    "documentary_collage",
+    "hardboiled_fragmentary",
+    "comic_bureaucratic",
+    "surreal_lyrical",
+    "propulsive_thriller",
+    "plainspoken_intimate",
 )
 
 

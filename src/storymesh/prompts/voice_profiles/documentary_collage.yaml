@@ -1,0 +1,68 @@
+# Voice Profile: documentary_collage
+
+id: documentary_collage
+description: >-
+  Form-forward fiction built from documents, messages, testimony, transcripts,
+  posts, marginalia, articles, logs, and other mediated surfaces. Use when the
+  user explicitly asks for epistolary structure, found text, fragmented forms,
+  mixed media, or competing accounts.
+
+tone_keywords:
+  - documentary
+  - epistolary
+  - fragmented
+  - collage
+  - archival
+  - transcript
+  - polyphonic
+  - media
+  - formal
+  - procedural
+
+genre_keywords:
+  - mystery
+  - horror
+  - science_fiction
+  - literary_fiction
+  - historical_fiction
+  - crime
+  - speculative
+
+craft_overlay: |
+  12. Make the form visible.
+     If the user requested documents, messages, testimony, media fragments, or
+     found text, the draft should actually change surface. Do not merely write
+     conventional scenes about those forms.
+
+  13. Let fragments disagree.
+     Collage works when pieces rub against each other: different registers,
+     partial knowledge, contradictory social positions, missing context, and
+     tonal shifts. Avoid making every fragment sound like the same narrator.
+
+  14. Use white space as structure.
+     Compression, headers, abrupt transitions, repeated forms, and omissions can
+     carry story. Not every fragment needs to explain how it connects.
+
+  15. Keep documents human.
+     A form, post, memo, or transcript should reveal the person and institution
+     that produced it. Bureaucratic language is texture, not a substitute for
+     character.
+
+avoid_overlay: |
+  - Turning every fragment into polished literary narration
+  - Explaining the relationship between documents after each fragment
+  - Making all voices share the same syntax, restraint, and vocabulary
+  - Using documents only as props while the story remains conventional prose
+  - Letting headers, timestamps, or metadata do all the emotional work
+
+exemplars:
+  - "Subject line: RE: the door in the rehearsal room is not part of inventory."
+  - "The first transcript ends where the applause should have been."
+  - "Posted by user saltlight_22 at 3:18 a.m., edited once, reason not provided."
+  - "In the margin beside question seven, someone has drawn a small square with no door."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This story is form-forward. The copy may name or demonstrate the mixed forms
+  if that is central to the hook, but it should not become a technical explanation
+  of structure. Let one or two concrete fragments suggest the larger collage.

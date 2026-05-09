@@ -151,7 +151,7 @@ class StoryWriterAgentOutput(BaseModel):
     scene_list: list[SceneOutline] = Field(
         min_length=3,
         description=(
-            "6–10 structured scene outlines. The auditable intermediate between "
+            "3–9 structured scene outlines. The auditable intermediate between "
             "the proposal's key_scenes and the final prose draft."
         ),
     )

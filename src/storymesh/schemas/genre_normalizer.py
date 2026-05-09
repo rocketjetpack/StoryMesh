@@ -263,9 +263,9 @@ class GenreNormalizerAgentOutput(BaseModel):
             "Genres inferred from holistic prompt analysis (Pass 4). "
             "These are not mapped from specific tokens but emerge from the "
             "overall context, themes, and narrative signals in the prompt. "
-            "Downstream agents that want the full genre picture should combine "
-            "normalized_genres and inferred_genres; agents needing only "
-            "high-confidence explicit genres should use normalized_genres alone."
+            "Strong canonical inferences may also be promoted into "
+            "normalized_genres so broad explicit labels do not suppress "
+            "concrete implied genres."
         ),
     )
 

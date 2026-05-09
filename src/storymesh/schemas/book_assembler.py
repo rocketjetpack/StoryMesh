@@ -45,6 +45,33 @@ class BookAssemblerAgentInput(BaseModel):
     run_id: str = Field(
         description="Unique run identifier. Used as the EPUB identifier.",
     )
+    user_prompt: str | None = Field(
+        default=None,
+        description=(
+            "Original free-text prompt supplied by the user. Rendered onto the "
+            "run-info page in the assembled book. Optional so legacy callers "
+            "(e.g. ``regenerate_book_assembler`` paths that lack the prompt) "
+            "still validate; when ``None`` the run-info page is omitted."
+        ),
+    )
+    runtime_seconds: float | None = Field(
+        default=None,
+        ge=0.0,
+        description=(
+            "Pipeline wall-clock duration in seconds (graph start to "
+            "book_assembler entry). Rendered onto the run-info page. "
+            "Optional; when ``None`` the run-info page is omitted."
+        ),
+    )
+    token_usage: dict[str, int] | None = Field(
+        default=None,
+        description=(
+            "LLM token totals for the run. Expected keys: ``approx_prompt_tokens``, "
+            "``approx_response_tokens``, ``approx_total_tokens``, ``calls``. "
+            "Rendered onto the run-info page. Optional; when ``None`` the "
+            "run-info page is omitted."
+        ),
+    )
 
 
 class BookAssemblerAgentOutput(BaseModel):

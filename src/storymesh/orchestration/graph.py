@@ -556,7 +556,11 @@ def build_graph(
             outline_max_tokens=story_cfg.get("outline_max_tokens", 4096),
             draft_max_tokens=story_cfg.get("draft_max_tokens", 8000),
             summary_max_tokens=story_cfg.get("summary_max_tokens", 1024),
-            target_words=story_cfg.get("target_words", 3000),
+            maximum_words=story_cfg.get(
+                "maximum_words",
+                story_cfg.get("target_words", 3000),
+            ),
+            length_policy=story_cfg.get("length_policy", "story_natural"),
         )
         story_writer_node = make_story_writer_node(story_agent, artifact_store=artifact_store)
 

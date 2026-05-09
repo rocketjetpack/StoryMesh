@@ -55,6 +55,48 @@ _ALTERNATE_ANGLE_NOTE = (
     "fundamentally different story premise, protagonist, and plot structure."
 )
 
+_DIVERSITY_CARDS = (
+    (
+        "Candidate 1 card: develop the most direct version of the assigned "
+        "seed, but do not let direct become default. The protagonist should "
+        "want a tangible outcome, and the climax should not be a report, log, "
+        "trial, archive, notebook, official finding, or file submission unless "
+        "the user explicitly requested that machinery."
+    ),
+    (
+        "Candidate 2 card: enter through a side door. Use a protagonist whose "
+        "relation to the premise is beneficiary, worker, dependent, rival, "
+        "child, elder, performer, host, guest, or person with the wrong "
+        "expertise. Do not make them an investigator, auditor, archivist, "
+        "observer, analyst, or record-keeper by temperament."
+    ),
+    (
+        "Candidate 3 card: change the story engine. Use relationship pressure, "
+        "public embarrassment, physical risk, desire, hunger, performance, a "
+        "meal, wager, ritual, rescue, sabotage, pursuit, or bodily consequence "
+        "instead of investigation, explanation, or evidence handling."
+    ),
+    (
+        "Candidate 4 card: change the time shape or formal surface. Consider "
+        "one bad hour, aftermath first, seasonal drift, circular return, "
+        "interrupted routine, oral tale, dialogue-forward scenes, fragments, "
+        "or an ending-in-miniature first. Use documents only if the user asked "
+        "for documents."
+    ),
+    (
+        "Candidate 5 card: change the social scale and ending posture. Let the "
+        "pressure happen through family, workplace, neighborhood, crowd, "
+        "market, classroom, ship, fandom, village, or public consequence. End "
+        "with a material, social, comic, bodily, or spoken change rather than "
+        "a lone person contemplating an ambiguous object."
+    ),
+)
+
+
+def _candidate_diversity_card(candidate_index: int) -> str:
+    """Return a deterministic diversity card for a 0-based candidate index."""
+    return _DIVERSITY_CARDS[candidate_index % len(_DIVERSITY_CARDS)]
+
 
 class ProposalDraftAgent:
     """Develops narrative seeds into full story proposals (Stage 4).
@@ -170,6 +212,9 @@ class ProposalDraftAgent:
         seed_assignments: dict[str, str] = {
             str(i): seeds[i % len(seeds)].seed_id for i in range(num_candidates)
         }
+        diversity_cards: dict[str, str] = {
+            str(i): _candidate_diversity_card(i) for i in range(num_candidates)
+        }
 
         candidates: list[StoryProposal] = []
         parse_failures = 0
@@ -185,6 +230,7 @@ class ProposalDraftAgent:
                 candidate_index=i + 1,
                 total_candidates=num_candidates,
                 alternate_angle_note=alternate_angle_note,
+                diversity_card=_candidate_diversity_card(i),
                 user_prompt=input_data.user_prompt,
                 normalized_genres=input_data.normalized_genres,
                 user_tones=input_data.user_tones,
@@ -321,6 +367,7 @@ class ProposalDraftAgent:
             "draft_temperature": self._temperature,
             "selection_temperature": self._selection_temperature,
             "seed_assignments": seed_assignments,
+            "diversity_cards": diversity_cards,
             "total_llm_calls": total_llm_calls,
             "is_retry": is_retry,
             "attempt_number": rubric_feedback.attempt_number if rubric_feedback else 1,
@@ -414,6 +461,7 @@ class ProposalDraftAgent:
             "draft_temperature": self._revision_temperature,
             "selection_temperature": None,
             "seed_assignments": {},
+            "diversity_cards": {},
             "total_llm_calls": 1,
             "is_retry": True,
             "is_revision": True,

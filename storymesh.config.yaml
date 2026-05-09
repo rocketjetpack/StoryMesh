@@ -74,7 +74,7 @@ agents:
     model: claude-sonnet-4-6
     temperature: 1.2
     max_tokens: 4096
-    num_candidates: 3
+    num_candidates: 5
     selection_temperature: 0.2
     selection_max_tokens: 2048
     revision_temperature: 0.5  # Lower temp for directed revision — precision over variance
@@ -101,7 +101,8 @@ agents:
     outline_max_tokens: 4096
     draft_max_tokens: 8000        # Supports up to ~6000-word drafts with margin
     summary_max_tokens: 1024
-    target_words: 3000            # Target prose length (actual output may vary ±15%)
+    maximum_words: 4500           # Hard creative ceiling, not a target to fill
+    length_policy: story_natural  # Use the shortest length that completes the story
 
   cover_art:
     image_provider: openai

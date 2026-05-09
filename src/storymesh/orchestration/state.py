@@ -47,6 +47,15 @@ class StoryMeshState(TypedDict, total=False):
     run_id: str
     """Unique run identifier (UUID hex), generated before graph invocation."""
 
+    pipeline_start_time: float
+    """``time.perf_counter()`` value captured before ``graph.stream()``.
+
+    Used by the book_assembler stage to compute the total pipeline runtime
+    that is rendered onto the run-info page of the assembled book. This is
+    wall-clock from graph entry up to book_assembler entry; the assembly
+    stage itself and post-graph CLI work are not included.
+    """
+
     # ── Stage 0: GenreNormalizerAgent ──────────────────────────────────────
     genre_normalizer_output: GenreNormalizerAgentOutput | None
 

@@ -137,7 +137,9 @@ class StoryWriterAgent:
         outline_max_tokens: int = 4096,
         draft_max_tokens: int = 6000,
         summary_max_tokens: int = 1024,
-        target_words: int = 3000,
+        maximum_words: int | None = None,
+        target_words: int | None = None,
+        length_policy: str = "story_natural",
     ) -> None:
         """Construct the agent.
 
@@ -155,9 +157,14 @@ class StoryWriterAgent:
             draft_max_tokens: Token budget for the prose pass. Must be large
                 enough for the full story — default 6000 supports ~4500 words.
             summary_max_tokens: Token budget for the summary pass.
-            target_words: Target word count for the full draft. Used in both
-                the outline prompt (to calibrate scene count) and the draft
-                prompt (to guide length).
+            maximum_words: Maximum prose word budget for the full draft. Used
+                as a ceiling, not a target, by prompt styles that support
+                natural story length.
+            target_words: Deprecated alias for maximum_words. Kept so older
+                config files and prompt styles continue to work.
+            length_policy: Named prompt policy for length behavior. The default
+                asks the model to choose the shortest length that completes the
+                story within the maximum word budget.
         """
         self._llm_client = llm_client
         self._outline_temperature = outline_temperature
@@ -166,7 +173,10 @@ class StoryWriterAgent:
         self._outline_max_tokens = outline_max_tokens
         self._draft_max_tokens = draft_max_tokens
         self._summary_max_tokens = summary_max_tokens
-        self._target_words = target_words
+        self._maximum_words = maximum_words if maximum_words is not None else (
+            target_words if target_words is not None else 3000
+        )
+        self._length_policy = length_policy
 
         # Load all prompts eagerly so misconfiguration is caught at
         # construction time, not mid-pipeline.
@@ -214,9 +224,10 @@ class StoryWriterAgent:
         ).decode()
 
         logger.debug(
-            "StoryWriterAgent starting | title=%r target_words=%d has_rubric=%s",
+            "StoryWriterAgent starting | title=%r maximum_words=%d length_policy=%s has_rubric=%s",
             proposal.title,
-            self._target_words,
+            self._maximum_words,
+            self._length_policy,
             input_data.rubric_feedback is not None,
         )
 
@@ -266,7 +277,8 @@ class StoryWriterAgent:
             "outline_temperature": self._outline_temperature,
             "draft_temperature": self._draft_temperature,
             "summary_temperature": self._summary_temperature,
-            "target_words": self._target_words,
+            "maximum_words": self._maximum_words,
+            "length_policy": self._length_policy,
             "scene_count": len(scene_list),
             "word_count": word_count,
             "total_llm_calls": 3,
@@ -319,7 +331,9 @@ class StoryWriterAgent:
         )
         proposal_json = orjson.dumps(proposal.model_dump()).decode()
         user_prompt_text = self._outline_prompt.format_user(
-            target_words=self._target_words,
+            maximum_words=self._maximum_words,
+            target_words=self._maximum_words,
+            length_policy=self._length_policy,
             user_prompt=user_prompt,
             normalized_genres=normalized_genres,
             user_tones=user_tones,
@@ -403,7 +417,9 @@ class StoryWriterAgent:
         )
         user_prompt_text = self._draft_prompt.format_user(
             title=proposal.title,
-            target_words=self._target_words,
+            maximum_words=self._maximum_words,
+            target_words=self._maximum_words,
+            length_policy=self._length_policy,
             protagonist=proposal.protagonist,
             thematic_thesis=proposal.thematic_thesis,
             tone=proposal.tone,

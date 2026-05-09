@@ -22,6 +22,21 @@ from storymesh.schemas.genre_normalizer import (
     InferredGenre,
 )
 
+_INFERRED_GENRE_PROMOTION_THRESHOLD = 0.7
+_CANONICAL_GENRES = {
+    "fantasy",
+    "science_fiction",
+    "horror",
+    "romance",
+    "mystery",
+    "thriller",
+    "historical_fiction",
+    "literary_fiction",
+    "adventure",
+    "crime",
+    "western",
+}
+
 
 class GenreNormalizerAgent:
     """Transforms raw input into a structured object.
@@ -103,22 +118,65 @@ class GenreNormalizerAgent:
 
         inferred_genres: list[InferredGenre] = resolver_result.inferred_genres
 
-        # Option B: When Passes 1–3 find nothing but Pass 4 infers genres,
-        # promote the inferred canonical genres into normalized_genres as a
-        # last-resort fallback so the pipeline can continue. The full
-        # InferredGenre objects remain in inferred_genres for downstream
-        # consumers that want rationale and confidence data.
+        promoted_inferred_genres = _deduplicate_preserve_order([
+            ig.canonical_genre for ig in inferred_genres
+            if ig.confidence >= _INFERRED_GENRE_PROMOTION_THRESHOLD
+            and ig.canonical_genre in _CANONICAL_GENRES
+        ])
+        promoted_inferred_subgenres = _deduplicate_preserve_order([
+            subgenre for ig in inferred_genres
+            if ig.confidence >= _INFERRED_GENRE_PROMOTION_THRESHOLD
+            and ig.canonical_genre in _CANONICAL_GENRES
+            for subgenre in ig.subgenres
+        ])
+
+        # Pass 4 is additive, not merely diagnostic. If Passes 1–3 resolve a
+        # broad register label like literary_fiction, strongly implied concrete
+        # genres still need to reach downstream agents. Otherwise prompts that
+        # say "literary" plus a speculative/horror/crime premise collapse into
+        # literary_fiction only.
+        if promoted_inferred_genres:
+            if not normalized_genres:
+                import logging as _logging  # noqa: PLC0415
+                _logging.getLogger(__name__).warning(
+                    "Passes 1–3 found no explicit genres for %r. "
+                    "Promoting %d Pass 4 inferred genre(s) into normalized_genres "
+                    "as a last-resort fallback.",
+                    input_data.raw_genre,
+                    len(promoted_inferred_genres),
+                )
+            normalized_genres = _deduplicate_preserve_order(
+                normalized_genres + promoted_inferred_genres
+            )
+            subgenres = _deduplicate_preserve_order(
+                subgenres + promoted_inferred_subgenres
+            )
+
+        # If all inferred genres are below the promotion threshold and Passes
+        # 1-3 found nothing, preserve the old fallback behavior so the pipeline
+        # can still continue when Pass 4 produced a usable but cautious answer.
         if not normalized_genres and inferred_genres:
+            fallback_inferred = [
+                ig for ig in inferred_genres
+                if ig.canonical_genre in _CANONICAL_GENRES
+            ]
             import logging as _logging  # noqa: PLC0415
             _logging.getLogger(__name__).warning(
                 "Passes 1–3 found no explicit genres for %r. "
                 "Promoting %d Pass 4 inferred genre(s) into normalized_genres "
                 "as a last-resort fallback.",
                 input_data.raw_genre,
-                len(inferred_genres),
+                len(fallback_inferred),
             )
             normalized_genres = _deduplicate_preserve_order(
-                [ig.canonical_genre for ig in inferred_genres]
+                [ig.canonical_genre for ig in fallback_inferred]
+            )
+            promoted_inferred_genres = normalized_genres
+            subgenres = _deduplicate_preserve_order(
+                subgenres + [
+                    subgenre for ig in fallback_inferred
+                    for subgenre in ig.subgenres
+                ]
             )
 
         # Build the debug dict with full resolution and audit data.
@@ -129,6 +187,7 @@ class GenreNormalizerAgent:
             "narrative_context": resolver_result.narrative_context,
             "unresolved_tokens": resolver_result.unresolved_tokens,
             "inferred_genres": [ig.model_dump() for ig in inferred_genres],
+            "promoted_inferred_genres": promoted_inferred_genres,
         }
 
         if not normalized_genres:
