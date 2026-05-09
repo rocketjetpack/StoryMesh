@@ -1,0 +1,172 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * StoryMesh kiosk — dark literary theme.
+ * The brief explicitly forbade the generic AI-app look (Inter on white,
+ * purple gradients). Instead: ink-on-cream typography, oxidised brass accent,
+ * paper-grain background, and warm radial focal pool behind the wizard.
+ */
+
+:root {
+  --ink: #0E1116;
+  --ink-soft: #161A22;
+  --ash: #2A2C32;
+  --cream: #F0E6D6;
+  --cream-soft: #DCD0BC;
+  --brass: #C28840;
+  --brass-bright: #E0A659;
+  --oxblood: #5C1A1B;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--cream);
+  font-family: "Newsreader", ui-serif, Georgia, serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Two-layer atmosphere: a warm focal pool pulled toward the upper-left
+   * wizard zone, falling off to deep ink at the edges. SVG paper grain at
+   * low opacity sits on top to break up the gradient banding. */
+  background-image:
+    url("/paper-grain.svg"),
+    radial-gradient(80vw 80vh at 28% 38%, rgba(194, 136, 64, 0.18) 0%, rgba(194, 136, 64, 0) 60%),
+    radial-gradient(120vw 120vh at 80% 100%, rgba(92, 26, 27, 0.12) 0%, rgba(14, 17, 22, 0) 70%),
+    linear-gradient(180deg, #0B0D11 0%, var(--ink) 60%);
+  background-size: 320px 320px, auto, auto, auto;
+  background-blend-mode: overlay, normal, normal, normal;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Suppress browser context menu and selection on a kiosk. */
+* { -webkit-touch-callout: none; }
+input, textarea { user-select: text; -webkit-user-select: text; cursor: text; }
+
+h1, h2, h3, .display {
+  font-family: "Fraunces", ui-serif, Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--cream);
+}
+
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+/* The prompt input itself uses the display face — a deliberate subversion
+ * of the generic "monospace placeholder" look. */
+.prompt-field {
+  background: rgba(22, 26, 34, 0.55);
+  color: var(--cream);
+  border: 1px solid rgba(240, 230, 214, 0.12);
+  border-radius: 4px;
+  padding: 1.25rem 1.5rem;
+  font-family: "Fraunces", ui-serif, Georgia, serif;
+  font-size: 1.5rem;
+  line-height: 1.5;
+  font-weight: 400;
+  width: 100%;
+  resize: none;
+  outline: none;
+  transition: border-color 250ms ease, background-color 250ms ease, box-shadow 250ms ease;
+}
+.prompt-field:focus {
+  border-color: var(--brass);
+  background: rgba(22, 26, 34, 0.75);
+  box-shadow: 0 0 0 4px rgba(194, 136, 64, 0.10);
+}
+.prompt-field::placeholder { color: rgba(240, 230, 214, 0.35); font-style: italic; }
+
+/* CTA button — letterpress feel, no rounded-blue-pill. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: transparent;
+  color: var(--brass-bright);
+  border: 1px solid var(--brass);
+  padding: 0.85rem 1.6rem;
+  border-radius: 2px;
+  font-family: "Fraunces", ui-serif, Georgia, serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--brass);
+  color: var(--ink);
+  letter-spacing: 0.06em;
+}
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--cream-soft);
+  border: none;
+  font-family: "Newsreader", ui-serif, Georgia, serif;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0.5rem 0.8rem;
+  letter-spacing: 0.02em;
+}
+.btn-ghost:hover { color: var(--brass-bright); }
+
+/* Side panel separator — a printed gold rule rather than a flat divider. */
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--brass) 30%, var(--brass) 70%, transparent 100%);
+  opacity: 0.5;
+}
+
+/* Voice card */
+.voice-card {
+  border: 1px solid rgba(240, 230, 214, 0.10);
+  background: rgba(22, 26, 34, 0.55);
+  padding: 1rem 1.1rem;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+.voice-card:hover { border-color: rgba(194, 136, 64, 0.45); }
+.voice-card[data-selected="true"] {
+  border-color: var(--brass);
+  background: rgba(194, 136, 64, 0.10);
+  box-shadow: 0 0 24px rgba(194, 136, 64, 0.12) inset;
+}
+.voice-card[data-recommended="true"]::before {
+  content: "Recommended";
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.65rem;
+  color: var(--brass-bright);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+/* Active job ink-dot */
+.ink-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--brass-bright);
+  display: inline-block;
+}
+
+/* Gallery cover-art tile */
+.cover-tile {
+  background: var(--ink-soft);
+  border: 1px solid rgba(240, 230, 214, 0.06);
+  padding: 6px;
+  perspective: 1200px;
+}
+.cover-tile img { display: block; width: 100%; height: auto; }

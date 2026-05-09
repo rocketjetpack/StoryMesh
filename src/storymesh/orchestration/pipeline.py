@@ -35,6 +35,7 @@ class StoryMeshPipeline:
         min_retries: int = 0,
         skip_resonance_review: bool = True,
         prompt_style: str | None = None,
+        voice_profile_override: str | None = None,
     ) -> None:
         # Graph is built on the first generate() call to defer config loading.
         self._graph: Any = None
@@ -46,12 +47,14 @@ class StoryMeshPipeline:
         self._min_retries = min_retries
         self._skip_resonance_review = skip_resonance_review
         self._prompt_style = prompt_style
+        self._voice_profile_override = voice_profile_override
         self._resolved_prompt_style: str | None = None
 
     def generate(
         self,
         user_prompt: str,
         email_recipient: str | None = None,
+        run_id: str | None = None,
     ) -> GenerationResult:
         """Run the StoryMesh pipeline for the given prompt.
 
@@ -66,6 +69,11 @@ class StoryMeshPipeline:
             ``email.recipient`` value in ``storymesh.config.yaml`` for this run
             only.  Pass ``None`` (default) to rely solely on the config.
         :type email_recipient: str | None
+        :param run_id: Optional caller-supplied run identifier. When ``None``
+            (default) a fresh UUID hex is generated. Allows external
+            orchestrators (e.g. the kiosk frontend) to know the run directory
+            path before the pipeline returns.
+        :type run_id: str | None
         :return: A GenerationResult containing the synopsis and metadata.
         :rtype: GenerationResult
         """
@@ -87,13 +95,15 @@ class StoryMeshPipeline:
                 min_retries=self._min_retries,
                 skip_resonance_review=self._skip_resonance_review,
                 prompt_style=resolved_prompt_style,
+                voice_profile_override=self._voice_profile_override,
             )
         else:
             resolved_prompt_style = self._resolved_prompt_style or "default"
 
         # Generate run_id before invocation so metadata is on disk even if the
         # graph crashes mid-run (enables partial-run post-mortem inspection).
-        run_id = uuid.uuid4().hex
+        if run_id is None:
+            run_id = uuid.uuid4().hex
         # Capture timestamp before graph execution so both the initial write and
         # the post-run update reflect the run *start* time, not the end time.
         run_timestamp = datetime.now(tz=timezone.utc).isoformat()  # noqa: UP017

@@ -24,6 +24,11 @@ system: |
   - Only infer genres with clear textual evidence in the prompt. Do not speculate.
   - Do NOT include any genre that is already listed in "Already resolved genres."
     That list is provided specifically to prevent duplication.
+  - Treat "literary_fiction" as a mode/register, not an umbrella that absorbs
+    other clear genre signals. If "literary_fiction" is already resolved but
+    the full prompt clearly implies science_fiction, horror, fantasy, crime,
+    mystery, thriller, romance, historical_fiction, adventure, or western, infer
+    those additional genres rather than returning an empty list.
   - Each inferred genre must include a rationale explaining the specific evidence
     from the prompt that implies it.
   - canonical_genre MUST be one of the widely recognized top-level literary genres:
@@ -38,6 +43,28 @@ system: |
     not just thriller generically).
   - Default tones should reflect the tonal conventions of the inferred genre in the
     context of this specific prompt, not generic genre defaults.
+  - Preserve signals of pace, form, and social scale. A prompt asking for pursuit,
+    capers, battles, chases, public performance, comedy, epistolary fragments,
+    forum posts, transcripts, media feeds, or collage may imply a different
+    genre or subgenre than a quiet literary investigation. Do not flatten these
+    signals into literary_fiction unless the prompt explicitly centers interior
+    realism or literary tradition.
+  - Do not infer literary_fiction merely because the prompt has ambiguity,
+    grief, style shifts, or psychological pressure. Those qualities can belong
+    to thriller, horror, romance, adventure, crime, fantasy, science fiction, or
+    comedy. Infer literary_fiction only when the prompt clearly asks for a
+    literary mode, domestic/social realism, formal experimentation, or character
+    study as the primary experience.
+  - When literary_fiction is already resolved, bias this pass toward identifying
+    concrete non-literary genres that are strongly implied by setting, premise,
+    threat, relationship engine, technology, crime, magic, period detail, or
+    adventure structure. Return literary_fiction only if it is not already
+    resolved and is independently central.
+  - When the prompt implies a formal container such as letters, reports,
+    interview transcripts, forum threads, songs, legal filings, play scripts, or
+    oral testimony, preserve that specificity in subgenres or tones when there
+    is clear evidence. Formal signals are not just decorative context; they shape
+    the eventual story's diversity.
   - If no additional genres are clearly implied, return an empty inferred_genres list.
     An empty result is correct and common — do not force inferences.
   - Use snake_case for all genre, subgenre, and tone names.

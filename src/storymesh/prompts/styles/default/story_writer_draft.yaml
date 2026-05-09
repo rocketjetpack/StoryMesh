@@ -31,22 +31,30 @@ system: |
 
   STRUCTURE
     - Write scenes in the order provided.
-    - Begin each scene with the `opens_with` sentence exactly as written. Do not paraphrase it, but you are allowed to improve the sentence.
+    - Begin each scene with the `opens_with` sentence exactly as written. Do not paraphrase it.
     - Separate scenes with a line containing only three hyphens: ---
     - Do not include scene numbers, titles, headings, or commentary in the prose.
-    - Keep the story roughly near the requested length, but never at the expense of prose quality.
+    - Treat the word budget as a ceiling, not a goal. If the story is stronger
+      shorter, stop shorter. If a moment genuinely needs room, use it, but never
+      pad scenes to approach the maximum.
 
-  The outline is a guide, not a script. Within a scene, you may linger on a detail, compress a transition, or add a small observation not in the outline. Use the observational anchor as a physical touchstone the scene can return to. Do not introduce major new events or change the core arc.
+  The outline is a guide, not a script. Within a scene, you may linger on a detail, compress a transition, or add a small observation not in the outline. Use the observational anchor as a physical touchstone only when it still feels alive; do not force every scene to circle its anchor. Do not introduce major new events or change the core arc.
 
   WRITING GOAL
   Write as if you are telling a story, not constructing one. The prose should feel like it is discovering what happens as it goes, not executing a plan. Some moments will need force. Most will need plainness. Let the moment decide.
+
+  Let this story have its own nervous system. If the premise wants speed, let
+  scenes move. If it wants comedy, let jokes land without apologizing for them.
+  If it wants fragments, make the fragments visible. If it wants tenderness,
+  allow direct human sentences. Do not translate every request into the same
+  cool, restrained, epistemic voice.
 
   CRAFT PRINCIPLES
     1. Concrete over generic.
        Name specific objects, places, tools, textures, actions. Prefer the exact thing over the abstract category unless abstract better serves the moment. Concrete description does not require comparison. Often the strongest line is the one that simply states what is physically happening.
 
     2. Vary rhythm naturally.
-       Use short sentences when they feel earned. Use longer ones when a moment needs to stretch. Do not let adjacent sentences sound mechanically similar.2. Vary rhythm and structure. Use short sentences when they feel earned. Use longer ones when a moment needs to stretch. Vary not just length, but construction: alternate between plain statements, comparisons, fragments, and more complex sentences. Avoid repeating the same syntactic pattern across adjacent sentences.
+       Use short sentences when they feel earned. Use longer ones when a moment needs to stretch. Vary not just length, but construction: alternate between plain statements, fragments, dialogue beats, comparisons, and more complex sentences. Avoid repeating the same syntactic pattern across adjacent sentences.
 
     3. Cognitive friction.
        People do not think in straight lines. Allow hesitation, rereading, deflection, small stalling actions, attention shifting before a thought finishes.
@@ -62,9 +70,14 @@ system: |
 
     7. Controlled imperfection.
        Allow small redundancies and observations that do not fully pay off. Not every line should feel equally purposeful.
+       A human draft is not optimized into continuous significance. Let some
+       details be merely local, social, funny, ugly, awkward, useful, or odd.
 
     8. End scenes on texture.
        Prefer ending on an image, action, or line of dialogue over a thematic statement or realization.
+       The final ending does not need to be tasteful stillness. It can be blunt,
+       funny, public, socially awkward, materially changed, embodied, or spoken
+       aloud when that is truer to the story.
 
     9. Natural over logical.
        Sentences should sound like a person wrote them, not like they were assembled from valid propositions. Watch for double negatives used as emphasis, redundant conceptual repetition, and phrasing that is technically correct but idiomatically wrong. When a sentence is accurate but strange, rewrite it simpler. "Her documents checked out" not "there is nothing in any of her documentation that is not true."
@@ -84,7 +97,7 @@ system: |
 
   {craft_overlay}
   UNKNOWNS
-  If the story has unknowns — unresolved questions, things the protagonist cannot verify, things the world resists explaining — let them breathe in the prose. Do not resolve them. Do not spotlight them. Let them exist as natural gaps in understanding.
+  If the story has unknowns — unresolved questions, things the protagonist cannot verify, things the world resists explaining — let them breathe in the prose. Do not resolve them. Do not spotlight them. Let them exist as natural gaps in understanding. Unknowns may be emotional, social, bodily, comic, romantic, spiritual, or practical; do not reduce them all to evidence problems.
 
   THEMATICS
   The thematic pressure is enacted, not explained. Every scene should contribute to it indirectly through action, detail, and arrangement. Do not state the thesis. Do not summarize what events "mean." The central tensions remain unresolved at the end.
@@ -101,6 +114,15 @@ system: |
     - Use of em dashes unless they are the best available punctuation for the moment
     - A fully resolved explanation when ambiguity would serve better
     - Watch for local repetition. If two nearby sentences use the same comparative construction or phrasing pattern, revise one of them.
+    - Overusing "she had," "she did not," "which meant," "the way," "still,"
+      "could not verify," or "could not determine" as default literary pressure
+    - Turning every protagonist into a counter, recorder, observer, auditor, or
+      keeper of documents unless the story specifically requires that
+    - Ending every story with a lone protagonist looking at an object and not
+      knowing what it means
+    - Letting a requested formal mode remain invisible. If the user asked for
+      forum posts, emails, testimony, songs, dream logic, or media fragments,
+      the draft should contain prose that actually changes shape.
     
   {avoid_overlay}
   DEFAULT CHOICE
@@ -113,7 +135,13 @@ system: |
 
 user: |
   TITLE: {title}
-  TARGET LENGTH: approximately {target_words} words
+  WORD BUDGET: maximum {maximum_words} words
+  LENGTH POLICY: {length_policy}
+
+  This is a ceiling, not a target. Choose the shortest length that completes the
+  story with force. A complete story may be 900, 1400, 2200, or {maximum_words}
+  words. Do not add scenes, transitions, explanations, or reflective endings to
+  approach the ceiling.
 
   ---
   PROTAGONIST:

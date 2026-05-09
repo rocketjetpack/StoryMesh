@@ -23,6 +23,8 @@ def generate_synopsis(
     skip_resonance_review: bool = True,
     prompt_style: str | None = None,
     email_recipient: str | None = None,
+    run_id: str | None = None,
+    voice_profile_override: str | None = None,
 ) -> GenerationResult:
     """High-level API function to generate a fiction synopsis from the given prompt.
 
@@ -39,6 +41,12 @@ def generate_synopsis(
     :param email_recipient: Optional email address to deliver the assembled book to
         after the book assembler stage completes.  Overrides ``email.recipient``
         in ``storymesh.config.yaml`` for this call only.
+    :param run_id: Optional caller-supplied run identifier. When ``None`` (default)
+        a fresh UUID hex is generated. Lets external orchestrators (e.g. the kiosk
+        frontend) know the run directory path before the pipeline returns.
+    :param voice_profile_override: Optional voice profile id to force without running
+        the classifier LLM. When ``None`` (default), the VoiceProfileSelectorAgent
+        chooses based on the prompt.
     :return: A GenerationResult containing the generated synopsis and related metadata.
     """
     pipeline = StoryMeshPipeline(
@@ -47,5 +55,6 @@ def generate_synopsis(
         min_retries=min_retries,
         skip_resonance_review=skip_resonance_review,
         prompt_style=prompt_style,
+        voice_profile_override=voice_profile_override,
     )
-    return pipeline.generate(user_prompt, email_recipient=email_recipient)
+    return pipeline.generate(user_prompt, email_recipient=email_recipient, run_id=run_id)

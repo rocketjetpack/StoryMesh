@@ -41,6 +41,8 @@ system: |
   - Whether order can be restored
   - What the relationship between individual and society is
   - What counts as a good ending
+  - What desire, appetite, shame, loyalty, money, faith, labor, play, family,
+    status, or bodily risk can force a person to do
 
   STEP 3 — IDENTIFY TROPES:
   For each cluster, also identify 2–4 dominant narrative tropes (common story devices,
@@ -80,6 +82,48 @@ system: |
     Tone is not a dial to balance against literary ambition — it is the form
     the story takes.
   - Reference which tension IDs it draws from
+
+  VERBALIZED SAMPLING QUEUES FOR SEED DIVERSITY:
+  Before writing the seeds, silently sample different options from these queues.
+  Do not output the queue names or your sampling notes. Use them only to widen
+  the seed space.
+
+  - Protagonist relation to premise: cause, victim, beneficiary, witness,
+    accomplice, skeptic, maintenance worker, performer, child, elder, outsider,
+    rival, courier, caretaker, comic nuisance, reluctant expert, non-expert.
+  - Story engine: pursuit, negotiation, public performance, domestic rupture,
+    romance pressure, survival logistics, trial, heist, confession, apprenticeship,
+    journey, dinner-table conflict, media storm, ritual, work shift, oral history,
+    bodily transformation, neighborhood dispute, game, rescue, sabotage.
+  - Social scale: one room, two people, family, workplace, crew, neighborhood,
+    fandom, village, institution, city, diaspora, battlefield, online swarm.
+  - Formal container: straight prose, letters, testimony, interviews, songs,
+    field notes, forum posts, stage directions, recipes, invoices, prayer,
+    legal filings, repair logs, news crawl, classroom exercise, marginalia,
+    overheard dialogue. Use formal containers only when they serve the prompt.
+  - Pacing shape: compressed hour, one bad day, seasonal drift, episodic chain,
+    countdown, circular return, interrupted routine, escalating errands,
+    journey with reversals, aftermath first, ending-in-miniature first.
+
+  Across the seed list, deliberately vary protagonist role, social scale, story
+  engine, and formal container. Do not make every seed an investigator
+  reconstructing truth from records unless the user explicitly asked for that
+  exact mode. One seed may be the direct premise. The others should explore less
+  obvious doors into the same request.
+
+  DEFAULT-CENTER REJECTION:
+  Before writing seeds, silently identify the most obvious version of the user's
+  premise. Only one seed may use that center. Every other seed must move at least
+  two dimensions away from it: protagonist relation, scene engine, social scale,
+  time shape, formal texture, central desire, or climax action.
+
+  FORMAL-MACHINERY LIMIT:
+  Across the seed list, at most one seed may use logs, files, reports, trials,
+  archives, notebooks, minutes, legal filings, repair logs, official findings,
+  incident records, or documentary evidence as its primary story engine unless
+  the user explicitly requested that form. Other seeds should route specificity
+  through bodies, dialogue, errands, meals, tools, jokes, work, danger, desire,
+  social pressure, weather as logistics, touch, debt, hunger, injury, or movement.
 
   EXAMPLES OF GOOD THEMATIC ASSUMPTIONS:
   - mystery: "Truth is always recoverable if enough evidence is gathered"

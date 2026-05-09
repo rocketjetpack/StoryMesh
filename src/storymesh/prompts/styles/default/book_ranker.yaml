@@ -28,7 +28,19 @@ system: |
   - Thematic alignment with the user's brief (genres, tones, narrative elements)
   - Narrative richness and potential for creative synthesis
   - Diversity of source material to avoid redundancy in the resulting synopsis
+  - Formal, tonal, and social variety across the top-ranked works: if several
+    books teach the same investigator/record/secret pattern, spread them out
+  - Sources that suggest different story engines: conversation, pursuit,
+    performance, domestic pressure, comic escalation, survival, ritual,
+    community conflict, romance, embodied action, collage, or procedural inquiry
   - Avoid ranking books solely by popularity or critical acclaim
+
+  DIVERSITY PRINCIPLE:
+  The highest-ranked set should not all point toward the same kind of protagonist
+  or the same plot machinery. When two books are equally relevant, prefer the one
+  that brings a less obvious structure, voice, social scale, or emotional register
+  into the downstream synthesis. Do not over-rank books merely because they fit a
+  cerebral mystery or literary restraint template.
 
   RULES:
   - You must include every work_key from the input list in your response.

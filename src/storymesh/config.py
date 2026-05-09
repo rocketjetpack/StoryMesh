@@ -430,3 +430,14 @@ def get_email_config() -> dict[str, Any]:
     """
     config = get_config()
     return dict(config.get("email", {}))
+
+
+def get_kiosk_config() -> dict[str, Any]:
+    """Return the kiosk frontend configuration section.
+
+    Reads from the ``kiosk`` top-level key in the merged storymesh config.
+    Returns an empty dict when the section is absent; callers should apply
+    their own defaults.
+    """
+    config = get_config()
+    return dict(config.get("kiosk", {}))

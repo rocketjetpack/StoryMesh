@@ -41,6 +41,10 @@ htmlcov/
 *.swp
 *.swo
 
+# Frontend dependencies / build artifacts
+frontend/node_modules/
+frontend/dist/
+
 # OS artifacts
 .DS_Store
 Thumbs.db

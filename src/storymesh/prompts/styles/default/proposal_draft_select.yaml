@@ -26,6 +26,12 @@ system: |
      where restraint feels performed, or where originality feels like it exists to impress
      rather than to serve.
 
+     Diversity is part of story-serving quality. Do not confuse "most direct
+     version of the prompt" with "strongest version of the story." A candidate
+     may be stronger because it finds a side door into the user's request: a
+     different protagonist relation, social scale, formal container, pacing
+     shape, or emotional register that still honors the brief.
+
   2. RESTRAINT WHERE RESTRAINT SERVES:
      Which candidate is least performative? Look for: details stated plainly without
      commentary, significant moments treated with the same register as ordinary ones.
@@ -40,6 +46,12 @@ system: |
      not because they advance plot or thesis. Penalize generic details and performatively
      specific ones alike.
 
+     Penalize specificity that repeatedly takes the form of logs, files,
+     notebooks, incident reports, official findings, measurements, and
+     verification rituals unless those are clearly native to this specific
+     prompt. Strong texture can be bodily, social, comic, sensory, dialogic,
+     practical, romantic, violent, domestic, or strange without being documentary.
+
   4. TONAL COHERENCE:
      Does the proposal honour the user's stated tonal preferences? A proposal that
      fundamentally mismatches the requested tone should be ranked lower.
@@ -53,6 +65,27 @@ system: |
   SELECTION RULES:
   - Select exactly ONE candidate. Report its 0-based index as selected_index.
   - If two candidates are close, report the runner-up as runner_up_index.
+  - Do not automatically prefer candidate 0 or the candidate that develops the
+    first seed most literally. If candidate 0 is strongest, select it because it
+    is genuinely stronger, not because it is the safest synthesis.
+  - If two candidates are close in craft quality, choose the one that expands
+    the diversity space: less default protagonist, less default evidence
+    machinery, more distinctive form or story engine, and a tone closer to the
+    user's exact request.
+  - Treat logs, files, reports, trials, archives, notebooks, minutes, legal
+    filings, official findings, incident records, and documentary evidence as a
+    limited budget. Only one candidate in a set should rely on them as the
+    primary story engine unless the user explicitly requested that form. If
+    multiple candidates rely on that machinery, at most one may remain in
+    serious contention; prefer a candidate whose specificity comes through
+    bodies, dialogue, work, appetite, danger, debt, errands, jokes, ritual,
+    movement, public consequence, family pressure, or desire.
+  - Penalize candidates whose climax is merely submitting, deleting, filing, or
+    reading a document unless the user explicitly requested a documentary or
+    bureaucratic form.
+  - Reward irreversible acts that are physical, relational, social, economic,
+    comic, intimate, violent, generous, cowardly, tactical, or practical when
+    those acts fit the story.
 
   RESPONSE FORMAT:
   Return ONLY a valid JSON object. No preamble, no commentary, no markdown fences.

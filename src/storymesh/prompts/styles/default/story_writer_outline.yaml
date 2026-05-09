@@ -25,15 +25,21 @@ system: |
   Your task is to expand a story proposal's key scenes into a complete
   scene-by-scene breakdown that will guide a prose drafting pass.
 
-  You will receive a StoryProposal with 3-5 `key_scenes`. Your job is to expand
-  these into 6-10 scene outlines that cover the full story arc, including the
-  opening, transitions between key moments, and the denouement.
+  You will receive a StoryProposal with 3-5 `key_scenes`. Your job is to choose
+  the story's natural scene shape — enough scenes to make the irreversible
+  change legible, not enough scenes to fill a preset container.
 
   THE OUTLINE IS A SCAFFOLD, NOT A SCRIPT
   The prose writer will use this outline as a guide, not a contract. They may
   linger on a moment longer than you planned, compress a transition, or add a
   small local detail. Your job is to give them enough structure to work from and
   enough room to discover the story as they write it.
+
+  The outline must also preserve the story's difference from other stories. Do
+  not automatically turn every premise into a restrained sequence of observation,
+  evidence, and irreversible paperwork. Choose scene engines that belong to this
+  proposal: dialogue, movement, public pressure, bodily risk, social comedy,
+  intimacy, performance, labor, pursuit, ritual, argument, or formal collage.
 
   FOR EACH SCENE YOU MUST PROVIDE:
 
@@ -62,6 +68,13 @@ system: |
      Good: "The salvaged tax forms she uses as notebook paper — running out."
      Bad: "The weight of her moral burden."
 
+     The anchor does not need to be a document or object. It can be a gesture,
+     a smell, a repeated line of dialogue, a taste, a bodily discomfort, a
+     social rule, a rhythm, a tool, a mistake, a joke that lands badly, or a
+     room behavior. Across the outline, vary anchor types. Unless the proposal
+     specifically demands documentary texture, avoid making most anchors files,
+     logs, reports, screens, notebooks, forms, or metadata.
+
   6. `opens_with` — the LITERAL first sentence of this scene in the final prose.
      This sentence is used verbatim by the writer. It must:
      - Be particular to this moment in this story (not a generic genre opening)
@@ -71,6 +84,8 @@ system: |
        are doing specific work
      - NOT begin with a character's emotion, feeling, or thought
      - NOT use "As" or "When" as the first word
+     - Vary scene openings across the outline. Do not let most scenes begin
+       with "The..." or "She had..." unless that repetition is formally intended.
 
      Examples of strong opens_with:
   {profile_exemplars}
@@ -82,10 +97,15 @@ system: |
      - "When she arrived at the scene, nothing could have prepared her."
 
   SCENE COUNT GUIDANCE:
-  - 6 scenes for stories targeting ~2000 words (one scene ~300 words)
-  - 8 scenes for stories targeting ~3000 words (one scene ~375 words)
-  - 10 scenes for stories targeting ~5000 words (one scene ~500 words)
-  - Use the `target_words` value provided to calibrate
+  - The word budget is a ceiling, not a target. Do not add scenes to approach it.
+  - 3-4 scenes for a compressed encounter, argument, ritual, chase, confession,
+    single-room pressure, or one-bad-hour story.
+  - 5-6 scenes for a compact story with one major turn and one consequence.
+  - 7-9 scenes only when the premise genuinely needs escalation across
+    locations, time, social scale, or formal fragments.
+  - Fewer, larger scenes are often stronger than a full ladder of evenly weighted
+    scenes. Brief fragments are also allowed when the requested form calls for
+    them.
 
   STRUCTURAL GUIDANCE:
   - Scene 1 should establish protagonist, world, and the first pressure on the
@@ -94,9 +114,21 @@ system: |
     character through action or specific detail
   - The penultimate scene should carry the highest pressure — do not save
     it for the final scene
-  - The final scene should land on the tension, not resolve it
+  - The final scene should land on the tension, not resolve it. It does not
+    need to be a lone protagonist contemplating an ambiguous object. It may be
+    blunt, funny, socially awkward, public, embodied, materially consequential,
+    or spoken aloud if that is where the story's pressure naturally goes.
   - Not every scene needs equal weight. Some scenes exist to apply pressure.
     Some exist to let the reader breathe. Let the story decide.
+  - If the user requested a form such as emails, forum posts, songs, testimony,
+    media fragments, dream logic, or stylistic shifts, make that form visible in
+    the scene plan rather than reducing it to conventional prose scenes about
+    the form.
+  - Include at least one scene whose primary engine is not investigation,
+    explanation, or evidence handling unless the whole proposal demands that.
+  - The irreversible act should be physical, relational, social, economic,
+    comic, intimate, violent, generous, cowardly, tactical, or practical unless
+    the requested form demands documentary action.
 
   NARRATIVE REQUIREMENTS
   ======================
@@ -139,7 +171,12 @@ system: |
   }}
 
 user: |
-  TARGET WORD COUNT: {target_words} words total across all scenes
+  WORD BUDGET: maximum {maximum_words} words total across all scenes
+  LENGTH POLICY: {length_policy}
+
+  This is a ceiling, not a target. Choose the shortest scene structure that
+  completes the story with force. Do not add scenes, transitions, explanations,
+  or reflective endings to approach the ceiling.
 
   USER PROMPT: "{user_prompt}"
   GENRES: {normalized_genres}

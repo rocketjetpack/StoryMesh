@@ -1,226 +1,400 @@
 # StoryMesh
 
-StoryMesh is a Python package for a fully implemented agentic fiction pipeline. A single `generate` call normalizes a free-text creative prompt, fetches thematically relevant books from Open Library, extracts the tensions between genre traditions, drafts and edits a story proposal (with rubric-driven retry), selects a voice profile, writes a complete short story in three prose passes, reviews it for near-miss moments, generates a cover image, and assembles a PDF and EPUB.
+StoryMesh is an agentic fiction pipeline for turning a free-text creative brief into a complete short story package: proposal, prose draft, cover image, and assembled PDF/EPUB artifacts.
+
+The current package version is `0.7.0`.
+
+## What It Does
+
+Given a prompt like:
+
+```text
+A quiet literary mystery set in a flood-damaged coastal city...
+```
+
+StoryMesh will:
+
+1. normalize genres, tones, and narrative context from the prompt
+2. optionally infer implied genres from the prompt holistically
+3. fetch comparable books from Open Library
+4. rank them for narrative usefulness and diversity
+5. extract thematic tensions and generate narrative seeds
+6. draft one or more story proposals and select the strongest
+7. judge the proposal against a rubric and optionally retry with feedback
+8. select a voice profile
+9. write a full short story in outline -> draft -> summary passes
+10. optionally run a resonance review pass on the prose
+11. optionally generate cover art
+12. assemble the result into PDF and EPUB
+
+StoryMesh also includes:
+
+- a `compare` mode for StoryMesh vs. single-call baseline runs
+- prompt-style switching at runtime
+- offline stylometric diagnostics
+- a kiosk web app with a React frontend and FastAPI backend
 
 ## Current Status
 
-All pipeline stages are implemented:
+The core pipeline is implemented end-to-end.
 
-- Package, CLI, config loader, and version reporting
-- LangGraph orchestration with typed shared state and per-node artifact persistence
-- `GenreNormalizerAgent` with deterministic mapping, fuzzy matching, and optional LLM fallback
-- `BookFetcherAgent` backed by the Open Library Search API with disk cache, deduplication, and configurable `max_books` cap
-- `BookRankerAgent` with deterministic weighted composite scoring (genre overlap, reader engagement, rating quality, rating volume), optional LLM re-ranking by narrative potential, and MMR diversity selection
-- `ThemeExtractorAgent` — identifies thematic assumptions each genre tradition takes for granted, finds contradictions between traditions, frames them as creative questions, and generates concrete narrative seeds
-- `ProposalDraftAgent` with multi-sample seed-steering and self-selection. Generates N candidate proposals from different seeds at elevated temperature, then uses a critic call to select the strongest
-- `RubricJudgeAgent` with 6-dimension craft quality rubric, cross-provider evaluation (OpenAI evaluating Anthropic output), cliché detection, composite scoring with configurable pass threshold, and structured feedback for the retry loop
-- `VoiceProfileSelectorAgent` — classifies the user's prompt into one of three voice profiles (`literary_restraint`, `cozy_warmth`, `genre_active`) to produce genre-appropriate prose without homogenizing output across the portfolio
-- `StoryWriterAgent` — three-pass prose generation: scene outline → full draft → back-cover summary. Voice profile overlays are applied to all three passes for register-appropriate output
-- `ResonanceReviewerAgent` — identifies 0–3 near-miss moments where the draft implies depth but retreats before engaging. Expands avoidance moments with targeted prose additions; re-generates the back-cover summary to reflect the revised draft. Cross-provider review (GPT-4o reads what Claude wrote)
-- `CoverArtAgent` — generates a cover image via gpt-image-1 using the `image_prompt` from the selected proposal. Title and byline are composited onto the image using Pillow
-- `BookAssemblerAgent` — assembles a PDF (WeasyPrint) and EPUB (ebooklib) from the final prose draft and cover art
-- LLM and ImageClient provider registries for extensible backend support
-- Rubric retry loop with configurable pass threshold, max retries, and min retries
-- Quality presets: `draft`, `standard`, `high`, `very_high`
-- Offline stylometric counter (`storymesh stylometrics`) for per-run tic frequency diagnostics
-- Rich-formatted CLI and Python API
+Implemented subsystems include:
+
+- Python package + Typer CLI
+- LangGraph orchestration with typed shared state
+- per-stage artifact persistence under `~/.storymesh/runs/<run_id>/`
+- `GenreNormalizerAgent`
+- `VoiceProfileSelectorAgent`
+- `BookFetcherAgent`
+- `BookRankerAgent`
+- `ThemeExtractorAgent`
+- `ProposalDraftAgent`
+- `RubricJudgeAgent`
+- `ProposalReaderAgent` on the retry path
+- `StoryWriterAgent`
+- `ResonanceReviewerAgent`
+- `CoverArtAgent`
+- `BookAssemblerAgent`
+- compare-mode baseline generation and blinded eval packet output
+- prompt-style loading with `default` fallback
+- kiosk backend + frontend
 
 ## Architecture
 
-The pipeline is built as a LangGraph `StateGraph` with this topology:
+The pipeline is built as a LangGraph `StateGraph`.
+
+High-level flow:
 
 ```text
 START
-  → genre_normalizer
-  → voice_profile_selector         ← selects literary_restraint / cozy_warmth / genre_active
-  → book_fetcher
-  → book_ranker
-  → theme_extractor
-  → proposal_draft
-  → rubric_judge
-  → [conditional]
-      ├── PASS → story_writer → resonance_reviewer → cover_art → book_assembler → END
-      └── FAIL → proposal_draft (max retries configurable per quality preset)
+  -> genre_normalizer
+  -> voice_profile_selector
+  -> book_fetcher
+  -> book_ranker
+  -> theme_extractor
+  -> proposal_draft
+  -> rubric_judge
+       -> PASS -> story_writer -> resonance_reviewer? -> cover_art? -> book_assembler -> END
+       -> FAIL -> proposal_reader -> proposal_draft (revision) -> rubric_judge
 ```
 
-All stages perform real work. The rubric retry loop is wired via a conditional edge; a failing rubric score triggers re-entry into `proposal_draft` with targeted feedback injected into the prompt. `resonance_reviewer` only runs at `high` and `very_high` quality presets.
+Notes:
 
-### Stage 0: GenreNormalizerAgent
+- `proposal_reader` only runs on the retry path.
+- `resonance_reviewer` only runs for `high` and `very_high` quality presets.
+- `cover_art` is a noop when no image provider is available.
+- `book_assembler` may emit PDF, EPUB, both, or neither depending on installed extras and config.
 
-Status: implemented
+## Pipeline Stages
 
-Four-pass resolution pipeline:
+### 1. Genre Normalization
 
-- **Pass 1** — Greedy longest-match against `genre_map.json` (exact then fuzzy)
-- **Pass 2** — Greedy longest-match against `tone_map.json` (exact then fuzzy)
-- **Pass 3** — LLM fallback for unresolved tokens: classifies each remaining token as genre, tone, narrative context, or unknown
-- **Pass 4** — Holistic genre inference: sends the full original prompt plus everything already resolved to an LLM and asks what genres are *implied* by the overall context but not yet captured. Results are stored as `InferredGenre` objects in a separate `inferred_genres` field, distinct from `normalized_genres`. Each inference carries a `rationale` string and a `confidence` score (default 0.7, lower than Pass 3's 0.8 to reflect the higher uncertainty of holistic inference). If Passes 1–3 find no explicit genres but Pass 4 infers some, the inferred genres are promoted into `normalized_genres` as a last-resort fallback so the pipeline can continue.
+`GenreNormalizerAgent` resolves:
 
-Other behaviors:
-- Reads taxonomy data from `src/storymesh/data/genre_map.json` and `src/storymesh/data/tone_map.json`
-- Passes 3 and 4 share the same LLM client, model, and temperature (both are lightweight classification tasks)
-- Produces a strict `GenreNormalizerAgentOutput` including debug traces and preserved narrative context
-- `InferredGenre.default_tones` is informational only and does **not** feed into the tone-merge pipeline
+- explicit genres
+- tone words
+- narrative context
+- implied genres from holistic prompt inference
 
-### Stage 0.5: VoiceProfileSelectorAgent
+It uses a multi-pass approach:
 
-Status: implemented
+- static map matching for genres
+- static map matching for tones
+- LLM fallback for unresolved tokens
+- holistic genre inference over the full prompt
 
-Runs immediately after `genre_normalizer` and before `book_fetcher`. Classifies the user's prompt, normalized genres, and tone words into one of three voice profiles using a Haiku classifier at T=0:
+If no explicit genres are found but inference produces viable ones, inferred genres are promoted so the pipeline can continue.
 
-| Profile | Intended for | Key behaviors |
-|---|---|---|
-| `literary_restraint` | dark, mystery, literary, dread, psychological | Current default prose style; subtext over statement |
-| `cozy_warmth` | bedtime, cute, comfy, gentle, quietly wondrous | Direct emotion-naming; ritualistic repetition; soft anthropomorphism |
-| `genre_active` | action, adventure, pulp, high-energy fanfic | Kinetic over interior; dialogue-forward; sentence economy |
+### 2. Voice Profile Selection
 
-The selected profile flows through pipeline state and is consumed by `StoryWriterAgent` (all three passes) and `ResonanceReviewerAgent` (revision and summary passes). If no API key is configured, the node defaults to `literary_restraint` without making any LLM calls. The profile can also be pinned via `voice_profile_override` in `storymesh.config.yaml` to bypass the classifier.
+`VoiceProfileSelectorAgent` picks a voice profile for the run.
 
-### Stage 1: BookFetcherAgent
+Profiles live in:
 
-Status: implemented
+- `src/storymesh/prompts/voice_profiles/`
 
-- Queries Open Library's search API by subject
-- Queries both `normalized_genres` (explicit, Passes 1–3) and `inferred_genres` (holistic, Pass 4) so books implied by contextual signals surface alongside explicitly named genres
-- Uses disk cache via `diskcache`
-- Deduplicates books by Open Library work key
-- Preserves all matched source genres per book
-- Caps results at `max_books` (default 50) after deduplication, prioritising cross-genre books
-- Emits debug metadata for cache hits, misses, truncation, and per-genre counts
+The classifier can be bypassed with:
 
-### Stage 2: BookRankerAgent
+- CLI: `--voice <profile_id>`
+- config: `agents.voice_profile_selector.voice_profile_override`
 
-Status: implemented
+### 3. Book Fetching
 
-- Scores books using a weighted composite of four signals:
-  - **Genre overlap** (weight 0.40): fraction of queried genres that returned this book
-  - **Reader engagement** (weight 0.25): min-max normalized `readinglog_count` from Open Library
-  - **Rating quality** (weight 0.20): confidence-adjusted average rating (discounts low sample sizes)
-  - **Rating volume** (weight 0.15): min-max normalized `ratings_count`
-- Applies **MMR diversity selection** after scoring: uses Maximal Marginal Relevance with Jaccard genre similarity to ensure the shortlist covers distinct genre traditions rather than returning the same dominant titles repeatedly; configurable via `diversity_weight` (default 0.3; set to 0.0 for pure relevance)
-- Output is returned in MMR selection order so downstream LLM agents see genre-diverse books early in the list, which directly influences which genre clusters ThemeExtractorAgent identifies as primary
-- Truncates to a configurable `top_n` (default 10)
-- Emits dual-representation output: full `RankedBook` records in artifacts, slim `RankedBookSummary` objects for downstream LLM token efficiency
-- Optional LLM re-rank pass: when `llm_rerank: true`, passes the shortlist to an LLM which re-orders by narrative potential for the user's creative brief; falls back gracefully on LLM failure
-- All scoring weights, `top_n`, and `diversity_weight` are configurable in `storymesh.config.yaml`
+`BookFetcherAgent` queries Open Library by subject, caches responses on disk, and deduplicates books by work key.
 
-### Stage 3: ThemeExtractorAgent
+### 4. Book Ranking
 
-Status: implemented
+`BookRankerAgent` scores fetched books using weighted signals like:
 
-The creative engine of the pipeline. Rather than asking "what themes do these books share?", it identifies the **thematic assumptions** each genre tradition takes for granted, finds where those assumptions **contradict** each other, and frames each contradiction as a **creative question** that a story could explore.
+- genre overlap
+- reader engagement
+- rating quality
+- rating volume
 
-For example, given "dark post-apocalyptic detective mystery":
-- The mystery tradition assumes: truth is discoverable, there is a resolution, a detective figure restores order
-- The post-apocalyptic tradition assumes: systems have collapsed, survival trumps justice, the world is fundamentally disordered
-- The tension: What does "solving a case" mean when there's no institution to deliver justice to?
+It also applies MMR-based diversity selection. An optional LLM rerank pass can be enabled in config.
 
-Output (the ThemePack) contains:
-- **Genre clusters**: books grouped by tradition with their thematic assumptions and dominant tropes
-- **Thematic tensions**: pairs of opposing assumptions framed as creative questions, each scored by intensity and accompanied by 2–4 **clichéd resolutions** — the predictable narrative moves that lazy writing defaults to. Downstream agents use these as explicit exclusions (ProposalDraft) and evaluation criteria (RubricJudge)
-- **Narrative seeds**: 3–5 concrete 2–3 sentence story kernels that emerge from the tensions, incorporating the user's narrative context tokens (settings, time periods, character archetypes)
+### 5. Theme Extraction
 
-Uses `claude-sonnet-4-6` at temperature 0.6 — more capable than classification agents, with enough creative latitude to produce novel tensions while still generating valid structured JSON.
+`ThemeExtractorAgent` turns genre traditions and comparable books into:
 
-### Stage 4: ProposalDraftAgent
+- genre clusters
+- thematic tensions
+- narrative seeds
 
-Status: implemented
+This is the stage that frames contradiction between genre assumptions as creative pressure for the story.
 
-Develops narrative seeds into fully realised story proposals using a **multi-sample with self-selection** architecture:
+### 6. Proposal Drafting
 
-1. **Generate N candidates** (default 3) — each candidate is assigned a different narrative seed and calls the LLM independently at elevated temperature (1.2). Each call is fully stateless; divergence is enforced at the prompt level via seed-steering, candidate indexing, and an anti-overlap instruction
-2. **Select the strongest** — a separate low-temperature (0.2) critic call evaluates all valid candidates against the thematic tensions, checking for cliché violations, thematic depth, specificity, tonal coherence, and internal conflict mirroring
+`ProposalDraftAgent` drafts candidate proposals from the seeds, then selects the strongest one.
 
-Output contains the selected `StoryProposal`, all candidate proposals (for artifact inspection), a `SelectionRationale` with the critic's reasoning, and a debug dict with per-run metadata (temperatures, seed assignments, call counts).
+It supports:
 
-If all candidate calls fail to parse, a `RuntimeError` is raised so the pipeline handles it gracefully. If only one candidate survives, it is selected without a critic call. If the critic call fails, candidate 0 is selected as a fallback.
+- initial proposal generation
+- retry generation after rubric feedback
+- directed revision after both rubric and reader feedback
 
-Uses `claude-sonnet-4-6` for both drafting (temperature 1.2) and selection (temperature 0.2).
+### 7. Rubric Evaluation
 
-### Stage 5: RubricJudgeAgent
+`RubricJudgeAgent` scores the proposal and decides whether it passes.
 
-Status: implemented
+If it fails and retry budget remains, the pipeline loops through:
 
-Evaluates the selected `StoryProposal` from Stage 4 against six craft quality dimensions:
+- `proposal_reader`
+- `proposal_draft` revision/retry
+- `rubric_judge`
 
-- **D-1 Tension Inhabitation** (weight 0.25): Does the proposal live inside the identified thematic tension rather than resolving or avoiding it?
-- **D-2 Specificity Density** (weight 0.20): Are setting, character, and conflict expressed through concrete particulars rather than genre-level abstractions?
-- **D-3 Craft Discipline** (weight 0.20): Does the proposal honour the Craft Directives from Stage 4, especially CD-1 (no resolution) and CD-2 (specificity)?
-- **D-4 Protagonist Interiority** (weight 0.15): Does the protagonist have a clearly differentiated want/need split with an internal stake distinct from the surface plot?
-- **D-5 Structural Surprise** (weight 0.10): Is there at least one structural or tonal element that subverts the expected arc for the genre combination?
-- **D-6 User Intent Fidelity** (weight 0.10): Does the proposal faithfully honour the user's original creative brief?
+### 8. Story Writing
 
-Scoring is an integer composite out of 10, with each dimension scored 0 (fail) / 1 (acceptable) / 2 (strong). If the composite falls below the configured `pass_threshold` (default 6), the agent emits a structured `RubricJudgeAgentOutput` with `passed=False` and dimension-level feedback; the conditional edge re-routes to `proposal_draft` for a targeted retry. A `min_retries` setting forces at least one editorial revision even when the proposal passes on the first attempt.
+`StoryWriterAgent` writes the story in three passes:
 
-Deliberately uses a **different LLM provider** than ProposalDraftAgent (`provider: openai`, `model: gpt-4o`) to prevent the evaluator from inheriting the generator's blind spots. The prompt is calibrated as antagonistic: it is instructed to find weaknesses, with anchors like "score of 2 is rare" and "most proposals score 5–7."
+1. scene outline
+2. full draft
+3. back-cover summary
 
-### Stage 6: StoryWriterAgent
+Voice-profile overlays are injected into this stage.
 
-Status: implemented
+### 9. Resonance Review
 
-Produces a complete short story in three sequential LLM passes:
+`ResonanceReviewerAgent` runs only for higher quality settings.
 
-1. **Outline pass** (T=0.5): Expands the `StoryProposal`'s `key_scenes` into 6–10 `SceneOutline` objects. Each outline carries an `opens_with` sentence used verbatim by the draft pass — preventing generic AI opening lines. Voice profile exemplars replace the default few-shot examples at this stage.
+It:
 
-2. **Draft pass** (T=0.8): Writes the full prose using scene outlines as structure. All craft principles (sentence rhythm, subtext, concrete detail, temporal irregularity) are enforced via the prompt. Voice profile `craft_overlay` and `avoid_overlay` are injected into the system prompt, producing register-appropriate prose without duplicating the full prompt for each profile.
+- identifies near-miss moments in the draft
+- revises the prose in-place
+- regenerates the summary from the revised draft
 
-3. **Summary pass** (T=0.4): Writes ~300-word back-cover marketing copy from the completed draft. Writing after the draft ensures it accurately reflects what was written rather than what was planned. Voice profile `summary_overlay` adjusts register here too.
+### 10. Cover Art
 
-### Stage 6b: ResonanceReviewerAgent
+`CoverArtAgent` uses the selected proposal's `image_prompt` and appends a flat-canvas enforcement suffix before calling the image backend.
 
-Status: implemented. Only runs at `high` and `very_high` quality presets.
+The generated image is then composited with:
 
-Reviews the completed prose draft for near-miss moments — places where the story implies depth but retreats before engaging — and produces targeted expansions. Uses three internal LLM passes:
+- title
+- byline
 
-1. **Review pass** (GPT-4o, T=0.4): Identifies 0–3 near-miss moments, classifying each as *restraint* (earned silence) or *avoidance* (missed opportunity). Using a different provider than the writer avoids shared blind spots.
+using Pillow.
 
-2. **Revision pass** (Claude, T=0.7): Expands avoidance moments in-place within the existing draft, matching the original voice. Adds roughly 50–150 words per moment. The voice profile `craft_overlay` is forwarded as a register reminder.
+### 11. Book Assembly
 
-3. **Summary pass** (Claude, T=0.4): Re-generates the back-cover summary from the revised draft so it reflects the final text.
+`BookAssemblerAgent` creates:
 
-The node replaces `story_writer_output` in the pipeline state with the revised draft and summary, so downstream nodes (`cover_art`, `book_assembler`) consume the revised text without any changes to their code.
+- `output.pdf`
+- `output.epub`
 
-### Stage 7: CoverArtAgent
+in the run directory.
 
-Status: implemented
+## Prompt Styles
 
-Generates a cover image for the selected `StoryProposal` using the gpt-image-1 model via the OpenAI Images API.
+Prompts are organized under:
 
-Before the prompt reaches the API, `CoverArtAgent` appends a flat-canvas enforcement suffix that instructs the model to produce art filling the entire canvas with no book object, no perspective frame, and no text or lettering. Title and byline ("A StoryMesh Production") are composited onto the raw PNG programmatically via Pillow, giving reliable typography independent of the model's text rendering.
+- `src/storymesh/prompts/styles/`
 
-Configuration options (all in the `cover_art:` agent block of `storymesh.config.yaml`):
+Prompt resolution order for style `X` is:
 
-- `image_provider`: image generation backend (default `openai`)
-- `image_model`: model identifier (default `gpt-image-1`)
-- `image_size`: portrait `1024x1792` is the default for book covers
-- `image_quality`: `auto`, `low`, `medium`, or `high` (default `auto`)
+1. `styles/X/<prompt>.yaml`
+2. `styles/default/<prompt>.yaml`
 
-If `OPENAI_API_KEY` is absent, the node runs as a noop.
+That means a style only needs to override the prompt files it wants to change.
 
-### Stage 8: BookAssemblerAgent
+Current style directories in the repo include:
 
-Status: implemented
+- `default` — canonical prompt set
+- `slim` — selective shorter overrides
+- `bare_minimum` — starter/template style
+- `context_priming` — experiments with prepend-based priming
+- `verbalized_sampling` — experiments in explicit candidate comparison
+- `test` — internal/testing style
 
-Assembles the final short story into a PDF (via WeasyPrint) and EPUB (via ebooklib) using the prose draft, scene list, back-cover summary, and cover art PNG from earlier stages. No LLM calls. Runs as a noop if neither WeasyPrint nor ebooklib is installed.
+Runtime selection:
 
-## Requirements
+```bash
+storymesh generate "your prompt" --prompt-style default
+storymesh generate "your prompt" --prompt-style bare_minimum
+storymesh generate "your prompt" --prompt-style slim
+```
 
-- Python 3.12+
-- `pip`
+The default configured style is read from:
 
-Optional extras:
+- `storymesh.config.yaml -> prompts.style`
 
-- `storymesh[anthropic]`
-- `storymesh[openai]`
-- `storymesh[gemini]` *(dependency declared; LLM client not yet implemented)*
-- `storymesh[langsmith]`
-- `storymesh[dev]`
-- `storymesh[all-providers]`
-- `storymesh[langgraph-studio]`
+### Context Priming
 
-Core dependencies are declared in [pyproject.toml](pyproject.toml).
+StoryMesh also supports an optional `prompts.prepend` pool in config. When a prompt template contains the literal `{prepend}` token, a random configured prepend line is substituted into the system prompt.
 
-## Setup
+This is process-wide prompt decoration, not a separate style system.
+
+## Voice Profiles
+
+Voice profiles live in:
+
+- `src/storymesh/prompts/voice_profiles/`
+
+They are prompt-adjacent data files, not code. They can alter:
+
+- craft overlay
+- avoid overlay
+- summary overlay
+- exemplars
+
+Current repo profiles include:
+
+- `literary_restraint`
+- `cozy_warmth`
+- `genre_active`
+- plus several additional experimental profiles
+
+## CLI
+
+### Generate
+
+```bash
+storymesh generate "dark post-apocalyptic detective mystery"
+```
+
+Useful options:
+
+```bash
+storymesh generate "prompt" --quality standard
+storymesh generate "prompt" --prompt-style bare_minimum
+storymesh generate "prompt" --voice cozy_warmth
+storymesh generate "prompt" --email you@example.com
+storymesh generate "prompt" --run-id my_custom_run_id
+```
+
+Quality presets:
+
+- `draft`
+- `standard`
+- `high`
+- `very_high`
+
+During generation, the CLI shows:
+
+- a live per-stage progress table
+- elapsed wall-clock time
+- approximate token totals aggregated from `llm_calls.jsonl`
+
+### Compare
+
+```bash
+storymesh compare "A literary mystery in a flood-damaged city"
+```
+
+`compare`:
+
+1. runs the full StoryMesh pipeline
+2. reads `story_writer_output.json`
+3. uses StoryMesh's final word count as the target length for a one-shot baseline
+4. runs a single-call baseline using the `story_writer` provider/model by default
+5. writes comparison artifacts into the same run directory
+
+Baseline options:
+
+```bash
+storymesh compare "prompt" \
+  --quality standard \
+  --prompt-style default \
+  --baseline-provider openai \
+  --baseline-model gpt-4o \
+  --baseline-temperature 0.8 \
+  --baseline-max-tokens 8000
+```
+
+### Rerun
+
+Re-run selected downstream stages without rerunning the whole graph:
+
+```bash
+storymesh rerun cover_art
+storymesh rerun cover_art <run_id>
+storymesh rerun book_assembler
+storymesh rerun book_assembler <run_id> --email you@example.com
+```
+
+### Inspection / Utilities
+
+```bash
+storymesh show-version
+storymesh show-config
+storymesh show-agent-config genre_normalizer
+storymesh inspect-run
+storymesh inspect-run <run_id>
+storymesh inspect-run <run_id> --llm all
+storymesh inspect-run <run_id> --html out.html
+storymesh stylometrics
+storymesh stylometrics <run_id> --pretty
+storymesh stylometrics --all
+storymesh purge-cache
+storymesh purge-cache --stages-only
+storymesh purge-cache --api-only
+storymesh purge-runs
+```
+
+### Kiosk
+
+The kiosk commands are mounted under the main CLI when the `kiosk` extra is installed:
+
+```bash
+storymesh kiosk start
+storymesh kiosk start --foreground
+storymesh kiosk start --host 0.0.0.0 --port 8000
+storymesh kiosk stop
+storymesh kiosk status
+```
+
+## Python API
+
+```python
+from storymesh import generate_synopsis
+
+result = generate_synopsis(
+    "A literary mystery in a drought-stricken mountain town",
+    prompt_style="default",
+    voice_profile_override="literary_restraint",
+)
+
+print(result.final_synopsis)
+print(result.metadata["run_id"])
+```
+
+Public entrypoint:
+
+- `storymesh.generate_synopsis()`
+
+Important keyword arguments:
+
+- `pass_threshold`
+- `max_retries`
+- `min_retries`
+- `skip_resonance_review`
+- `prompt_style`
+- `email_recipient`
+- `run_id`
+- `voice_profile_override`
+
+## Installation
+
+### Core
 
 ```bash
 git clone https://github.com/<your-username>/storymesh.git
@@ -230,15 +404,113 @@ source .venv/bin/activate
 pip install -e ".[anthropic]"
 ```
 
-API keys are loaded from `.env` (CWD or `~/.storymesh/.env`) at pipeline run time. Absent keys produce a warning; agents fall back to static-only mode. CLI commands like `show-config` and `show-version` never require API keys.
+### Optional Extras
 
-Create a `.env` from `.env.example`:
+Declared extras:
+
+- `anthropic`
+- `openai`
+- `gemini`
+- `pdf`
+- `kiosk`
+- `langsmith`
+- `dev`
+- `all-providers`
+- `langgraph-studio`
+
+Examples:
 
 ```bash
-cp .env.example .env
+pip install -e ".[anthropic,openai,pdf]"
+pip install -e ".[dev]"
+pip install -e ".[kiosk]"
+pip install -e ".[all-providers,pdf,kiosk]"
 ```
 
-Then set any required keys:
+Notes:
+
+- `gemini` is declared as an optional dependency, but there is not currently a registered Gemini client implementation under `src/storymesh/llm/`.
+- PDF/EPUB generation depends on the `pdf` extra.
+- kiosk mode depends on the `kiosk` extra.
+
+## Frontend / Kiosk Development
+
+The kiosk frontend lives in:
+
+- `frontend/`
+
+It is a React + Vite + TypeScript app.
+
+Frontend commands:
+
+```bash
+cd frontend
+npm install
+npm run dev
+npm run build
+npm run preview
+```
+
+Backend:
+
+- FastAPI app: `src/storymesh/kiosk/app.py`
+- SSE-backed job updates
+- built frontend is served from `frontend/dist` when present
+
+Main kiosk API routes:
+
+- `GET /healthz`
+- `GET /api/prompt-styles`
+- `POST /api/submit`
+- `GET /api/jobs`
+- `GET /api/gallery`
+- `GET /api/cover/{run_id}`
+- `GET /api/run/{run_id}/synopsis`
+- `GET /api/events`
+
+Important privacy invariant:
+
+- kiosk request models do accept an email address on submission
+- kiosk response models never expose that email
+- the subprocess receives the email through `STORYMESH_EMAIL_RECIPIENT`, not argv
+
+## Configuration
+
+Primary project config:
+
+- `storymesh.config.yaml`
+
+Config layering:
+
+1. project config discovered by walking up from `src/storymesh/`
+2. optional user override at `~/.storymesh/storymesh.config.yaml`
+
+The user config is deep-merged on top of the project config.
+
+`.env` loading order:
+
+1. `.env` in the current working directory
+2. `~/.storymesh/.env`
+
+Important config sections:
+
+- `llm`
+- `prompts`
+- `agents`
+- `api_clients`
+- `cache`
+- `logging`
+- `email`
+- `kiosk`
+- `langsmith`
+
+The repo also includes:
+
+- `storymesh.config.yaml.example`
+
+## Environment Variables
+
+Typical variables:
 
 ```dotenv
 ANTHROPIC_API_KEY=
@@ -247,170 +519,90 @@ GOOGLE_API_KEY=
 LANGCHAIN_TRACING_V2=
 LANGCHAIN_API_KEY=
 LANGCHAIN_PROJECT=storymesh-dev
+STORYMESH_SMTP_USER=
+STORYMESH_SMTP_PASSWORD=
 ```
 
-## Configuration
+When provider keys are missing, StoryMesh warns and affected LLM-backed stages may degrade to static-only/noop behavior depending on the agent.
 
-The main config file is `storymesh.config.yaml`.
+## Artifacts
 
-Important behavior:
+Run artifacts are written under:
 
-- `get_config()` loads the YAML and `.env` files without requiring any API keys. Key presence is validated (as a warning) only when the pipeline is about to run.
-- `.env` is loaded from the current working directory first, then `~/.storymesh/.env`
-- Cache directories are derived from `cache.dir`
-- Logging is configured from `logging.level`
-- All config section names under `agents:` match graph node names (e.g. `genre_normalizer`, `book_fetcher`, `proposal_draft`)
-
-Current committed config includes:
-
-- LLM defaults
-- `genre_normalizer`, `book_ranker`, `theme_extractor`, `proposal_draft`, and `cover_art` agent overrides
-- Open Library client settings including `max_books`
-- Cache and logging settings
-- Optional LangSmith project settings
-
-An example config is also provided at `storymesh.config.yaml.example`.
-
-## Usage
-
-### CLI
-
-Generate with the current pipeline:
-
-```bash
-storymesh generate "dark post-apocalyptic detective mystery"
+```text
+~/.storymesh/runs/<run_id>/
 ```
 
-Example output:
+Typical files include:
 
-```
-╭──────────────────────────────────────────────────────────────╮
-│ StoryMesh v0.9.0  Run abc123def456                           │
-│ Input: "dark post-apocalyptic detective mystery"             │
-╰──────────────────────────────────────────────────────────────╯
-
- Stage                    Status    Time      Artifact
- ───────────────────────────────────────────────────────────────────────────
- genre_normalizer         ✓ done    0.03s     ~/.storymesh/runs/abc.../genre_normalizer_output.json
- book_fetcher             ✓ done    1.24s     ~/.storymesh/runs/abc.../book_fetcher_output.json
- book_ranker              ✓ done    0.01s     ~/.storymesh/runs/abc.../book_ranker_output.json
- theme_extractor          ✓ done    3.21s     ~/.storymesh/runs/abc.../theme_extractor_output.json
- proposal_draft           ✓ done    8.74s     ~/.storymesh/runs/abc.../proposal_draft_output.json
- rubric_judge             ✓ done    4.12s     ~/.storymesh/runs/abc.../rubric_judge_output.json
- story_writer             ✓ done    22.40s    ~/.storymesh/runs/abc.../story_writer_output.json
- resonance_reviewer       ✓ done    18.33s    ~/.storymesh/runs/abc.../resonance_reviewer_output.json
- cover_art                ✓ done    3.54s     ~/.storymesh/runs/abc.../cover_art_output.json
- book_assembler           ✓ done    0.88s     ~/.storymesh/runs/abc.../book_assembler_output.json
- ───────────────────────────────────────────────────────────────────────────
-                          Total: 62.50s
-
-╭─ Synopsis ───────────────────────────────────────────────────────────╮
-│ In the weeks after the flood receded, Mara Voss returned to what     │
-│ she knew. The records were gone. The precinct was a waterline stain  │
-│ on brick. She kept working anyway.                                   │
-╰──────────────────────────────────────────────────────────────────────╯
-
-PDF:  ~/.storymesh/runs/abc123def456/story.pdf
-EPUB: ~/.storymesh/runs/abc123def456/story.epub
-Artifacts saved to: ~/.storymesh/runs/abc123def456/
+```text
+run_metadata.json
+llm_calls.jsonl
+genre_normalizer_output.json
+voice_profile_selector_output.json
+book_fetcher_output.json
+book_ranker_output.json
+theme_extractor_output.json
+proposal_draft_output.json
+rubric_judge_output.json
+proposal_reader_feedback_output.json
+story_writer_output.json
+resonance_reviewer_output.json
+cover_art_output.json
+cover_art.png
+book_assembler_output.json
+output.pdf
+output.epub
 ```
 
-Inspect version information:
+Compare-mode runs add:
 
-```bash
-storymesh show-version
+```text
+baseline_output.json
+comparison.json
+blinded_eval_packet.json
+blinded_eval_key.json
 ```
 
-Inspect resolved config:
+Artifact notes:
 
-```bash
-storymesh show-config
-storymesh show-agent-config genre_normalizer
-storymesh show-agent-config proposal_draft
+- `llm_calls.jsonl` includes approximate token counts per call
+- the one-shot baseline call is logged under agent name `compare_baseline`
+- stage output files are written incrementally as the graph progresses
+
+Stage cache location:
+
+```text
+~/.storymesh/stages/
 ```
 
-Inspect a past run stage-by-stage:
+API cache root defaults to:
 
-```bash
-storymesh inspect-run                          # most recent run
-storymesh inspect-run <run_id>                 # specific run
-storymesh inspect-run <run_id> --llm all       # include full LLM prompts and responses
-storymesh inspect-run <run_id> --html out.html # export a self-contained HTML report
+```text
+~/.cache/storymesh/
 ```
 
-Count prose tics in a story draft (offline, no LLM calls):
+## LLM-as-Judge Workflow
 
-```bash
-storymesh stylometrics                  # most recent run, JSON output
-storymesh stylometrics <run_id>         # specific run
-storymesh stylometrics --pretty         # human-readable table
-storymesh stylometrics --all            # all runs in the store
-```
+If you are using `storymesh compare` to evaluate StoryMesh against a one-shot baseline:
 
-Regenerate the cover art for a previous run without re-running the full pipeline:
+- use `blinded_eval_packet.json` as the judge input
+- keep `blinded_eval_key.json` out of the judging prompt
 
-```bash
-storymesh rerun cover_art               # regenerate for the most recent run
-storymesh rerun cover_art <run_id>      # regenerate for a specific run
-```
+The packet contains:
 
-Purge caches and run data:
+- original user prompt
+- two anonymized candidates labeled `A` and `B`
+- each story's full draft and word count
 
-```bash
-storymesh purge-cache                # purge both stage and API response caches
-storymesh purge-cache --stages-only  # stage artifact cache only
-storymesh purge-cache --api-only     # Open Library API response cache only
-storymesh purge-runs                 # delete all per-run artifact directories
-```
+This is designed for either:
 
-### Python API
-
-```python
-from storymesh import generate_synopsis
-
-result = generate_synopsis("dark post-apocalyptic detective mystery")
-print(result.final_synopsis)
-print(result.metadata)
-```
-
-The public return type is `GenerationResult`, defined in `src/storymesh/schemas/result.py`. The `metadata` dict includes `user_prompt`, `pipeline_version`, `run_id`, `stage_timings`, and `run_dir`.
-
-## Artifacts and Caching
-
-StoryMesh persists run artifacts under `~/.storymesh`. Artifacts are written as each node completes (not after the full graph finishes), so a crash mid-pipeline leaves partial artifacts on disk for inspection.
-
-```
-~/.storymesh/
-├── runs/
-│   └── <run_id>/
-│       ├── run_metadata.json                   ← written before graph invocation
-│       ├── llm_calls.jsonl                     ← per-call log (agent, prompt, response)
-│       ├── genre_normalizer_output.json
-│       ├── voice_profile_selector_output.json
-│       ├── book_fetcher_output.json
-│       ├── book_ranker_output.json
-│       ├── theme_extractor_output.json
-│       ├── proposal_draft_output.json
-│       ├── rubric_judge_output.json
-│       ├── story_writer_output.json
-│       ├── resonance_reviewer_output.json
-│       ├── cover_art_output.json
-│       ├── cover_art.png
-│       ├── book_assembler_output.json
-│       ├── story.pdf
-│       └── story.epub
-└── stages/                                     ← stage-level cache (content-addressed)
-```
-
-Open Library responses are cached under the configured cache root, typically:
-
-```
-~/.cache/storymesh/open_library
-```
+- human blind review
+- LLM-as-judge workflows
 
 ## Development
 
-Install development dependencies:
+Install dev dependencies:
 
 ```bash
 pip install -e ".[dev]"
@@ -422,36 +614,39 @@ Run tests:
 pytest
 ```
 
-Real API coverage exists behind the `real_api` marker:
+Run real API tests:
 
 ```bash
 pytest -m real_api
 ```
 
-Useful files:
+Useful source files:
 
-- `src/storymesh/orchestration/graph.py`
-- `src/storymesh/orchestration/pipeline.py`
 - `src/storymesh/cli.py`
 - `src/storymesh/config.py`
+- `src/storymesh/orchestration/graph.py`
+- `src/storymesh/orchestration/pipeline.py`
+- `src/storymesh/core/stage_progress.py`
+- `src/storymesh/kiosk/app.py`
+- `src/storymesh/kiosk/jobs.py`
 
-## Known Gaps and Limitations
+## Known Limitations
 
-- LLM-required stages (`ThemeExtractorAgent`, `ProposalDraftAgent`, `RubricJudgeAgent`, `VoiceProfileSelectorAgent`, `StoryWriterAgent`, `ResonanceReviewerAgent`) degrade to noops when the relevant API key is absent.
-- `CoverArtAgent` requires `OPENAI_API_KEY`; without one, Stage 7 runs as a noop.
-- `BookAssemblerAgent` requires WeasyPrint (PDF) and ebooklib (EPUB); without them it runs as a noop.
-- **Rubric-judge aesthetic bias**: the current rubric rewards literary-fiction qualities regardless of voice profile. Proposals for `cozy_warmth` or `genre_active` stories will be scored against literary criteria, which may cause the retry loop to pull them back toward literary aesthetic. This is a known v1 limitation; per-profile rubric conditioning is deferred.
-- **ThemeExtractorAgent's dialectical framework** assumes every story argues a thesis via genre tension. This works well for literary and genre fiction but produces over-philosophical proposals for cozy or action genres.
+- Many stages still depend on external provider availability; absent keys can turn parts of the pipeline into static-only/noop behavior.
+- `CoverArtAgent` currently depends on the OpenAI image backend.
+- the rubric is still biased toward the house literary sensibility more than all voice profiles equally
+- the theme-extraction framework is strongest on literary / mystery / speculative tension-heavy prompts and can feel overdetermined for lighter commercial modes
+- Gemini is listed as an optional dependency but is not yet wired as a provider implementation
 
-## Roadmap
+## Repo Layout
 
-- ~~Implement `ProposalDraftAgent` with multi-sample drafting and critic selection~~
-- ~~Activate rubric-based retry logic with real pass/fail signal~~
-- ~~Implement `StoryWriterAgent` for three-pass prose generation~~
-- ~~Implement `ResonanceReviewerAgent` for near-miss detection and targeted expansion~~
-- ~~Implement `CoverArtAgent` for gpt-image-1 cover image generation~~
-- ~~Implement `BookAssemblerAgent` for PDF and EPUB output~~
-- ~~Add `VoiceProfileSelectorAgent` to produce genre-appropriate prose~~
-- ~~Add offline stylometric counter (`storymesh stylometrics`)~~
-- Per-profile rubric conditioning (v2: `cozy_warmth` and `genre_active` proposals scored against appropriate criteria)
-- Per-profile theme extraction (v2: lighter extraction path for non-literary genres)
+High-signal directories:
+
+- `src/storymesh/agents/` — agent implementations
+- `src/storymesh/orchestration/` — LangGraph graph, nodes, pipeline wrapper
+- `src/storymesh/prompts/styles/` — prompt styles
+- `src/storymesh/prompts/voice_profiles/` — voice profiles
+- `src/storymesh/kiosk/` — FastAPI kiosk backend
+- `frontend/` — kiosk frontend
+- `tests/` — test suite
+- `plans/` — design / implementation notes

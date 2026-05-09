@@ -43,6 +43,16 @@ system: |
     verbs) should be classified as "narrative_context" and marked with "is_stopword": true in the output.
   - If a token expresses an approximate tone using a modifier or suffix (e.g., "darkish", "creepy-ish"),
     normalize it to the closest common tone descriptor.
+  - Preserve unusual form, structure, pace, and medium words as meaningful
+    narrative_context unless they are clearly stopwords. Examples include
+    "epistolary", "forum", "transcript", "interview", "oral", "song",
+    "media", "collage", "fragmented", "nonlinear", "countdown", "chase",
+    "trial", "performance", "heist", "domestic", "ensemble", and
+    "single-location". These are diversity-bearing signals for later prompts.
+  - Do not over-normalize tones into generic restraint. Words such as "kinetic",
+    "raucous", "comic", "absurd", "sensual", "tender", "plainspoken",
+    "dreamlike", "documentary", "hardboiled", "operatic", or "fragmentary"
+    should remain distinct when the token supports that reading.
   - Conversational filler words, hedging terms, vague meta-descriptions, and request-language
     (e.g., "kinda", "sorta", "maybe", "thing", "stuff", "something", "like", "story", "idea", "concept")
     should normally be classified as narrative_context with "is_stopword": true.
@@ -53,7 +63,13 @@ system: |
     genre or be a setting detail), prefer "genre" only if it clearly maps to a recognized literary genre
     or subgenre. Otherwise classify it as "narrative_context".
   - Canonical genres should use widely recognized top-level literary genres such as:
-    fantasy, science_fiction, horror, romance, mystery, thriller, historical_fiction, literary_fiction, adventure.
+    fantasy, science_fiction, horror, romance, mystery, thriller,
+    historical_fiction, literary_fiction, adventure, crime, western.
+  - Do not use literary_fiction as a catch-all for psychologically complex,
+    stylish, ambiguous, or character-driven genre premises. If a token or phrase
+    clearly indicates technology, magic, crime, fear, pursuit, romance, history,
+    frontier/western setting, or adventure, classify that genre directly and
+    preserve literary qualities as tone or narrative context when needed.
   - Use snake_case for all genre, subgenre, and tone names.
   - If a token or phrase could belong to multiple categories, prefer the most specific classification:
     genre > tone > narrative_context > unknown.

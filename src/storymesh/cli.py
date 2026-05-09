@@ -24,6 +24,10 @@ from storymesh.core.run_inspector import (
     StageInspection,
     StageStatus,
 )
+from storymesh.core.stage_progress import (
+    STAGE_NAMES as _STAGE_NAMES,
+    infer_stage_statuses as _infer_stage_statuses,
+)
 from storymesh.exceptions import RunNotFoundError
 from storymesh.llm.base import current_run_id
 from storymesh.versioning import AGENT_VERSIONS, SCHEMA_VERSIONS
@@ -32,6 +36,15 @@ from storymesh.versioning import __version__ as storymesh_version
 app = typer.Typer()
 console = Console()
 
+# `storymesh kiosk start|stop|status` lives in the kiosk subpackage so its
+# httpx/uvicorn dependencies stay optional. Importing lazily means `storymesh
+# generate` still works without the kiosk extra installed.
+try:
+    from storymesh.kiosk.cli import kiosk_app  # noqa: PLC0415
+    app.add_typer(kiosk_app, name="kiosk")
+except ImportError:
+    pass
+
 # Quality presets: (pass_threshold, max_retries, min_retries, enable_resonance_review)
 _QUALITY_PRESETS: dict[str, tuple[int, int, int, bool]] = {
     "draft":     (5, 1, 0, False),
@@ -39,21 +52,6 @@ _QUALITY_PRESETS: dict[str, tuple[int, int, int, bool]] = {
     "high":      (7, 3, 1, True),   # threshold lowered 8→7: rubric scores cluster at 6-7
     "very_high": (9, 3, 2, True),
 }
-
-# Pipeline stage names in execution order — used to build the stage table.
-_STAGE_NAMES = [
-    "genre_normalizer",
-    "book_fetcher",
-    "book_ranker",
-    "theme_extractor",
-    "proposal_draft",
-    "rubric_judge",
-    "proposal_reader_feedback",
-    "story_writer",
-    "resonance_reviewer",  # Stage 6b
-    "cover_art",           # Stage 7
-    "book_assembler",      # Stage 8
-]
 
 _BASELINE_SYSTEM_PROMPT = """\
 You are a fiction writer. Write one complete short story in a single pass.
@@ -186,50 +184,6 @@ def _find_active_run_dir(store: ArtifactStore, started_at: float) -> Path | None
     return None
 
 
-def _read_last_llm_agent(run_dir: Path) -> str | None:
-    """Return the agent name from the last llm_calls.jsonl line, if any."""
-    path = run_dir / "llm_calls.jsonl"
-    if not path.exists():
-        return None
-    lines = path.read_bytes().splitlines()
-    for line in reversed(lines):
-        if not line.strip():
-            continue
-        try:
-            raw = orjson.loads(line)
-            if isinstance(raw, dict):
-                return str(raw.get("agent", "")) or None
-        except Exception:
-            continue
-    return None
-
-
-def _infer_stage_statuses(run_dir: Path | None) -> tuple[dict[str, str], str | None]:
-    """Infer per-stage statuses from artifact files and recent LLM activity."""
-    statuses = {stage: "pending" for stage in _STAGE_NAMES}
-    if run_dir is None:
-        return statuses, None
-
-    for stage in _STAGE_NAMES:
-        if (run_dir / f"{stage}_output.json").exists():
-            statuses[stage] = "done"
-
-    active_stage = _read_last_llm_agent(run_dir)
-    if active_stage not in statuses:
-        active_stage = None
-
-    if active_stage is None:
-        for stage in _STAGE_NAMES:
-            if statuses[stage] != "done":
-                active_stage = stage
-                break
-
-    if active_stage is not None and statuses.get(active_stage) != "done":
-        statuses[active_stage] = "running"
-
-    return statuses, active_stage
-
-
 def _render_live_stage_table(
     *,
     label: str,
@@ -345,6 +299,24 @@ def generate(
             "Overrides email.recipient in storymesh.config.yaml for this run.",
         ),
     ] = None,
+    run_id: Annotated[
+        str | None,
+        typer.Option(
+            "--run-id",
+            help="Optional caller-supplied run identifier. When omitted, a fresh "
+            "UUID hex is generated. Useful for external orchestrators that need "
+            "to know the run directory path before the pipeline returns.",
+        ),
+    ] = None,
+    voice: Annotated[
+        str | None,
+        typer.Option(
+            "--voice",
+            help="Force a specific voice profile id (e.g. 'cozy_warmth', "
+            "'literary_restraint'). When omitted, VoiceProfileSelectorAgent picks "
+            "one based on the prompt.",
+        ),
+    ] = None,
 ) -> None:
     """Generate an original fiction synopsis from the given prompt."""
     if quality not in _QUALITY_PRESETS:
@@ -356,6 +328,13 @@ def generate(
         raise typer.Exit(code=1)
 
     pass_threshold, max_retries, min_retries, enable_resonance = _QUALITY_PRESETS[quality]
+
+    # Allow STORYMESH_EMAIL_RECIPIENT to supply the recipient when --email is
+    # not given. This is the path the kiosk subprocess uses so the email never
+    # appears in argv (where `ps` would expose it).
+    import os as _os  # noqa: PLC0415
+    resolved_email = email or _os.environ.get("STORYMESH_EMAIL_RECIPIENT") or None
+
     result, wall_clock = _run_with_stage_progress(
         "StoryMesh pipeline",
         lambda: generate_synopsis(
@@ -365,7 +344,9 @@ def generate(
             min_retries=min_retries,
             skip_resonance_review=not enable_resonance,
             prompt_style=prompt_style,
-            email_recipient=email,
+            email_recipient=resolved_email,
+            run_id=run_id,
+            voice_profile_override=voice,
         ),
     )
 

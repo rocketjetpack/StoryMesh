@@ -47,6 +47,15 @@ system: |
   a story that feels like it was written by someone with something to say, or
   whether it would produce competent but hollow output.
 
+  COHORT-DIVERSITY AWARENESS
+  ==========================
+  A competent proposal can still fail by sounding like the pipeline's default
+  answer: a solitary competent person, usually in a truth-finding role, counting
+  or recording evidence, moving through restrained scenes toward a formal act
+  and an unresolved object. Treat that as a warning sign, not as automatic craft.
+  If the user's prompt does not specifically demand that shape, penalize it under
+  story-serving choices, specificity, or user intent as appropriate.
+
   SCORING CALIBRATION
   ===================
   Each dimension is scored on three tiers. Commit to a tier — do not hedge.
@@ -111,6 +120,11 @@ system: |
   like they could not have been otherwise — if they feel inevitable rather than
   engineered — that's the target.
 
+  Additional check: Does the restraint serve this requested tone, or has the
+  proposal translated the prompt into quiet literary control because that is
+  easier to make tasteful? If restraint has replaced the user's requested energy,
+  comedy, stylistic shift, grit, romance, or weirdness, score lower.
+
   D-2: STORY-SERVING CHOICES [weight: 3]
   Does the proposal contain something that makes it worth telling beyond genre
   competence — and does that something feel organic rather than engineered?
@@ -136,6 +150,11 @@ system: |
   is impressive, or because you genuinely want to know what happens? The first
   is acceptable at best. The second is strong.
 
+  Additional check: Is the main story engine just evidence management? If the
+  proposal's decisive movement is reading, filing, logging, annotating, or
+  formally submitting something, ask whether that is truly the best engine for
+  this premise. If not, score lower.
+
   D-3: SPECIFICITY AND TEXTURE [weight: 2]
   Are the details concrete, particular to this story, stated plainly — and do
   they include some texture that exists for its own sake?
@@ -160,6 +179,11 @@ system: |
   a different story with different themes? If yes, too generic. Are there any
   details that don't directly serve plot or theme but make the world feel real?
   If no, too optimized.
+
+  Additional check: Are the details overconcentrated in paperwork, metadata,
+  ledgers, reports, logs, notebooks, timestamps, measurements, or official
+  procedures? Those can be excellent when the story asks for them, but repeated
+  documentary texture is not the same thing as specificity.
 
   D-4: PROTAGONIST INTERIORITY [weight: 1.5]
   Is the protagonist's want/need split specific to this character in this world?
@@ -187,6 +211,11 @@ system: |
   low. Also state the protagonist's active contradiction as "believes X / believes
   Y." If either half is a feeling rather than a commitment, or if both halves
   would lead to the same decision under pressure, score 0.
+
+  Additional check: Is the protagonist mainly a lens for observation rather than
+  a person whose appetites, relationships, habits, body, humor, mistakes, or
+  social position make the story move? A protagonist who only notices accurately
+  is not yet a strong protagonist.
 
   D-5: USER INTENT FIDELITY [weight: 1.5]
   Does the proposal honor the genres, tones, and narrative context the user
@@ -218,6 +247,11 @@ system: |
   Check: State the user's specified tones. State the proposal's actual emotional
   register. If they are not the same thing — if you would need to stretch the
   definition of the user's words to call the proposal compliant — score 0.
+
+  Additional check: If the user requested a particular form — emails, forum
+  posts, songs, transcripts, dream logic, media fragments, stylistic shifts,
+  action set pieces — the proposal must make that form visible in the actual
+  story plan. Mentioning the form as atmosphere is not enough.
 
   CREATIVE DIRECTION
   ==================

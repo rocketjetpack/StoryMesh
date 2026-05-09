@@ -21,6 +21,48 @@ system: |
   ADDITIONAL SEEDS for context only — do not develop them. You will also receive a list
   of THEMATIC TENSIONS, each with familiar resolutions that form the genre contract.
 
+  PRIVATE VERBALIZED SAMPLING QUEUES:
+  Before drafting the new proposal, privately choose at least one option from
+  each queue below. Do not output the queue labels or your private notes. Use the
+  choices to escape the previous proposal's default shape.
+
+  - Protagonist posture: instigator, bystander, beneficiary, liar, apprentice,
+    performer, relative, rival, patient, courier, repairer, host, guest, child,
+    elder, comic obstacle, ordinary worker, person with the wrong expertise.
+  - Narrative engine: pursuit, negotiation, seduction, meal, trial, rehearsal,
+    public performance, heist, pilgrimage, domestic argument, work shift,
+    festival, rescue, sabotage, correspondence, wager, lesson, confession,
+    physical survival, social embarrassment.
+  - Formal/texture bias: dialogue-forward, sensory/body-forward, social comedy,
+    documentary collage, oral tale, lyrical dream, hardboiled, plainspoken,
+    procedural, adventure serial, intimate memory, absurd bureaucracy.
+  - Scale: two-person pressure, family, crew, workplace, neighborhood, fandom,
+    institution, city, wilderness, market, ship, road, stage, classroom.
+  - Ending posture: changed relationship, public consequence, private compromise,
+    comic reversal, bodily cost, practical victory, emotional loss, new appetite,
+    unresolved social obligation, door opened rather than case closed.
+
+  Diversity is part of quality, especially on retry. Unless the assigned seed
+  explicitly requires it, avoid the default cluster of: solitary female
+  investigator, documents/logs, measuring/counting as the main trait, formal
+  report submission as the climax, and a tasteful unresolved object as the final
+  beat. Those choices are available when the story truly needs them, but they
+  should not be the fallback.
+
+  The candidate-specific diversity card in the user message is binding unless
+  it directly contradicts the user's prompt. Use it to make this proposal
+  occupy a distinct part of the possibility space, not merely to rename the
+  previous proposal's investigation/procedure shape.
+
+  FORMAL-MACHINERY BUDGET:
+  Across a candidate set, only one proposal should use logs, files, reports,
+  trials, archives, notebooks, minutes, legal filings, official findings,
+  incident records, or documentary evidence as its primary story engine unless
+  the user explicitly requested that form. If your diversity card is not the
+  direct/default card, assume that budget has already been spent and choose a
+  different engine: bodies, dialogue, work, appetite, danger, debt, errands,
+  jokes, ritual, movement, public consequence, family pressure, or desire.
+
   YOUR TASK (follow this exactly):
 
   STEP 1 — DEVELOP THE ASSIGNED SEED:
@@ -36,9 +78,23 @@ system: |
   institution is corrupt" — not "torn between loyalty and doubt." If you cannot name
   both halves, the character does not yet have a contradiction.
 
-  Before developing the seed further, state the user's specified tones (from USER TONES
-  in the user message) and confirm that the seed's tonal_direction honours them directly.
-  If the seed reframes the tone, choose a different angle.
+  Before developing the seed further, privately verify the user's specified
+  tones (from USER TONES in the user message) and confirm that the seed's
+  tonal_direction honours them directly. Do not output this verification. If
+  the seed reframes the tone, choose a different angle.
+
+  Choose names, roles, and social worlds that feel native to this story rather
+  than drawn from examples or from the failed proposal. Do not reuse example
+  names. Do not default to investigator, auditor, archivist, professor, analyst,
+  or record-keeper unless the user's prompt or assigned seed makes that role
+  genuinely necessary.
+
+  Give the protagonist a surface goal that is tangible in the world. Avoid
+  "wants to understand what is happening" as the main want unless the user asked
+  for a mystery. Strong wants include: keep a job, get home, save face, win
+  someone back, hide a mistake, make dinner, cross a border, finish a repair,
+  protect income, avoid a ceremony, deliver a body, recover a child, keep a
+  room open, or preserve a lie.
 
   STEP 2 — ADDRESS THE TENSIONS:
   Every tension listed in tensions_used should be present in the story's landscape. The
@@ -54,6 +110,11 @@ system: |
   given up, a role relinquished. Name this decision in your plot_arc. If you cannot
   identify it, the arc is not yet complete.
 
+  The costly decision does not need to be a formal filing, report, confession, or
+  document submission. It may be physical, social, comic, romantic, tactical,
+  domestic, public, bodily, or practical. Prefer the kind of irreversible act this
+  particular story would naturally produce.
+
   STEP 3 — THEMATIC PRESSURE:
   The thematic_thesis field is not the story's answer or philosophical verdict. It is
   the pressure the story applies — what it keeps circling around, what contradiction it
@@ -62,9 +123,9 @@ system: |
 
   Good thematic_thesis (pressure, not answer):
   "The story circles the question of whether institutions create justice or merely
-  make justice visible. Mara rebuilds the infrastructure of investigation in a vacuum,
-  and the story never fully resolves whether the tribunal's authority is real or
-  performed — only that it costs her something either way."
+  make justice visible. Lio keeps hosting the illegal tribunal in the back room
+  of his bakery, and the story never fully resolves whether the room gives the
+  verdict authority or only gives frightened people a place to sit."
 
   Weak thematic_thesis (verdict, too closed):
   "Institutions do not create justice — they create the infrastructure for justice to
@@ -79,6 +140,10 @@ system: |
   the story ends — include them in the unknowns field. Not every story needs them.
   Do not manufacture ambiguity for its own sake. When they are present, they should
   feel like natural gaps in understanding, not engineered mystery.
+
+  Unknowns do not always have to be epistemic puzzles. They can be social,
+  bodily, romantic, spiritual, comic, practical, or sensory uncertainties. Do
+  not make every ambiguity a question of records, proof, logs, or verification.
 
   STEP 5 — WRITE AN ART DIRECTION BRIEF:
   The image_prompt field is an art direction brief for a human illustrator or painter.
@@ -107,14 +172,13 @@ system: |
   EXAMPLES OF STRONG OUTPUT:
 
   Good plot arc (specific, scene-driven, does not pre-resolve):
-  "Mara Voss, a former homicide detective turned scavenger, finds a body arranged with
-  deliberate symbolism in a flooded district — someone is communicating through murder.
-  With no courts, no databases, and no legal authority, she rebuilds the infrastructure
-  of investigation: cultivating informants, establishing witness trust, creating a
-  portable record system from salvaged materials. The killer systematically destroys
-  each piece of her work. She assembles a community tribunal with no legal standing,
-  presenting her case to people who have no obligation to listen. The tribunal reaches
-  a verdict, and Mara is left holding a decision she did not expect to have to make."
+  "Inez Calder, who runs the last bathhouse in a flooded district, lets neighbors
+  hold disputes in the empty men's room because the tile walls make everyone lower
+  their voices. When a corpse is carried in during washing hour, she refuses to
+  close the baths, and the investigation unfolds through steam, gossip, favors,
+  and the people who keep arriving with soap and knives. By the time the killer
+  is named, Inez has turned a business into a court and has to choose whether to
+  keep the door open to the person everyone wants excluded."
 
   Weak plot arc (too resolved, pre-determines the ending's meaning):
   "...She assembles a tribunal and presents her case. The tribunal convicts, and she
@@ -179,12 +243,11 @@ system: |
   should not call attention to themselves. State them plainly. If the prose
   lingers on a detail, admiring its own specificity, it becomes performative.
 
-  Good: "She kept records of every lie she'd told since age twelve, organized
-  by recipient." (Stated as fact. The reader does the work of finding it
-  strange.)
+  Good: "She kept the broken buttons from every borrowed coat in a tea tin."
+  (Stated as fact. The reader does the work of finding it strange.)
 
-  Bad: "In a peculiar habit that spoke volumes about her fractured relationship
-  with truth, she maintained meticulous records of every lie..." (The prose is
+  Bad: "In a peculiar habit that spoke volumes about her fear of abandonment,
+  she maintained a symbolic collection of broken buttons..." (The prose is
   explaining why the detail is interesting, which means the detail isn't doing
   its job.)
 
@@ -223,6 +286,12 @@ system: |
   - The phrase "little did they know"
   - Characters who are "haunted by" something
   - Use of emdash of any kind for any generic reason. MAX TWO PER STORY.
+  - The protagonist defined mainly by counting, cataloguing, observing, filing,
+    measuring, or recording, unless the user explicitly asked for that life
+  - The climax as a report, log, submission, official finding, or archived file
+    unless the story's requested form makes that unavoidable
+  - The same tasteful ending shape: protagonist alone with an object, still
+    unable to know what it means
 
   RESPONSE FORMAT:
   Return ONLY a valid JSON object. No preamble, no commentary, no markdown fences.
@@ -273,6 +342,9 @@ user: |
   You are generating candidate {candidate_index} of {total_candidates}. Your proposal must be
   substantially different from any other proposal generated from these same inputs. Prioritize
   bold, surprising creative choices over safe or expected ones.{alternate_angle_note}
+
+  DIVERSITY CARD FOR THIS CANDIDATE:
+  {diversity_card}
 
   Develop the ASSIGNED SEED below as your primary starting point.
 
