@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
-from storymesh.config import get_kiosk_config
+from storymesh.config import ensure_storymesh_logging, get_kiosk_config
 from storymesh.kiosk.jobs import JobManager
 from storymesh.kiosk.models import (
     GalleryItem,
@@ -64,6 +64,15 @@ def create_app(*, manager: JobManager | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        # Re-attach the storymesh log handler. Uvicorn calls
+        # ``logging.config.dictConfig`` during its own startup, which (with
+        # ``disable_existing_loggers=True``, the dictConfig default) silently
+        # disables every logger that existed at app-import time — including
+        # our ``storymesh`` hierarchy. Calling ``ensure_storymesh_logging``
+        # from the FastAPI startup hook restores INFO/WARNING/ERROR output
+        # so kiosk diagnostics (e.g. the per-job env-var presence line in
+        # JobManager._start_subprocess_locked) reach the daemon log.
+        ensure_storymesh_logging()
         await job_manager.start()
         try:
             yield

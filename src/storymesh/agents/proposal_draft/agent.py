@@ -22,6 +22,7 @@ from typing import Any
 
 import orjson
 
+from storymesh.exceptions import LLMRefusalError
 from storymesh.llm.base import LLMClient
 from storymesh.prompts.loader import load_prompt
 from storymesh.schemas.proposal_draft import (
@@ -218,6 +219,8 @@ class ProposalDraftAgent:
 
         candidates: list[StoryProposal] = []
         parse_failures = 0
+        candidate_errors: list[str] = []
+        first_failure: Exception | None = None
 
         for i in range(num_candidates):
             assigned_seed = seeds[i % len(seeds)]
@@ -270,20 +273,34 @@ class ProposalDraftAgent:
                     assigned_seed.seed_id,
                     proposal.title,
                 )
-            except Exception as exc:
-                parse_failures += 1
+            except LLMRefusalError:
+                # Refusals are deterministic for this prompt — abort the whole
+                # candidate loop and surface the refusal to the caller without
+                # burning the remaining attempts.
                 logger.warning(
-                    "Candidate %d/%d failed | seed=%s error=%s",
+                    "Candidate %d/%d refused by provider | seed=%s — aborting candidate loop.",
                     i + 1,
                     num_candidates,
                     assigned_seed.seed_id,
-                    exc,
                 )
+                raise
+            except Exception as exc:
+                parse_failures += 1
+                detail = (
+                    f"candidate {i + 1}/{num_candidates} (seed={assigned_seed.seed_id}): "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                candidate_errors.append(detail)
+                if first_failure is None:
+                    first_failure = exc
+                logger.warning("ProposalDraftAgent %s", detail)
 
         if not candidates:
+            joined = "; ".join(candidate_errors) if candidate_errors else "no detail captured"
             raise RuntimeError(
-                "ProposalDraftAgent: all candidate proposals failed parsing."
-            )
+                f"ProposalDraftAgent: all {num_candidates} candidate proposals failed. "
+                f"Errors: {joined}"
+            ) from first_failure
 
         # Successful generate calls (each attempted call that raised is a failure;
         # calls not yet attempted never incremented the counter).

@@ -26,9 +26,11 @@ from storymesh.core.run_inspector import (
 )
 from storymesh.core.stage_progress import (
     STAGE_NAMES as _STAGE_NAMES,
+)
+from storymesh.core.stage_progress import (
     infer_stage_statuses as _infer_stage_statuses,
 )
-from storymesh.exceptions import RunNotFoundError
+from storymesh.exceptions import LLMRefusalError, RunNotFoundError
 from storymesh.llm.base import current_run_id
 from storymesh.versioning import AGENT_VERSIONS, SCHEMA_VERSIONS
 from storymesh.versioning import __version__ as storymesh_version
@@ -333,25 +335,63 @@ def generate(
     # not given. This is the path the kiosk subprocess uses so the email never
     # appears in argv (where `ps` would expose it).
     import os as _os  # noqa: PLC0415
-    resolved_email = email or _os.environ.get("STORYMESH_EMAIL_RECIPIENT") or None
+    env_recipient_raw = _os.environ.get("STORYMESH_EMAIL_RECIPIENT")
+    env_recipient = (env_recipient_raw or "").strip()
+    resolved_email = email or env_recipient or None
 
-    result, wall_clock = _run_with_stage_progress(
-        "StoryMesh pipeline",
-        lambda: generate_synopsis(
-            user_prompt,
-            pass_threshold=pass_threshold,
-            max_retries=max_retries,
-            min_retries=min_retries,
-            skip_resonance_review=not enable_resonance,
-            prompt_style=prompt_style,
-            email_recipient=resolved_email,
-            run_id=run_id,
-            voice_profile_override=voice,
-        ),
-    )
+    # Diagnostic: when running under the kiosk, this print lands in
+    # kiosk_subprocess.log per run. Goes via stdout so it survives any logger
+    # config the kiosk daemon imposes. Email value itself is never printed —
+    # only its presence — so the run log stays free of recipient PII.
+    if _os.environ.get("STORYMESH_KIOSK_RUN") == "1":
+        env_state = (
+            "set+nonempty" if env_recipient else
+            "set+empty" if env_recipient_raw is not None else
+            "unset"
+        )
+        cli_state = "provided" if email else "not-provided"
+        console.print(
+            f"[dim]email recipient resolution | "
+            f"STORYMESH_EMAIL_RECIPIENT={env_state} | "
+            f"--email={cli_state} | "
+            f"resolved={'yes' if resolved_email else 'no'}[/dim]"
+        )
+
+    try:
+        result, wall_clock = _run_with_stage_progress(
+            "StoryMesh pipeline",
+            lambda: generate_synopsis(
+                user_prompt,
+                pass_threshold=pass_threshold,
+                max_retries=max_retries,
+                min_retries=min_retries,
+                skip_resonance_review=not enable_resonance,
+                prompt_style=prompt_style,
+                email_recipient=resolved_email,
+                run_id=run_id,
+                voice_profile_override=voice,
+            ),
+        )
+    except LLMRefusalError as exc:
+        console.print()
+        console.print(
+            Panel(
+                f"[bold red]The {exc.provider} model refused to generate a response.[/bold red]\n\n"
+                f"[bold]Model:[/bold] {exc.model}\n"
+                f"[bold]Detail:[/bold] {exc.detail}\n\n"
+                "Refusals usually mean the prompt triggered the provider's content "
+                "policy. Rephrase the prompt — for example, soften graphic violence, "
+                "remove specific real-world targets, or describe events at a higher "
+                "level of abstraction — and try again.",
+                title="Prompt refused",
+                border_style="red",
+                expand=False,
+            )
+        )
+        raise typer.Exit(code=2) from exc
 
     meta = result.metadata
-    run_id: str = str(meta.get("run_id", "unknown"))
+    resolved_run_id: str = str(meta.get("run_id", "unknown"))
     version: str = str(meta.get("pipeline_version", "?"))
     active_prompt_style: str = str(meta.get("prompt_style", "default"))
     stage_timings_raw = meta.get("stage_timings", {})
@@ -361,7 +401,7 @@ def generate(
     # ── Header ────────────────────────────────────────────────────────────
     console.print(
         Panel(
-            f"[bold]StoryMesh v{version}[/bold]  Run [dim]{run_id}[/dim]\n"
+            f"[bold]StoryMesh v{version}[/bold]  Run [dim]{resolved_run_id}[/dim]\n"
             f'Input: "[italic]{user_prompt}[/italic]"\n'
             f"Prompt style: [dim]{active_prompt_style}[/dim]",
             expand=False,
@@ -411,7 +451,7 @@ def generate(
     if run_dir != Path("") and run_dir.exists():
         console.print(f"Artifacts saved to: [dim]{run_dir}[/dim]")
         store = ArtifactStore()
-        usage = load_llm_usage_summary(store, run_id)
+        usage = load_llm_usage_summary(store, resolved_run_id)
         if usage["calls"]:
             console.print(_render_usage_line("LLM usage (approx)", usage))
         console.print(f"Wall clock: [dim]{_format_duration(wall_clock)}[/dim]")

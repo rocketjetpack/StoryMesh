@@ -15,6 +15,9 @@ export default {
         cream: "#F0E6D6",
         brass: "#C28840",
         oxblood: "#5C1A1B",
+        "oxblood-bright": "#8C2E2F",
+        patina: "#7E9A6E",
+        "patina-bright": "#9DBC8B",
         ash: "#2A2C32",
       },
       keyframes: {

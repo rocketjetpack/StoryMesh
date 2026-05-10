@@ -355,7 +355,9 @@ storymesh purge-runs
 The kiosk commands are mounted under the main CLI when the `kiosk` extra is installed:
 
 ```bash
-storymesh kiosk start
+storymesh kiosk build-frontend          # one-time / after frontend changes
+storymesh kiosk build-frontend --skip-install
+storymesh kiosk start                    # auto-builds the bundle if missing
 storymesh kiosk start --foreground
 storymesh kiosk start --host 0.0.0.0 --port 8000
 storymesh kiosk stop
@@ -394,15 +396,56 @@ Important keyword arguments:
 
 ## Installation
 
-### Core
+There are two onboarding paths. Pick the one that matches how you intend to
+use StoryMesh; you can always add the kiosk later.
+
+### Path A — CLI only
+
+The common case. No Node.js, no frontend build. You get `storymesh generate`,
+`storymesh compare`, and the inspection / rerun commands.
 
 ```bash
 git clone https://github.com/<your-username>/storymesh.git
 cd storymesh
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[anthropic]"
+pip install -e ".[anthropic,openai,pdf]"
 ```
+
+Set whichever provider keys you need (e.g. `ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY`) in `~/.storymesh/.env` or your shell, and run:
+
+```bash
+storymesh generate "A quiet literary mystery in a flood-damaged coastal city"
+```
+
+### Path B — CLI + kiosk web UI
+
+Adds the FastAPI backend and the React kiosk frontend. Requires Node.js
+(only for the one-time frontend build).
+
+```bash
+git clone https://github.com/<your-username>/storymesh.git
+cd storymesh
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[anthropic,openai,pdf,kiosk]"
+storymesh kiosk build-frontend   # runs npm install + npm run build for you
+storymesh kiosk start
+```
+
+`storymesh kiosk start` will also auto-build the frontend on first launch
+when the bundle is missing and `npm` is on PATH, so a fresh contributor can
+skip the explicit `build-frontend` step. Re-run `storymesh kiosk
+build-frontend` after pulling frontend changes to pick them up.
+
+### Why isn't the frontend built by `pip install`?
+
+Two reasons. First, CLI-only users would gain nothing and pay a 30s build
+on every install. Second, dev contributors usually want `npm run dev` for
+hot reload, not a baked-in production bundle. Pip stays Python-only;
+`storymesh kiosk build-frontend` and the auto-build on `kiosk start` cover
+the kiosk path.
 
 ### Optional Extras
 
@@ -441,14 +484,29 @@ The kiosk frontend lives in:
 
 It is a React + Vite + TypeScript app.
 
-Frontend commands:
+### Production build
+
+For everyday use (running the kiosk against the built bundle), the StoryMesh
+CLI wraps the npm dance:
+
+```bash
+storymesh kiosk build-frontend           # = npm install && npm run build
+storymesh kiosk build-frontend --skip-install  # = npm run build only
+```
+
+`storymesh kiosk start` will auto-invoke this on first launch when
+`frontend/dist/index.html` is missing and `npm` is on PATH, so a fresh
+contributor doesn't need to remember it.
+
+### Iterating on the frontend
+
+For UI development with hot reload, drive Vite directly:
 
 ```bash
 cd frontend
-npm install
-npm run dev
-npm run build
-npm run preview
+npm install        # one-time
+npm run dev        # vite dev server with HMR
+npm run preview    # serve the production bundle locally
 ```
 
 Backend:

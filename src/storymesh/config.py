@@ -39,18 +39,61 @@ _PROVIDER_KEY_MAP = {
 }
 
 
+# Sentinel tag attached to our StreamHandler so we can detect "already
+# configured" without adding a duplicate handler on every call. Repeated
+# calls to _configure_logging() are a normal occurrence — get_config() only
+# fires once, but the kiosk app calls ensure_storymesh_logging() again from
+# its FastAPI startup hook to defeat uvicorn's dictConfig override.
+_STORYMESH_HANDLER_TAG = "_storymesh_log_handler"
+
+
 def _configure_logging(level_name: str) -> None:
-    """Configure the storymesh logger hierarchy."""
+    """Configure the storymesh logger hierarchy.
+
+    Idempotent: re-running this with the same logger hierarchy will adjust
+    the level but will not stack additional handlers. ``propagate`` is set
+    to False so that downstream consumers (e.g. uvicorn's dictConfig with
+    ``disable_existing_loggers=True``) cannot silently disable our output
+    via root-logger reconfiguration.
+    """
     storymesh_logger = logging.getLogger("storymesh")
     level = getattr(logging, level_name.upper(), logging.INFO)
     storymesh_logger.setLevel(level)
+    # uvicorn's startup runs ``logging.config.dictConfig`` with
+    # ``disable_existing_loggers=True`` (the dictConfig default), which sets
+    # ``disabled=True`` on every logger that existed at config time. Re-enable
+    # ours so the kiosk daemon actually emits records. We deliberately leave
+    # ``propagate=True`` so pytest's ``caplog`` fixture (which captures via
+    # the root logger) keeps working in tests.
+    storymesh_logger.disabled = False
+
+    has_ours = any(
+        getattr(h, _STORYMESH_HANDLER_TAG, False) for h in storymesh_logger.handlers
+    )
+    if has_ours:
+        return
 
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter(
         "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     ))
+    setattr(handler, _STORYMESH_HANDLER_TAG, True)
     storymesh_logger.addHandler(handler)
+
+
+def ensure_storymesh_logging() -> None:
+    """Re-assert the storymesh logger configuration.
+
+    Public re-entry point for callers that run *after* third-party logging
+    setup (notably uvicorn's ``dictConfig`` with ``disable_existing_loggers``
+    enabled, which silently disables loggers that existed at import time).
+    Safe to call repeatedly — :func:`_configure_logging` is idempotent.
+    """
+    level = "INFO"
+    if _config_cache is not None:
+        level = str(_config_cache.get("logging", {}).get("level", "INFO"))
+    _configure_logging(level)
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

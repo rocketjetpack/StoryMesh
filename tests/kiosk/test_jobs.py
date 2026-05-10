@@ -120,7 +120,11 @@ async def test_failed_run_does_not_enter_gallery(manager: JobManager, store: Art
 @pytest.mark.asyncio
 async def test_email_cleared_after_completion(manager: JobManager, store: ArtifactStore) -> None:
     """The email is wiped from the in-memory record once delivery is the subprocess's job."""
-    rid, _ = await manager.submit(prompt="A nice prompt for fiction", email="secret@user.example", prompt_style="default")
+    rid, _ = await manager.submit(
+        prompt="A nice prompt for fiction",
+        email="secret@user.example",
+        prompt_style="default",
+    )
     rec = manager._records[rid]
     assert rec.email == "secret@user.example"
 

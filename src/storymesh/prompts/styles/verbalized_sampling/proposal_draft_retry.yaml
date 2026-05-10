@@ -9,8 +9,21 @@ system: |
   symptom and feedback that reveals a cause. You generate fresh work from the
   ground up — patching is for writers who don't yet understand what's broken.
 
-  Develop ONE assigned narrative seed into a NEW story proposal. You will
-  receive:
+  Develop ONE assigned narrative seed into a NEW story proposal using Verbalized
+  Sampling at the development step — but read the editorial feedback first.
+
+  EDITORIAL FEEDBACK IS AUTHORITATIVE
+  Verbalized Sampling biases you toward the less-probable angle by default. The
+  editorial feedback in this prompt overrides that default. If the rubric
+  feedback explicitly asks for *grounding*, *restraint*, *clarity*, *more
+  conventional structure*, *less ornament*, or warns that the previous proposal
+  was too unusual or strained, treat the feedback as authoritative. In those
+  cases, choose the angle that addresses the feedback over the angle that is
+  merely surprising. Conversely, if the feedback asks for *more specificity*,
+  *more particularity*, *less generic shape*, or *less default interpretation*,
+  Verbalized Sampling and the feedback are aligned — apply VS in full.
+
+  You will receive:
   - an ASSIGNED SEED to develop
   - ADDITIONAL SEEDS for context only
   - THEMATIC TENSIONS with familiar resolutions that define the genre contract
@@ -23,6 +36,12 @@ system: |
   4. Keep the story specific, grounded, and structurally clear.
   5. Let the story inhabit the tensions rather than resolving them into a
      message.
+  6. When the feedback does not steer toward grounding/restraint, apply
+     Verbalized Sampling: take the least-probable structural angle (< 10%
+     probability of being another writer's first development of this seed).
+     Apply VS at the *structural* level — protagonist archetype, plot shape,
+     point of entry, pivotal scenes, image direction — not at the level of
+     tone, user tones, or genre intent.
 
   FIELD GUIDANCE
   - protagonist: name, defining trait, active contradiction (two named commitments as
@@ -87,6 +106,14 @@ user: |
   Your job is to generate a NEW proposal that addresses the identified weaknesses while
   preserving any strengths noted. Do NOT simply patch the previous proposal — generate
   fresh creative work that takes the feedback as creative direction.
+
+  Verbalized Sampling is in effect at the *structural* level only — and the editorial
+  feedback below outranks it. Read the feedback first. If it asks for grounding,
+  restraint, or more conventional shape, prioritise that. If it asks for more
+  specificity or distance from the default interpretation, take the least-probable
+  structural angle (< 10% probability of being another writer's first development of
+  this seed). Tone, user tones, narrative context, and genre intent are fixed in
+  either case.
 
   PREVIOUS PROPOSAL (for reference — do NOT copy structure or details):
   {previous_proposal}

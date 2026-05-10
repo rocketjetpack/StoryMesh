@@ -21,6 +21,7 @@ It is never returned by any HTTP endpoint and never written to argv (where
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import subprocess
@@ -30,7 +31,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import IO, Literal
 
 import orjson
 
@@ -59,6 +60,10 @@ class JobRecord:
     started_at: float | None = None
     completed_at: float | None = None
     process: subprocess.Popen[bytes] | None = field(default=None, repr=False)
+    # Per-run subprocess log file kept open for the lifetime of the process so
+    # that stdout/stderr (including pipeline log records) lands on disk for
+    # post-mortem inspection. Closed in _finalize().
+    log_handle: IO[bytes] | None = field(default=None, repr=False)
 
 
 class JobManager:
@@ -112,10 +117,8 @@ class JobManager:
         """Cancel the poller and terminate any active subprocesses."""
         if self._poller_task is not None:
             self._poller_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._poller_task
-            except asyncio.CancelledError:
-                pass
             self._poller_task = None
         async with self._lock:
             for record in self._records.values():
@@ -241,6 +244,17 @@ class JobManager:
         env["STORYMESH_EMAIL_RECIPIENT"] = record.email
         env["STORYMESH_KIOSK_RUN"] = "1"
 
+        # Visibility check: log whether email-related env vars are present at
+        # spawn time. Values are never logged, only presence — so missing creds
+        # are diagnosable without leaking secrets to the kiosk log.
+        logger.info(
+            "kiosk subprocess env | run_id=%s recipient=%s smtp_user=%s smtp_password=%s",
+            record.run_id,
+            "set" if env.get("STORYMESH_EMAIL_RECIPIENT") else "empty",
+            "set" if env.get("STORYMESH_SMTP_USER") else "missing",
+            "set" if env.get("STORYMESH_SMTP_PASSWORD") else "missing",
+        )
+
         cmd = [
             self.python_executable,
             "-m",
@@ -255,11 +269,19 @@ class JobManager:
         if record.prompt_style and record.prompt_style != "default":
             cmd.extend(["--prompt-style", record.prompt_style])
 
+        # Per-run subprocess log: pipeline stdout/stderr (including log records
+        # from email_delivery, agents, etc.) lands here so that failures inside
+        # the spawned process are diagnosable after the fact.
+        run_dir = self._store.runs_dir / record.run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        log_path = run_dir / "kiosk_subprocess.log"
+        record.log_handle = log_path.open("ab")
+
         record.process = subprocess.Popen(  # noqa: S603
             cmd,
             env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=record.log_handle,
+            stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
             close_fds=True,
         )
@@ -342,6 +364,15 @@ class JobManager:
         proc = record.process
         exit_code = proc.poll() if proc is not None else None
         success = exit_code == 0 and assembler_done
+
+        # Flush and close the subprocess log handle. The subprocess has exited
+        # by the time _finalize runs, so no further writes are expected.
+        if record.log_handle is not None:
+            try:
+                record.log_handle.close()
+            except OSError:
+                logger.warning("Failed to close kiosk subprocess log handle", exc_info=True)
+            record.log_handle = None
 
         async with self._lock:
             record.completed_at = time.time()

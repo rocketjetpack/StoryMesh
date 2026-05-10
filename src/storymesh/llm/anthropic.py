@@ -7,7 +7,7 @@ from typing import Any
 
 import anthropic
 
-from storymesh.exceptions import LLMOutputTruncatedError
+from storymesh.exceptions import LLMOutputTruncatedError, LLMRefusalError
 from storymesh.llm.base import LLMCallLogger, LLMClient, _traceable, register_provider
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
@@ -56,6 +56,21 @@ class AnthropicClient(LLMClient):
 
         response = self.client.messages.create(**kwargs)
 
+        if response.stop_reason == "refusal":
+            raise LLMRefusalError(
+                provider="anthropic",
+                model=self.model,
+                detail=_extract_refusal_detail(response),
+            )
+
+        for block in response.content:
+            if getattr(block, "type", None) == "refusal":
+                raise LLMRefusalError(
+                    provider="anthropic",
+                    model=self.model,
+                    detail=str(getattr(block, "text", "") or "(no detail provided)"),
+                )
+
         if len(response.content) != 1:
             raise ValueError(
                 f"Expected exactly 1 content block from Anthropic but got {len(response.content)}!"
@@ -75,6 +90,21 @@ class AnthropicClient(LLMClient):
             )
 
         return str(block.text)
+
+
+def _extract_refusal_detail(response: Any) -> str:  # noqa: ANN401  # SDK response object is loosely typed
+    """Best-effort extraction of refusal text from an Anthropic response.
+
+    The SDK exposes refusals either via ``stop_reason == 'refusal'`` (in which
+    case any text-bearing block usually carries the explanation) or via a
+    dedicated refusal content block. Return a human-readable string for the
+    error message, falling back to a generic placeholder.
+    """
+    for block in getattr(response, "content", []) or []:
+        text = getattr(block, "text", None)
+        if text:
+            return str(text)
+    return "(no detail provided)"
 
 
 register_provider("anthropic", AnthropicClient)

@@ -409,7 +409,7 @@ class TestParseFailures:
             "bad json",
         ]
         agent = _agent_with_responses(responses, num_candidates=3)
-        with pytest.raises(RuntimeError, match="all candidate proposals failed"):
+        with pytest.raises(RuntimeError, match=r"all 3 candidate proposals failed.*JSONDecodeError"):
             agent.run(_input())
 
     def test_single_valid_candidate_skips_selection(self) -> None:

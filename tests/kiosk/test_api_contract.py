@@ -24,7 +24,6 @@ from storymesh.core.artifacts import ArtifactStore
 from storymesh.kiosk.app import create_app
 from storymesh.kiosk.jobs import JobManager, JobRecord
 
-
 SECRET_EMAIL = "very-private-attendee@example-corp.com"
 
 
@@ -56,11 +55,11 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
         yield test_client
 
 
-def _walk_for_email(blob: Any, needle: str) -> list[str]:
+def _walk_for_email(blob: Any, needle: str) -> list[str]:  # noqa: ANN401  # arbitrary JSON tree
     """Return JSON-paths where ``needle`` appears anywhere inside ``blob``."""
     hits: list[str] = []
 
-    def visit(node: Any, path: str) -> None:
+    def visit(node: Any, path: str) -> None:  # noqa: ANN401  # arbitrary JSON tree
         if isinstance(node, str):
             if needle in node:
                 hits.append(path)

@@ -7,7 +7,7 @@ from typing import Any
 
 import openai
 
-from storymesh.exceptions import LLMOutputTruncatedError
+from storymesh.exceptions import LLMOutputTruncatedError, LLMRefusalError
 from storymesh.llm.base import LLMCallLogger, LLMClient, _traceable, register_provider
 
 _DEFAULT_MODEL = "gpt-4o-mini"
@@ -96,14 +96,29 @@ class OpenAIClient(LLMClient):
         if not response.choices:
             raise ValueError("OpenAI returned an empty choices list.")
 
-        content = response.choices[0].message.content
+        choice = response.choices[0]
+        refusal = getattr(choice.message, "refusal", None)
+        if isinstance(refusal, str) and refusal.strip():
+            raise LLMRefusalError(
+                provider="openai",
+                model=self.model,
+                detail=refusal,
+            )
+        if choice.finish_reason == "content_filter":
+            raise LLMRefusalError(
+                provider="openai",
+                model=self.model,
+                detail="finish_reason=content_filter",
+            )
+
+        content = choice.message.content
         if content is None:
             raise ValueError(
                 "OpenAI response choice contained a None content field. "
                 "This can occur when the model uses tool calls instead of a text response."
             )
 
-        if response.choices[0].finish_reason == "length":
+        if choice.finish_reason == "length":
             raise LLMOutputTruncatedError(
                 partial_response=content,
                 token_budget=max_tokens,

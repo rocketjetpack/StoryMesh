@@ -13,7 +13,7 @@ from typing import Any
 
 import orjson
 
-from storymesh.exceptions import LLMOutputTruncatedError
+from storymesh.exceptions import LLMOutputTruncatedError, LLMRefusalError
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +191,44 @@ class LLMClient(ABC):
                 if attempt < max_retries:
                     effective_max_tokens *= 2
                     continue
+                raise
+            except LLMRefusalError as exc:
+                latency_ms = round((time.perf_counter() - t0) * 1000)
+                logger.warning(
+                    "LLM refusal (attempt %d/%d): %s",
+                    attempt + 1,
+                    max_retries + 1,
+                    exc,
+                )
+                self._write_call_record(
+                    system_prompt=system_prompt,
+                    user_prompt=prompt,
+                    raw_response=f"<refusal: {exc.detail}>",
+                    temperature=temperature,
+                    attempt=attempt + 1,
+                    latency_ms=latency_ms,
+                    parse_success=False,
+                )
+                # Refusals are deterministic for the prompt — do not retry.
+                raise
+            except Exception as exc:
+                latency_ms = round((time.perf_counter() - t0) * 1000)
+                logger.warning(
+                    "LLM complete() raised %s (attempt %d/%d): %s",
+                    type(exc).__name__,
+                    attempt + 1,
+                    max_retries + 1,
+                    exc,
+                )
+                self._write_call_record(
+                    system_prompt=system_prompt,
+                    user_prompt=prompt,
+                    raw_response=f"<exception: {type(exc).__name__}: {exc}>",
+                    temperature=temperature,
+                    attempt=attempt + 1,
+                    latency_ms=latency_ms,
+                    parse_success=False,
+                )
                 raise
             latency_ms = round((time.perf_counter() - t0) * 1000)
 

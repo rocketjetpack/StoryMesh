@@ -18,6 +18,11 @@
   --brass: #C28840;
   --brass-bright: #E0A659;
   --oxblood: #5C1A1B;
+  --oxblood-bright: #8C2E2F;
+  /* Verdigris/patina — the green that brass oxidises to. Used to mark
+   * completed runs in JobsPanel, harmonising with --brass on aged metal. */
+  --patina: #7E9A6E;
+  --patina-bright: #9DBC8B;
 }
 
 html, body, #root {
@@ -153,13 +158,17 @@ h1, h2, h3, .display {
   margin-bottom: 0.5rem;
 }
 
-/* Active job ink-dot */
-.ink-dot {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: var(--brass-bright);
-  display: inline-block;
+/* Active job ink-dot. Wrapped in @layer components so Tailwind utility
+ * classes like `bg-patina-bright` can override the default brass colour
+ * for terminal-state cards in JobsPanel. */
+@layer components {
+  .ink-dot {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: var(--brass-bright);
+    display: inline-block;
+  }
 }
 
 /* Gallery cover-art tile */

@@ -11,6 +11,7 @@ services or when you want logs streaming to your terminal.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import signal
@@ -38,9 +39,68 @@ def _pid_file() -> Path:
     return Path.home() / ".storymesh" / "kiosk.pid"
 
 
+def _frontend_dir() -> Path:
+    """Resolve <repo>/frontend relative to this source file."""
+    return Path(__file__).resolve().parent.parent.parent.parent / "frontend"
+
+
 def _frontend_dist_dir() -> Path:
     """Resolve <repo>/frontend/dist relative to this source file."""
-    return Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"
+    return _frontend_dir() / "dist"
+
+
+def _bundle_present() -> bool:
+    """True iff a built frontend bundle exists at frontend/dist/index.html."""
+    return (_frontend_dist_dir() / "index.html").is_file()
+
+
+def _resolve_npm() -> str | None:
+    """Locate the ``npm`` executable on PATH, or return None if missing."""
+    import shutil  # noqa: PLC0415
+
+    return shutil.which("npm")
+
+
+def _run_frontend_build(*, install_first: bool) -> bool:
+    """Run ``npm install`` (optional) then ``npm run build`` in ``frontend/``.
+
+    Args:
+        install_first: When True, run ``npm install`` before ``npm run build``.
+            Skip it when ``frontend/node_modules`` already exists and the
+            caller knows dependencies are current.
+
+    Returns:
+        True on success, False if ``npm`` is not on PATH or any subprocess
+        exited non-zero. Errors are printed; this function never raises.
+    """
+    npm = _resolve_npm()
+    if npm is None:
+        _console.print(
+            "[red]npm not found on PATH.[/red] Install Node.js (https://nodejs.org/) "
+            "and re-run, or build manually with [bold]cd frontend && npm install && npm run build[/bold]."
+        )
+        return False
+
+    fe = _frontend_dir()
+    if not (fe / "package.json").is_file():
+        _console.print(f"[red]frontend/package.json not found at[/red] [dim]{fe}[/dim]")
+        return False
+
+    if install_first:
+        _console.print("[bold]Installing frontend dependencies[/bold] ([dim]npm install[/dim])…")
+        result = subprocess.run([npm, "install"], cwd=fe, check=False)  # noqa: S603
+        if result.returncode != 0:
+            _console.print("[red]npm install failed.[/red]")
+            return False
+
+    _console.print("[bold]Building frontend bundle[/bold] ([dim]npm run build[/dim])…")
+    result = subprocess.run([npm, "run", "build"], cwd=fe, check=False)  # noqa: S603
+    if result.returncode != 0:
+        _console.print("[red]npm run build failed.[/red]")
+        return False
+
+    _console.print(f"[green]Bundle built[/green] at [dim]{_frontend_dist_dir()}[/dim]")
+    return True
 
 
 class _RunInfo(NamedTuple):
@@ -85,6 +145,27 @@ def _write_pidfile(pid: int, host: str, port: int) -> None:
     path.write_text(json.dumps({"pid": pid, "host": host, "port": port}))
 
 
+@kiosk_app.command("build-frontend")
+def kiosk_build_frontend(
+    skip_install: Annotated[
+        bool,
+        typer.Option(
+            "--skip-install",
+            help="Skip npm install — only run npm run build. Useful when "
+            "node_modules is already current.",
+        ),
+    ] = False,
+) -> None:
+    """Install frontend deps (if needed) and build the production bundle.
+
+    Equivalent to running ``cd frontend && npm install && npm run build``.
+    Requires ``npm`` on PATH; install Node.js first if missing.
+    """
+    ok = _run_frontend_build(install_first=not skip_install)
+    if not ok:
+        raise typer.Exit(code=1)
+
+
 @kiosk_app.command("start")
 def kiosk_start(
     host: Annotated[str | None, typer.Option("--host", help="Bind address.")] = None,
@@ -109,13 +190,31 @@ def kiosk_start(
         _console.print(f"URL: [bold]http://{existing.host}:{existing.port}[/bold]")
         raise typer.Exit(code=0)
 
-    dist = _frontend_dist_dir()
-    if not dist.exists():
-        _console.print(
-            "[yellow]Warning:[/yellow] frontend bundle not found at "
-            f"[dim]{dist}[/dim]. The API will work but the UI will be unavailable."
-        )
-        _console.print("Build it with: [bold]cd frontend && npm install && npm run build[/bold]")
+    if not _bundle_present():
+        npm = _resolve_npm()
+        fe_pkg = _frontend_dir() / "package.json"
+        if npm is not None and fe_pkg.is_file():
+            _console.print(
+                f"[yellow]Frontend bundle missing[/yellow] at [dim]{_frontend_dist_dir()}[/dim] — "
+                "auto-building before launch."
+            )
+            install_first = not (_frontend_dir() / "node_modules").is_dir()
+            if not _run_frontend_build(install_first=install_first):
+                _console.print(
+                    "[yellow]Continuing without UI.[/yellow] The API will work but the kiosk "
+                    "page will not render. Fix the build and run "
+                    "[bold]storymesh kiosk build-frontend[/bold]."
+                )
+        else:
+            reason = "npm is not on PATH" if npm is None else "frontend/package.json not found"
+            _console.print(
+                f"[yellow]Warning:[/yellow] frontend bundle not found and {reason}. "
+                "The API will work but the UI will be unavailable."
+            )
+            if npm is None:
+                _console.print(
+                    "Install Node.js, then build with [bold]storymesh kiosk build-frontend[/bold]."
+                )
 
     cmd = [
         sys.executable,
@@ -191,10 +290,8 @@ def kiosk_stop() -> None:
         time.sleep(0.1)
     else:
         _console.print(f"[yellow]Kiosk did not exit; sending SIGKILL to PID {info.pid}[/yellow]")
-        try:
+        with contextlib.suppress(OSError):
             os.kill(info.pid, signal.SIGKILL)
-        except OSError:
-            pass
 
     pidfile.unlink(missing_ok=True)
     _console.print(f"[green]Kiosk stopped[/green] (PID {info.pid}).")
