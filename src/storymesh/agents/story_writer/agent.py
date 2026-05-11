@@ -433,7 +433,7 @@ class StoryWriterAgent:
         )
 
         try:
-            response = self._llm_client.complete_json(
+            draft = self._llm_client.complete(
                 user_prompt_text,
                 system_prompt=formatted_system,
                 temperature=self._draft_temperature,
@@ -444,7 +444,6 @@ class StoryWriterAgent:
                 f"StoryWriterAgent draft pass failed: {exc}"
             ) from exc
 
-        draft = str(response.get("full_draft", ""))
         if not draft or not draft.strip():
             raise RuntimeError(
                 "StoryWriterAgent draft pass returned an empty draft."

@@ -26,7 +26,8 @@ system: |
   {avoid_overlay}
 
   OUTPUT FORMAT
-  Return only valid JSON with a single key "full_draft".
+  Return only the prose. No JSON, no markdown fences, no commentary.
+  Separate scenes with a line containing only ---.
 
 user: |
   TITLE: {title}
@@ -49,4 +50,4 @@ user: |
   SCENE OUTLINES:
   {scene_list}
 
-  Return only the JSON object with the "full_draft" key.
+  Return only the prose. No JSON, no markdown fences, no commentary.

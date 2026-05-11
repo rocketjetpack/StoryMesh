@@ -133,19 +133,17 @@ _OUTLINE_RESPONSE = json.dumps({
     ]
 })
 
-_DRAFT_RESPONSE = json.dumps({
-    "full_draft": (
-        "The body had been arranged with the careful deliberation of someone "
-        "who expected it to be found.\n\nShe documented it twice. "
-        "The second pass was habit.\n\n---\n\n"
-        "She had run out of notebook paper two weeks ago and was using "
-        "the backs of salvaged tax forms.\n\nThe first witness said he was at "
-        "his sister's. The second said the same thing.\n\n---\n\n"
-        "The tribunal met in what had been a parking garage because it was the "
-        "only space large enough and because no one had claimed it.\n\n"
-        "They reached a verdict. She folded the paper and put it in her coat."
-    )
-})
+_DRAFT_RESPONSE = (
+    "The body had been arranged with the careful deliberation of someone "
+    "who expected it to be found.\n\nShe documented it twice. "
+    "The second pass was habit.\n\n---\n\n"
+    "She had run out of notebook paper two weeks ago and was using "
+    "the backs of salvaged tax forms.\n\nThe first witness said he was at "
+    "his sister's. The second said the same thing.\n\n---\n\n"
+    "The tribunal met in what had been a parking garage because it was the "
+    "only space large enough and because no one had claimed it.\n\n"
+    "They reached a verdict. She folded the paper and put it in her coat."
+)
 
 _SUMMARY_RESPONSE = json.dumps({
     "back_cover_summary": (
@@ -307,8 +305,7 @@ class TestStoryWriterAgentHappyPath:
         agent = _agent_with_responses([_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE])
         result = agent.run(_make_input())
 
-        import json as _json
-        expected_draft = _json.loads(_DRAFT_RESPONSE)["full_draft"].strip()
+        expected_draft = _DRAFT_RESPONSE.strip()
         assert result.word_count == len(expected_draft.split())
 
     def test_scene_list_opens_with_preserved(self) -> None:
@@ -498,7 +495,7 @@ class TestDraftPassFailures:
     def test_empty_full_draft_raises_runtime_error(self) -> None:
         agent = _agent_with_responses([
             _OUTLINE_RESPONSE,
-            json.dumps({"full_draft": ""}),
+            "",
         ])
 
         with pytest.raises(RuntimeError, match="empty draft"):
@@ -507,7 +504,7 @@ class TestDraftPassFailures:
     def test_whitespace_only_draft_raises_runtime_error(self) -> None:
         agent = _agent_with_responses([
             _OUTLINE_RESPONSE,
-            json.dumps({"full_draft": "   \n  "}),
+            "   \n  ",
         ])
 
         with pytest.raises(RuntimeError, match="empty draft"):
@@ -730,7 +727,7 @@ class TestStoryWriterNode:
     def _mock_agent(self, output: StoryWriterAgentOutput | None = None) -> StoryWriterAgent:
         agent = MagicMock(spec=StoryWriterAgent)
         if output is None:
-            draft = json.loads(_DRAFT_RESPONSE)["full_draft"].strip()
+            draft = _DRAFT_RESPONSE.strip()
             summary = json.loads(_SUMMARY_RESPONSE)["back_cover_summary"].strip()
             output = StoryWriterAgentOutput(
                 back_cover_summary=summary,
@@ -1010,7 +1007,7 @@ class TestStoryWriterNodeVoiceProfile:
 
     def _mock_agent(self) -> MagicMock:
         agent = MagicMock(spec=StoryWriterAgent)
-        draft = json.loads(_DRAFT_RESPONSE)["full_draft"].strip()
+        draft = _DRAFT_RESPONSE.strip()
         summary = json.loads(_SUMMARY_RESPONSE)["back_cover_summary"].strip()
         output = StoryWriterAgentOutput(
             back_cover_summary=summary,

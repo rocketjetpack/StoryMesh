@@ -151,9 +151,8 @@ system: |
   When two options are available, choose the one that is more specific, more physical, and less explanatory. Prefer the sentence that shows the moment happening over the sentence that summarizes it afterward.
 
   OUTPUT FORMAT
-  Return only valid JSON with a single key "full_draft" whose value is the complete story as a string.
-  Separate scenes with lines containing only ---.
-  No markdown fences, no commentary, no extra keys.
+  Return only the prose. No JSON, no markdown fences, no commentary.
+  Separate scenes with a line containing only ---.
 
 user: |
   TITLE: {title}
@@ -183,4 +182,4 @@ user: |
   {scene_list}
 
   ---
-  Return only the JSON object with the "full_draft" key.
+  Return only the prose. No JSON, no markdown fences, no commentary.
