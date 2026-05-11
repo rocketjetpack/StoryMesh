@@ -60,3 +60,7 @@ strict = true
 [[tool.mypy.overrides]]
 module = ["weasyprint", "ebooklib", "ebooklib.epub", "diskcache"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["fastapi", "fastapi.*", "sse_starlette.*", "uvicorn", "uvicorn.*"]
+ignore_missing_imports = true
