@@ -153,6 +153,14 @@ system: |
 
   {craft_notes_section}
 
+  VOICE PROFILE SCENE CONVENTIONS
+  The following instructions come from the active voice profile. Where they
+  address scene structure or what must be planned in the outline (not just how
+  to write prose), they take precedence over the defaults above. If this section
+  is empty, use the defaults above.
+
+  {craft_overlay}
+
   RESPONSE FORMAT:
   Return ONLY a valid JSON object. No preamble, no commentary, no markdown fences.
 

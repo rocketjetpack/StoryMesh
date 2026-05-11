@@ -325,7 +325,7 @@ def test_generate_reports_existing_artifacts(tmp_path: Path) -> None:
     assert "done" in result.output
     # Footer "Artifacts saved to:" only prints when the run_dir exists.
     assert "Artifacts saved to" in result.output
-    assert str(run_dir) in result.output
+    assert str(run_dir) in result.output.replace("\n", "")
 
 
 # ---------------------------------------------------------------------------

@@ -5,8 +5,8 @@ and tone keywords. Uses a single deterministic LLM call (T=0) to classify the
 input into one of the built-in voice profiles.
 
 Failure handling: on LLM failure, unknown profile ID, or any parsing error,
-logs a warning and defaults to ``literary_restraint``. The pipeline must not
-crash on selector failure — the existing behavior is preserved as the fallback.
+logs a warning and defaults to ``plainspoken_intimate``. The pipeline must not
+crash on selector failure.
 """
 
 from __future__ import annotations
@@ -25,14 +25,14 @@ from storymesh.versioning.schemas import VOICE_PROFILE_SELECTOR_SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
-_FALLBACK_PROFILE_ID = "literary_restraint"
+_FALLBACK_PROFILE_ID = "plainspoken_intimate"
 
 
 class VoiceProfileSelectorAgent:
     """Classifies a run's voice profile from genres and tone keywords (Stage 0.5).
 
-    Single deterministic LLM call. Defaults to ``literary_restraint`` on any
-    failure, preserving backward-compatible behavior.
+    Single deterministic LLM call. Defaults to ``plainspoken_intimate`` on any
+    failure.
     """
 
     def __init__(
@@ -73,7 +73,7 @@ class VoiceProfileSelectorAgent:
 
         defaulted_to_fallback = False
         selected_id = _FALLBACK_PROFILE_ID
-        rationale = "Defaulted to literary_restraint (fallback)."
+        rationale = "Defaulted to plainspoken_intimate (fallback)."
 
         try:
             user_prompt_text = self._prompt.format_user(

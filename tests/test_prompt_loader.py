@@ -537,7 +537,7 @@ class TestRubricJudgePrompt:
 class TestSlimPromptStyle:
     def test_slim_style_loads_style_specific_prompt(self) -> None:
         pt = load_prompt("story_writer_draft", style="slim")
-        assert "serve the story rather than the prompt" in (
+        assert "serves the story's own register" in (
             pt.system + "\n" + pt._user_template
         ).lower()
 

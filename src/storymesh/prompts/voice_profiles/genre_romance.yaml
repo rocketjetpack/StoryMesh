@@ -1,0 +1,103 @@
+# Voice Profile: genre_romance
+
+id: genre_romance
+description: >-
+  Genre romance conventions with desire and anticipation as the primary plot
+  engine. Sensory interiority, emotional tension, longing, and a payoff
+  structure oriented toward HEA (happily ever after) or HFN (happy for now).
+  Use when romantic connection is the central dramatic question, not a subplot.
+
+tone_keywords:
+  - romantic
+  - passionate
+  - longing
+  - tender
+  - yearning
+  - sensual
+  - hopeful
+  - electric
+  - swoony
+  - heartfelt
+  - charged
+
+genre_keywords:
+  - romance
+  - contemporary_romance
+  - historical_romance
+  - paranormal_romance
+  - romantic_suspense
+  - romantasy
+
+craft_overlay: |
+  OUTLINE NOTE
+  When planning scenes for a romance story, the physical encounter must be
+  planned as a full scene in the outline — not elided with a cut to morning-
+  after or implied aftermath. The encounter is where desire and vulnerability
+  converge; it is a structural beat, not an elision. Plan it explicitly.
+
+  12. Desire is specific, not generic.
+     What exactly draws one character to the other — the way they carry
+     tension in their shoulders, an unexpected competence, a physical detail
+     that becomes charged with meaning — must be rendered precisely. Vague
+     attraction is not attraction.
+
+  13. Physical desire is not optional.
+     Romance readers expect the body to be present. Render attraction with
+     sensory honesty: heat, proximity, touch, the specific weight of a hand,
+     the sound of breathing in a quiet room. Euphemism and tasteful elision
+     are failures of nerve, not decorum.
+
+  14. Sexual encounters are a genre convention, not an intrusion.
+     In romance, physical consummation is often the emotional climax of the
+     relationship arc — the moment where desire, vulnerability, and commitment
+     converge. When the prompt signals heat (steamy, sensual, passionate,
+     erotic), render the encounter with honesty and specificity rather than
+     cutting away. The scene should carry the same emotional weight as any
+     other turning point. For prompts that signal "sweet" or "clean," restraint
+     is correct; for all others, the body belongs on the page.
+
+  15. Anticipation is a plot event.
+     The almost-touch, the interrupted moment, the sentence left unfinished
+     are structural beats, not decoration. Build them with the same care as
+     a physical scene — but they must resolve. Tension that never pays off
+     is not romantic, it is frustrating.
+
+  16. Interiority is where the story lives.
+     Show the character registering the love interest — noticing, interpreting,
+     wanting. The gap between what is felt in the body and what is said aloud
+     is the genre's primary source of tension. Do not retreat from what the
+     character physically wants.
+
+  17. Obstacles must be earned, not contrived.
+     Conflict is only valid if the reason the character cannot have what they
+     want is deeply felt and understood. Misunderstanding is a tool, not a
+     crutch.
+
+  18. The payoff must feel inevitable in hindsight.
+     The HEA or HFN landing should feel like arrival, not rescue. Plant the
+     emotional and physical logic early so the resolution is satisfying.
+
+avoid_overlay: |
+  - Euphemism and tasteful elision where the prompt calls for physical honesty
+  - Desire expressed only in emotional terms with the body kept offstage
+  - Obstacles sustained by characters refusing to communicate without a
+    convincing psychological reason
+  - Love interests whose appeal is asserted rather than demonstrated through
+    specific sensory and behavioural detail
+  - Emotional climaxes that arrive too early, deflating the arc
+  - Treating the relationship as a subplot to an external adventure when the
+    prompt positions it as central
+  - Resolution that depends on an external event rather than a character choice
+
+exemplars:
+  - "She had catalogued every reason this was a terrible idea and found, when he finally looked at her, that none of them were available."
+  - "He said her name like it was an answer to something he hadn't meant to ask."
+  - "She was not looking at him. She was aware, with the whole side of her body, that he was two feet away and not moving any closer, which was somehow worse."
+  - "They had been pretending, very successfully, for three weeks. Tonight the pretending had gotten complicated in a way neither of them was going to walk back from."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This is a romance. The copy must foreground the central relationship and
+  the obstacle standing between the characters. Lead with the tension, not
+  the world or the plot mechanics. The emotional promise — that this love
+  is worth the cost of getting there — should be legible in the hook.

@@ -987,7 +987,7 @@ class TestVoiceProfileOverlays:
         assert summary_system != default_system
 
     def test_overlays_do_not_appear_in_wrong_pass(self) -> None:
-        """craft_overlay is draft-only; it must not leak into the outline or summary system prompts."""
+        """craft_overlay goes to outline and draft; it must not leak into the summary system prompt."""
         profile = load_voice_profile("cozy_warmth")
         agent, client = _capturing_agent(
             [_OUTLINE_RESPONSE, _DRAFT_RESPONSE, _SUMMARY_RESPONSE],
@@ -996,7 +996,7 @@ class TestVoiceProfileOverlays:
 
         outline_system = client.captured_calls[0]["system_prompt"] or ""
         summary_system = client.captured_calls[2]["system_prompt"] or ""
-        assert "Direct emotion-naming" not in outline_system
+        assert "Direct emotion-naming" in outline_system
         assert "Direct emotion-naming" not in summary_system
 
 

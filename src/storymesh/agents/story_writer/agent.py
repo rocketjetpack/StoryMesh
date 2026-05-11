@@ -203,7 +203,7 @@ class StoryWriterAgent:
         voice_profile: VoiceProfile = (
             input_data.voice_profile
             if input_data.voice_profile is not None
-            else load_voice_profile("literary_restraint")
+            else load_voice_profile("plainspoken_intimate")
         )
         craft_overlay = voice_profile.craft_overlay
         avoid_overlay = voice_profile.avoid_overlay
@@ -237,6 +237,7 @@ class StoryWriterAgent:
             tensions_json=tensions_json,
             craft_notes_section=craft_notes_section,
             profile_exemplars=profile_exemplars,
+            craft_overlay=craft_overlay,
             user_prompt=input_data.user_prompt,
             normalized_genres=input_data.normalized_genres,
             user_tones=input_data.user_tones,
@@ -303,6 +304,7 @@ class StoryWriterAgent:
         tensions_json: str,
         craft_notes_section: str,
         profile_exemplars: str,
+        craft_overlay: str,
         user_prompt: str,
         normalized_genres: list[str],
         user_tones: list[str],
@@ -328,6 +330,7 @@ class StoryWriterAgent:
         formatted_system = self._outline_prompt.system.format(
             craft_notes_section=craft_notes_section,
             profile_exemplars=profile_exemplars,
+            craft_overlay=craft_overlay,
         )
         proposal_json = orjson.dumps(proposal.model_dump()).decode()
         user_prompt_text = self._outline_prompt.format_user(

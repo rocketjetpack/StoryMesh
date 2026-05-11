@@ -1,0 +1,97 @@
+# Voice Profile: childrens_bedtime
+#
+# Simple, rhythmic prose for picture books, early-reader stories, and
+# bedtime stories written for children. Selected when the user prompt
+# signals a young audience, picture-book form, or a genuinely juvenile
+# register — distinct from adult cozy fiction.
+#
+# The register here is fundamentally different from cozy_warmth: shorter
+# sentences, simpler vocabulary, sound-pattern structure, and direct
+# emotion-naming without subtext. The listener is a child, not an adult
+# who wants comfort.
+
+id: childrens_bedtime
+description: >-
+  Simple, rhythmic prose for picture books, early-reader stories, and
+  bedtime stories written for children. Very short sentences, plain
+  vocabulary, repetition as structure, and direct emotion-naming.
+  Subtext is absent. Sound patterns (alliteration, onomatopoeia) are
+  welcome. Resolution is clear and gentle.
+
+tone_keywords:
+  - childlike
+  - playful
+  - simple
+  - gentle
+  - bedtime
+  - soft
+  - sweet
+  - soothing
+  - friendly
+  - cheerful
+  - silly
+  - cozy
+  - warm
+
+genre_keywords:
+  - children
+  - picture_book
+  - bedtime
+  - fairy_tale
+  - fable
+  - early_reader
+
+craft_overlay: |
+  12. Sentences are short. Very short.
+     Aim for 5–12 words. Subject, verb, object. A child is listening,
+     not reading. If a sentence has a subordinate clause, consider
+     splitting it into two. A long sentence is not a better sentence.
+
+  13. Plain words only.
+     If a 7-year-old would not know the word, replace it. No abstract
+     nouns, no latinate vocabulary, no hedging phrases. Name the thing
+     directly: "scared", not "apprehensive". "Big", not "enormous".
+
+  14. Repetition is the structure.
+     A repeated phrase, a returning refrain, or a three-beat pattern
+     ("He looked left. He looked right. He looked up.") is not lazy
+     writing. It is the form. Let it repeat. Let it deepen.
+
+  15. Sound is as important as meaning.
+     Alliteration, onomatopoeia, and rhythm are welcome and often
+     preferable to variety. "The big brown bear" is better than
+     "the large ursine creature". Let the words feel good to say aloud.
+
+  16. Direct emotion-naming is required.
+     "She was scared." "He felt very happy." "It was the best day."
+     Do not make the child decode an emotion from physical symptoms or
+     objects. Name it plainly, then show it in the next action.
+
+  17. One thing happens per scene.
+     A children's story scene has a single event or discovery. Do not
+     layer complications. The character wants something, tries something,
+     and either gets it or tries again next scene.
+
+avoid_overlay: |
+  - Subordinate clauses and complex sentence constructions
+  - Abstract nouns ("longing", "grief", "ambivalence", "wonder" used abstractly)
+  - Adult-register vocabulary or idioms
+  - Subtext or implied emotion — always name it plainly
+  - Ambiguous or unresolved endings — close the loop, gently
+  - Darkness, menace, or dread that is not immediately resolved
+  - Sentence-fragment paragraphs used as dramatic beats (adult technique)
+  - Metaphors that require cultural knowledge a child would not have
+
+exemplars:
+  - "Pip could not sleep. The moon was too bright, and the blanket was too scratchy."
+  - "Every night, just before bed, the little fox said the same three words."
+  - "The bear looked left. He looked right. He looked up at the sky. No honey anywhere."
+  - "She was scared. But she took one small step. Then another. Then one more."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This is a children's story. The back-cover copy must match the book's
+  register: very short sentences, simple words, and a warm, inviting tone.
+  Name the main character and the one thing they want or must do.
+  End on reassurance or delight, not mystery or tension. Write as if
+  reading aloud to a 5-year-old.

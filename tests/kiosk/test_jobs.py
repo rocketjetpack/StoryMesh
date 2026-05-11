@@ -58,7 +58,7 @@ def manager(monkeypatch: pytest.MonkeyPatch, store: ArtifactStore) -> Iterator[J
     yield mgr
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_concurrency_cap_holds(manager: JobManager) -> None:
     """A 3rd submission while two are running must be queued, not spawned."""
     rid1, pos1 = await manager.submit(prompt="A first prompt", email="a@b.co", prompt_style="default")
@@ -76,7 +76,7 @@ async def test_concurrency_cap_holds(manager: JobManager) -> None:
     assert statuses[rid3].queue_position == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_queue_drains_when_active_finishes(manager: JobManager, store: ArtifactStore) -> None:
     """Finishing one running job should promote the head of the queue."""
     rid1, _ = await manager.submit(prompt="First long-form prompt", email="a@b.co", prompt_style="default")
@@ -103,7 +103,7 @@ async def test_queue_drains_when_active_finishes(manager: JobManager, store: Art
     assert gallery[0].run_id == rid1
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_failed_run_does_not_enter_gallery(manager: JobManager, store: ArtifactStore) -> None:
     """Exit code != 0 (or missing assembler output) should mark failed and skip the gallery."""
     rid1, _ = await manager.submit(prompt="A prompt that crashes", email="a@b.co", prompt_style="default")
@@ -117,7 +117,7 @@ async def test_failed_run_does_not_enter_gallery(manager: JobManager, store: Art
     assert manager.gallery() == []
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_email_cleared_after_completion(manager: JobManager, store: ArtifactStore) -> None:
     """The email is wiped from the in-memory record once delivery is the subprocess's job."""
     rid, _ = await manager.submit(
@@ -138,7 +138,7 @@ async def test_email_cleared_after_completion(manager: JobManager, store: Artifa
     assert rec.email == "", "email must be wiped from memory once the subprocess no longer needs it"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_title_extracted_from_proposal_draft(manager: JobManager, store: ArtifactStore) -> None:
     """The poller should pluck the title out of proposal_draft_output.json mid-run."""
     rid, _ = await manager.submit(prompt="A literary prompt about gardens", email="g@h.co", prompt_style="default")
@@ -174,7 +174,7 @@ def test_prompt_style_passed_to_subprocess(monkeypatch: pytest.MonkeyPatch, stor
     assert captured["env"]["STORYMESH_EMAIL_RECIPIENT"] == "x@y.co"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_gallery_seeded_from_disk_on_start(tmp_path: Path) -> None:
     """start() should pre-populate the gallery with the most recent successful runs."""
     store = ArtifactStore(root=tmp_path)

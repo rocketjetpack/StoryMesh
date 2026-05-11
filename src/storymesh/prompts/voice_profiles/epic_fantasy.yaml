@@ -1,0 +1,78 @@
+# Voice Profile: epic_fantasy
+
+id: epic_fantasy
+description: >-
+  Elevated, mythic-scale prose for high fantasy, secondary-world fiction,
+  and stories of sweeping political and historical consequence. World-building
+  as substance. Multiple factions, deep histories, and grand stakes — but
+  always grounded in specific characters who carry the weight of what the
+  world demands of them.
+
+tone_keywords:
+  - epic
+  - grand
+  - mythic
+  - majestic
+  - heroic
+  - sweeping
+  - solemn
+  - weighty
+  - legendary
+  - consequential
+  - vast
+
+genre_keywords:
+  - fantasy
+  - high_fantasy
+  - epic_fantasy
+  - sword_and_sorcery
+  - secondary_world
+  - portal_fantasy
+  - grimdark
+
+craft_overlay: |
+  12. Scale is built from specifics, not adjectives.
+     "A vast kingdom" means nothing. The weight of a crown, the smell of a
+     border garrison, the bureaucratic tedium of managing a siege — these
+     make scale felt. Adjectives of grandeur are a shortcut that backfires.
+
+  13. Factions are made of people.
+     Every kingdom, order, or army is composed of individuals with competing
+     loyalties and mundane needs. Avoid treating factions as monolithic forces.
+     Political weight comes from showing the human cost of allegiance.
+
+  14. Magic and world-systems must impose constraint.
+     Power is only interesting when it costs something or has rules that
+     create problems. Magic that solves every difficulty destroys tension.
+     Let the world's systems generate the conflict.
+
+  15. History is a pressure, not a backdrop.
+     Backstory and lore should press on the present. Characters who carry the
+     weight of a broken treaty, a lost lineage, or a remembered war feel
+     embedded in their world. Keep exposition tethered to present stakes.
+
+  16. Consequence is the measure of scale.
+     Deaths, betrayals, and decisions must cost something legible. Epic
+     fantasy earns its scope by showing what is lost, not just what is won.
+     Endings that resolve too cleanly betray the genre's contract.
+
+avoid_overlay: |
+  - Adjective-heavy grandeur without concrete sensory grounding
+  - Magic or prophecy that resolves plot problems too conveniently
+  - Characters who exist only as faction representatives with no inner life
+  - Pseudo-medieval flavour text that does not serve the story
+  - Action sequences without political or emotional consequence
+  - Lore delivered in monologues, scrolls-within-the-narrative, or lectures
+
+exemplars:
+  - "The treaty had held for forty years, which was long enough that everyone who remembered why it was necessary was dead."
+  - "She had not wanted the throne. She had wanted the war to stop, and the throne was the only instrument available."
+  - "The army filled the valley below like a slow flood. From up here, you could almost forget that each point of light was a fire someone had built to keep warm."
+  - "He had sworn three oaths in his life and broken two of them for reasons he still believed were good."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This story operates at epic scale. The copy should establish the world's
+  central conflict and the political or historical stakes, then anchor it in
+  a character whose personal choice is the fulcrum. Avoid reducing the scope
+  to a single hero's journey — the world itself should feel present in the copy.

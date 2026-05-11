@@ -126,39 +126,39 @@ class TestHappyPath:
 
 
 # ---------------------------------------------------------------------------
-# Failure handling — default to literary_restraint
+# Failure handling — default to plainspoken_intimate
 # ---------------------------------------------------------------------------
 
 
 class TestFailureHandling:
-    def test_unknown_profile_id_defaults_to_literary_restraint(self) -> None:
+    def test_unknown_profile_id_defaults_to_plainspoken_intimate(self) -> None:
         agent = _make_agent([_response("nonexistent_profile", "Something.")])
         output = agent.run(_make_input())
 
-        assert output.selected_profile_id == "literary_restraint"
+        assert output.selected_profile_id == "plainspoken_intimate"
         assert output.debug["defaulted_to_fallback"] is True
 
-    def test_llm_failure_defaults_to_literary_restraint(self) -> None:
+    def test_llm_failure_defaults_to_plainspoken_intimate(self) -> None:
         agent = VoiceProfileSelectorAgent(
             llm_client=FakeLLMClient(responses=[RuntimeError("provider error")]),
         )
         output = agent.run(_make_input())
 
-        assert output.selected_profile_id == "literary_restraint"
+        assert output.selected_profile_id == "plainspoken_intimate"
         assert output.debug["defaulted_to_fallback"] is True
 
-    def test_invalid_json_defaults_to_literary_restraint(self) -> None:
+    def test_invalid_json_defaults_to_plainspoken_intimate(self) -> None:
         agent = _make_agent(["not valid json {{{"])
         output = agent.run(_make_input())
 
-        assert output.selected_profile_id == "literary_restraint"
+        assert output.selected_profile_id == "plainspoken_intimate"
         assert output.debug["defaulted_to_fallback"] is True
 
-    def test_missing_profile_id_field_defaults_to_literary_restraint(self) -> None:
+    def test_missing_profile_id_field_defaults_to_plainspoken_intimate(self) -> None:
         agent = _make_agent([json.dumps({"rationale": "Missing profile id."})])
         output = agent.run(_make_input())
 
-        assert output.selected_profile_id == "literary_restraint"
+        assert output.selected_profile_id == "plainspoken_intimate"
         assert output.debug["defaulted_to_fallback"] is True
 
     def test_never_raises(self) -> None:

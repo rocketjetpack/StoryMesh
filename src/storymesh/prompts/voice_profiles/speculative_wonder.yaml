@@ -1,0 +1,77 @@
+# Voice Profile: speculative_wonder
+
+id: speculative_wonder
+description: >-
+  Idea-forward prose for hard SF, philosophical SF, and concept-driven
+  speculative fiction. World-systems, technologies, and discoveries carry
+  dramatic weight. Sense of wonder is the primary emotional register. The
+  human inside the concept — not the concept itself — is the story's engine.
+
+tone_keywords:
+  - wonder
+  - cerebral
+  - speculative
+  - intellectual
+  - philosophical
+  - expansive
+  - curious
+  - awe
+  - thoughtful
+  - rigorous
+  - visionary
+
+genre_keywords:
+  - science_fiction
+  - hard_sf
+  - first_contact
+  - speculative
+  - climate_fiction
+  - biopunk
+  - generation_ship
+  - post_apocalyptic
+
+craft_overlay: |
+  12. Ideas need stakes, not just interest.
+     A concept is not a scene. Ground every speculative element in a decision,
+     a cost, or a person who has to live with what the idea implies.
+
+  13. Exposition must earn its place through consequence.
+     Technical detail is welcome when it changes what a character can do, fear,
+     or understand. Strip it when it exists only to demonstrate the world's
+     cleverness.
+
+  14. Wonder is an emotion, not a description.
+     Do not describe a thing as wondrous — let the character's perception or
+     behaviour register the scale of what they are encountering. Restraint
+     amplifies awe.
+
+  15. The human at the centre matters as much as the idea.
+     Philosophical SF fails when characters become mouthpieces. Give the person
+     inside the concept their own hunger, confusion, or resistance to what the
+     idea demands of them.
+
+  16. Let the world-system create plot.
+     The rules of the speculative world — its biology, its physics, its
+     politics — should generate conflict naturally. Avoid importing external
+     drama when the premise already contains it.
+
+avoid_overlay: |
+  - Exposition disguised as dialogue ("As you know, Bob...")
+  - Technical density that loses the human stakes
+  - Wonder described through adjectives rather than enacted through behaviour
+  - Characters who exist only to explain or validate the concept
+  - Treating genre action beats as a substitute for intellectual tension
+  - Scientific or technological detail that does not change anything
+
+exemplars:
+  - "The message had taken eleven years to arrive, and they had spent three of those years arguing about whether to answer it."
+  - "She understood the mathematics before she understood what the mathematics meant for everyone she had left behind."
+  - "The machine could not lie, which turned out to be a different problem than they had anticipated."
+  - "He had translated the signal seventeen times. Each translation was correct. None of them agreed."
+
+summary_overlay: |
+  REGISTER NOTE FOR BACK COVER COPY
+  This story is idea-forward speculative fiction. The copy should lead with
+  the central question or discovery, then ground it in a human consequence.
+  Avoid reducing the concept to pure action or mystery — the intellectual
+  stakes are the hook.

@@ -70,14 +70,14 @@ class TestUnknownProfileRaises:
 
 
 class TestOverlayFieldContent:
-    def test_literary_restraint_craft_overlay_is_empty(self) -> None:
-        """literary_restraint intentionally uses empty overlays for backward compat."""
+    def test_literary_restraint_craft_overlay_is_non_empty(self) -> None:
+        """literary_restraint craft_overlay contains dark-fiction prose principles."""
         profile = load_voice_profile("literary_restraint")
-        assert profile.craft_overlay == ""
+        assert profile.craft_overlay.strip()
 
-    def test_literary_restraint_avoid_overlay_is_empty(self) -> None:
+    def test_literary_restraint_avoid_overlay_is_non_empty(self) -> None:
         profile = load_voice_profile("literary_restraint")
-        assert profile.avoid_overlay == ""
+        assert profile.avoid_overlay.strip()
 
     def test_literary_restraint_summary_overlay_is_empty(self) -> None:
         profile = load_voice_profile("literary_restraint")

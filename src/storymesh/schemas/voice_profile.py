@@ -27,6 +27,7 @@ _ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 BUILT_IN_PROFILE_IDS: tuple[str, ...] = (
     "literary_restraint",
     "cozy_warmth",
+    "childrens_bedtime",
     "genre_active",
     "documentary_collage",
     "hardboiled_fragmentary",
@@ -34,6 +35,9 @@ BUILT_IN_PROFILE_IDS: tuple[str, ...] = (
     "surreal_lyrical",
     "propulsive_thriller",
     "plainspoken_intimate",
+    "speculative_wonder",
+    "epic_fantasy",
+    "genre_romance",
 )
 
 

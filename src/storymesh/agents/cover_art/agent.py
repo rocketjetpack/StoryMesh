@@ -36,7 +36,9 @@ _COVER_FONT_PATHS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",            # Debian / Ubuntu
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",    # many Linux
     "/usr/share/fonts/liberation/LiberationSans-Bold.ttf",             # Fedora alt
-    "/Library/Fonts/Arial Bold.ttf",                                    # macOS
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",               # macOS Catalina+
+    "/System/Library/Fonts/Supplemental/Verdana Bold.ttf",             # macOS Catalina+ alt
+    "/Library/Fonts/Arial Bold.ttf",                                    # macOS pre-Catalina
     "C:\\Windows\\Fonts\\arialbd.ttf",                                  # Windows
 ]
 
