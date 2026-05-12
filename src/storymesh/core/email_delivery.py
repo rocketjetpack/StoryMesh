@@ -26,7 +26,7 @@ import logging
 import os
 import re
 import smtplib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
@@ -162,31 +162,48 @@ class EmailConfig:
     def from_dict(cls, data: dict[str, Any]) -> EmailConfig:
         """Construct an :class:`EmailConfig` from a config section dict.
 
-        Environment variables ``STORYMESH_SMTP_USER`` and
-        ``STORYMESH_SMTP_PASSWORD`` override config-file values when set.
+        Pure dict-to-object mapping — reads no environment variables.
+        Use :meth:`from_env_and_dict` in production code when
+        ``STORYMESH_SMTP_USER`` / ``STORYMESH_SMTP_PASSWORD`` env overrides
+        should be honoured.
 
         Args:
             data: The ``email`` section of the merged storymesh config.
 
         Returns:
-            A fully resolved :class:`EmailConfig`.
+            An :class:`EmailConfig` populated solely from *data*.
         """
-        smtp_user = (
-            os.environ.get("STORYMESH_SMTP_USER")
-            or str(data.get("smtp_user", ""))
-        )
-        smtp_password = (
-            os.environ.get("STORYMESH_SMTP_PASSWORD")
-            or str(data.get("smtp_password", ""))
-        )
         return cls(
             smtp_host=str(data.get("smtp_host", "")),
             smtp_port=int(data.get("smtp_port", 587)),
-            smtp_user=smtp_user,
-            smtp_password=smtp_password,
+            smtp_user=str(data.get("smtp_user", "")),
+            smtp_password=str(data.get("smtp_password", "")),
             from_address=str(data.get("from_address", "")),
             recipient=str(data.get("recipient", "")),
             include_epub=bool(data.get("include_epub", False)),
+        )
+
+    @classmethod
+    def from_env_and_dict(cls, data: dict[str, Any]) -> EmailConfig:
+        """Construct an :class:`EmailConfig`, applying env-var overrides.
+
+        Builds a base config via :meth:`from_dict`, then overlays
+        ``STORYMESH_SMTP_USER`` and ``STORYMESH_SMTP_PASSWORD`` from the
+        environment when they are set and non-empty.  This is the factory
+        production code should use; tests should prefer :meth:`from_dict`
+        for determinism.
+
+        Args:
+            data: The ``email`` section of the merged storymesh config.
+
+        Returns:
+            A fully resolved :class:`EmailConfig` with env overrides applied.
+        """
+        cfg = cls.from_dict(data)
+        return replace(
+            cfg,
+            smtp_user=os.environ.get("STORYMESH_SMTP_USER") or cfg.smtp_user,
+            smtp_password=os.environ.get("STORYMESH_SMTP_PASSWORD") or cfg.smtp_password,
         )
 
     @property

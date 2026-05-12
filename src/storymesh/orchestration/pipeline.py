@@ -351,7 +351,7 @@ def regenerate_book_assembler(
     persist_node_output(store, resolved_id, "book_assembler", output)
 
     # Email delivery — fires when a recipient is available.
-    email_cfg = EmailConfig.from_dict(get_email_config())
+    email_cfg = EmailConfig.from_env_and_dict(get_email_config())
     resolved_recipient = email_recipient or email_cfg.recipient
     if resolved_recipient:
         from pathlib import Path  # noqa: PLC0415

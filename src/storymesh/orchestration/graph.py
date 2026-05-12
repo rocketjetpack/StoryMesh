@@ -638,7 +638,7 @@ def build_graph(
     assembler_agent = BookAssemblerAgent(
         output_formats=assembler_cfg.get("output_formats", ["pdf", "epub"]),
     )
-    email_cfg = EmailConfig.from_dict(get_email_config())
+    email_cfg = EmailConfig.from_env_and_dict(get_email_config())
     book_assembler_node: Any = make_book_assembler_node(
         assembler_agent,
         artifact_store=artifact_store,

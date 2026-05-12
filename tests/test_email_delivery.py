@@ -136,12 +136,12 @@ class TestEmailConfig:
 
     def test_env_overrides_smtp_user(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("STORYMESH_SMTP_USER", "env_user@example.com")
-        cfg = EmailConfig.from_dict({"smtp_user": "config_user@example.com"})
+        cfg = EmailConfig.from_env_and_dict({"smtp_user": "config_user@example.com"})
         assert cfg.smtp_user == "env_user@example.com"
 
     def test_env_overrides_smtp_password(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("STORYMESH_SMTP_PASSWORD", "env_password")
-        cfg = EmailConfig.from_dict({"smtp_password": "config_password"})
+        cfg = EmailConfig.from_env_and_dict({"smtp_password": "config_password"})
         assert cfg.smtp_password == "env_password"
 
 
