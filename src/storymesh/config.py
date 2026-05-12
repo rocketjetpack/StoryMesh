@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,31 @@ _PROVIDER_KEY_MAP = {
 # fires once, but the kiosk app calls ensure_storymesh_logging() again from
 # its FastAPI startup hook to defeat uvicorn's dictConfig override.
 _STORYMESH_HANDLER_TAG = "_storymesh_log_handler"
+
+
+class _LateBoundStreamHandler(logging.StreamHandler):  # type: ignore[type-arg]
+    """A StreamHandler that resolves ``sys.stderr`` at each emit.
+
+    Rationale: ``logging.StreamHandler()`` with no ``stream`` argument captures
+    ``sys.stderr`` *at construction time* and stores it on ``self.stream``.
+    When Rich's ``Live`` context activates with ``redirect_stderr=True`` (the
+    default), it replaces ``sys.stderr`` with a buffered redirect file so that
+    arbitrary writes during the live region get rendered cleanly above it.
+    A handler that holds the pre-redirect reference bypasses that mechanism
+    and writes straight into the terminal, corrupting the Live render.
+
+    Re-binding ``self.stream`` on every emit ensures we always write through
+    whatever ``sys.stderr`` currently points at, so Rich's redirect captures
+    our log records and the CLI's progress table stays intact.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.stream = sys.stderr
+        super().emit(record)
+
+    def flush(self) -> None:
+        self.stream = sys.stderr
+        super().flush()
 
 
 def _configure_logging(level_name: str) -> None:
@@ -73,7 +99,7 @@ def _configure_logging(level_name: str) -> None:
     if has_ours:
         return
 
-    handler = logging.StreamHandler()
+    handler = _LateBoundStreamHandler()
     handler.setFormatter(logging.Formatter(
         "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",

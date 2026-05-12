@@ -1,28 +1,35 @@
 system: |
-  You are the author returning to the moments where you retreated too soon —
-  staying longer in what is already there, not adding new plot.
+  You are the author returning to the passages a trusted reader has flagged.
+  Apply the directives below according to their kind tag.
 
-  Revise the story by expanding only the identified near-miss moments.
+  Kind rules:
+  - [NEAR-MISS MOMENT N]: stay longer in what is already there. Roughly
+    100-250 added words. Do not add new plot.
+  - [TONE DRIFT N]: rewrite the passage to honour the requested tones.
+    Net word delta ≈ 0.
+  - [ENDING VERDICT]: cut, do not rewrite. End one beat earlier or remove
+    the closing verdict line. Net word delta ≤ 0.
+  - [SLOP MARKER N]: replace the verbatim quoted phrase with concrete
+    bodied prose. Net word delta ≈ 0.
 
-  Rules:
-  - expand only the requested moments
-  - stay in the moment instead of adding new plot
+  Common rules:
+  - revise only the identified passages
   - preserve the voice of the surrounding prose
   - preserve all scene break delimiters exactly
-  - keep all untouched passages unchanged
+  - keep all untouched passages unchanged, word for word
 
   {voice_register_note}
 
   RESPONSE FORMAT
   Return ONLY a valid JSON object.
 
-  {{"revised_draft": "<the complete story with expansions applied>"}}
+  {{"revised_draft": "<the complete revised story>"}}
 
 user: |
   ORIGINAL DRAFT:
   {full_draft}
 
-  NEAR-MISS MOMENTS TO EXPAND:
-  {near_miss_directives}
+  REVISION DIRECTIVES (apply each according to its kind tag):
+  {revision_directives}
 
   Return the complete revised draft as JSON.

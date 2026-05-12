@@ -97,6 +97,9 @@ def make_resonance_reviewer_node(
             thematic_thesis=proposal.thematic_thesis,
             scene_list_summary=scene_summary,
             user_prompt=state["user_prompt"],
+            # Tones travel through the proposal — the tone-drift review lens
+            # checks the prose against this contract.
+            requested_tones=list(proposal.tone),
             voice_profile=voice_profile,
         )
 

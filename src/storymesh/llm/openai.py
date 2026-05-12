@@ -86,9 +86,14 @@ class OpenAIClient(LLMClient):
         # self.model is always a non-None str after __init__ (resolved via
         # _DEFAULT_MODEL), but the base class types it as str | None.
         assert self.model is not None
+        # OpenAI deprecated ``max_tokens`` on chat.completions in favour of
+        # ``max_completion_tokens``. Newer model families (gpt-5*, o1*, o3*)
+        # reject the legacy name outright; the new name is accepted across
+        # the current chat-completion lineup, so the rename is forward- and
+        # backward-compatible against every currently-supported model.
         response = self.client.chat.completions.create(
             model=self.model,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
             temperature=temperature,
             messages=messages,  # type: ignore[arg-type]
         )

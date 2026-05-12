@@ -12,9 +12,21 @@ from storymesh.llm.base import LLMCallLogger, LLMClient, _traceable, register_pr
 
 _DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
+# Some newer Anthropic models (extended-thinking / reasoning variants) reject
+# the ``temperature`` parameter outright with a 400 invalid_request_error
+# whose message contains the literal string ``temperature``. This sentinel is
+# matched against ``BadRequestError.message`` to detect that case the first
+# time a model rejects it, after which we remember the result and stop
+# sending the parameter on subsequent calls. Per-class set rather than
+# per-instance so the discovery is shared across every AnthropicClient (one
+# per agent) that wraps the same model id.
+_TEMPERATURE_DEPRECATED_MARKER = "`temperature` is deprecated"
+_models_without_temperature: set[str] = set()
+
+
 class AnthropicClient(LLMClient):
     """LLMClient compatible class for leveraging the Anthropic SDK."""
-    
+
     def __init__(
             self,
             *,
@@ -43,18 +55,39 @@ class AnthropicClient(LLMClient):
             temperature: float,
             max_tokens: int
         ) -> str:
-        """Send a prompt to the Anthropic API and return the response."""
+        """Send a prompt to the Anthropic API and return the response.
 
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": [{"role": "user", "content": prompt}]
-        }
-        if system_prompt is not None:
-            kwargs["system"] = system_prompt
+        Tolerates models that have deprecated the ``temperature`` parameter:
+        the first call against such a model raises a 400 whose message
+        contains ``\\`temperature\\` is deprecated``; we catch it, remember
+        the model id in a module-level set, and retry without the parameter.
+        Subsequent calls against the same model skip ``temperature`` from
+        the start.
+        """
 
-        response = self.client.messages.create(**kwargs)
+        send_temperature = self.model not in _models_without_temperature
+
+        def _build_kwargs(include_temperature: bool) -> dict[str, Any]:
+            kw: dict[str, Any] = {
+                "model": self.model,
+                "max_tokens": max_tokens,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if include_temperature:
+                kw["temperature"] = temperature
+            if system_prompt is not None:
+                kw["system"] = system_prompt
+            return kw
+
+        try:
+            response = self.client.messages.create(**_build_kwargs(send_temperature))
+        except anthropic.BadRequestError as exc:
+            if send_temperature and _TEMPERATURE_DEPRECATED_MARKER in str(exc):
+                if self.model:
+                    _models_without_temperature.add(self.model)
+                response = self.client.messages.create(**_build_kwargs(False))
+            else:
+                raise
 
         if response.stop_reason == "refusal":
             raise LLMRefusalError(

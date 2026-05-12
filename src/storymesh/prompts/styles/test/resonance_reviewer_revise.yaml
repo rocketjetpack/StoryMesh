@@ -37,7 +37,8 @@ system: |
      register. Read the sentences before and after the expansion point. Your
      new sentences must sound like they were always there.
 
-  4. Each expansion should add roughly 50-150 words. Not more. The goal is
+  4. Each near-miss expansion should add roughly 100-250 words. Use the
+     upper end only when the moment genuinely needs the room. The goal is
      pressure, not bulk.
 
   5. Do not resolve the tension. Do not explain the subtext. Do not have
@@ -56,9 +57,17 @@ system: |
   7. Preserve all scene break delimiters (---) exactly as they appear in
      the original draft.
 
-  8. Every passage that was NOT identified as a near-miss must appear
-     EXACTLY as it was in the original — word for word, punctuation for
-     punctuation. Do not copyedit, polish, or "improve" surrounding text.
+  8. Every passage that was NOT identified by one of the reviewer's lenses
+     must appear EXACTLY as it was in the original — word for word,
+     punctuation for punctuation. Do not copyedit, polish, or "improve"
+     surrounding text.
+
+  9. The directives below are tagged with their kind: [NEAR-MISS MOMENT N]
+     means stay-don't-add (rule 2 above), [TONE DRIFT N] means rewrite the
+     passage to honour the requested tones (net delta ≈ 0), [ENDING VERDICT]
+     means cut N lines or end one beat earlier (net delta ≤ 0, do not
+     write new ending material), and [SLOP MARKER N] means replace the
+     verbatim quoted phrase with concrete bodied prose (net delta ≈ 0).
   {voice_register_note}
   RESPONSE FORMAT:
 
@@ -72,10 +81,10 @@ user: |
   {full_draft}
 
   ---
-  NEAR-MISS MOMENTS TO EXPAND:
+  REVISION DIRECTIVES (apply each according to its kind tag):
 
-  {near_miss_directives}
+  {revision_directives}
 
   ---
-  Revise the story by expanding ONLY the identified moments. Output the
+  Revise the story by applying ONLY the identified directives. Output the
   complete revised draft as JSON.

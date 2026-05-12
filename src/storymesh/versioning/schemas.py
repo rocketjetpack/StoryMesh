@@ -8,7 +8,7 @@ RUBRIC_SCHEMA_VERSION = "2.0"
 COVER_ART_SCHEMA_VERSION = "1.1"
 STORY_WRITER_SCHEMA_VERSION = "1.1"
 BOOK_ASSEMBLER_SCHEMA_VERSION = "1.0"
-RESONANCE_REVIEWER_SCHEMA_VERSION = "1.0"
+RESONANCE_REVIEWER_SCHEMA_VERSION = "2.0"
 VOICE_PROFILE_SCHEMA_VERSION = "1.0"
 VOICE_PROFILE_SELECTOR_SCHEMA_VERSION = "1.0"
 
@@ -119,3 +119,15 @@ SCHEMA_VERSIONS: dict[str, str] = {
 #             produces targeted expansions. Cross-provider review pass
 #             identifies 0-3 moments; revision pass expands avoidance moments
 #             in-place. Quality-gated: only runs at high/very_high presets.
+# 2026-05-11: Increment Resonance Reviewer schema to 2.0. Breaking change —
+#             review stage now runs four separate LLM passes, one per lens:
+#             near-miss (existing), tone-drift (vs requested_tones), ending-
+#             verdict (final 200-400 words), and slop-marker (AI-tells).
+#             Added schemas ToneDriftFinding, EndingVerdictFinding, SlopMarker.
+#             ResonanceReviewerAgentOutput gains tone_drift_findings,
+#             ending_verdict_finding, slop_markers, findings_total. Input gains
+#             requested_tones. Near-miss expansion budget raised from 50-150
+#             to 100-250 words per moment. Existing artifacts will not
+#             deserialize. Per-lens findings are emitted independently for
+#             research/eval; the agent still runs a single revision pass that
+#             consumes the union of all actionable findings.
