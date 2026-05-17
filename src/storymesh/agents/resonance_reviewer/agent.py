@@ -262,6 +262,7 @@ class ResonanceReviewerAgent:
         self, input_data: ResonanceReviewerAgentInput
     ) -> tuple[list[NearMissMoment], bool]:
         """Near-miss review. Returns (moments, failed_bool)."""
+        self._review_llm.agent_name = "resonance_reviewer_near_miss"
         user_prompt_text = self._near_miss_prompt.format_user(
             title=input_data.proposal_title,
             thematic_thesis=input_data.thematic_thesis,
@@ -295,6 +296,7 @@ class ResonanceReviewerAgent:
         self, input_data: ResonanceReviewerAgentInput
     ) -> tuple[list[ToneDriftFinding], bool]:
         """Tone-drift review. Skipped when no tones requested."""
+        self._review_llm.agent_name = "resonance_reviewer_tone"
         if not input_data.requested_tones:
             return [], False
 
@@ -338,6 +340,7 @@ class ResonanceReviewerAgent:
         self, input_data: ResonanceReviewerAgentInput
     ) -> tuple[EndingVerdictFinding | None, bool]:
         """Ending-verdict review. Singular finding or None."""
+        self._review_llm.agent_name = "resonance_reviewer_ending"
         user_prompt_text = self._ending_prompt.format_user(
             title=input_data.proposal_title,
             thematic_thesis=input_data.thematic_thesis,
@@ -370,6 +373,7 @@ class ResonanceReviewerAgent:
         self, input_data: ResonanceReviewerAgentInput
     ) -> tuple[list[SlopMarker], bool]:
         """Slop / AI-tell review."""
+        self._review_llm.agent_name = "resonance_reviewer_slop"
         user_prompt_text = self._slop_prompt.format_user(
             title=input_data.proposal_title,
             full_draft=input_data.full_draft,
@@ -410,6 +414,7 @@ class ResonanceReviewerAgent:
         voice_register_note: str = "",
     ) -> str:
         """Single revision pass that consumes the union of actionable findings."""
+        self._revision_llm.agent_name = "resonance_reviewer_revision"
         revision_directives = self._format_revision_directives(
             avoidance_moments=avoidance_moments,
             tone_drifts=tone_drifts,
@@ -504,6 +509,7 @@ class ResonanceReviewerAgent:
         summary_overlay: str = "",
     ) -> str:
         """Re-generate back-cover summary from revised draft."""
+        self._revision_llm.agent_name = "resonance_reviewer_summary"
         formatted_system = self._summary_prompt.system.format(
             summary_overlay=summary_overlay,
         )

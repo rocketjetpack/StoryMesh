@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from storymesh.agents.cover_art.agent import CoverArtAgent
@@ -59,6 +60,23 @@ def make_cover_art_node(
             run_id: str = state.get("run_id", "")
             artifact_store.save_run_binary(run_id, "cover_art.png", raw.image_bytes)
             image_path = str(artifact_store.runs_dir / run_id / "cover_art.png")
+            prompt_tokens = max(1, round(len(raw.image_prompt) / 4))
+            artifact_store.log_llm_call(run_id, {
+                "ts": datetime.now(tz=UTC).isoformat(),
+                "run_id": run_id,
+                "agent": "cover_art",
+                "model": raw.model,
+                "temperature": None,
+                "attempt": 1,
+                "system_prompt": "",
+                "user_prompt": raw.image_prompt,
+                "raw_response": raw.revised_prompt or "",
+                "parse_success": True,
+                "latency_ms": raw.latency_ms,
+                "approx_prompt_tokens": prompt_tokens,
+                "approx_response_tokens": 0,
+                "approx_total_tokens": prompt_tokens,
+            })
 
         output = CoverArtAgentOutput(
             image_path=image_path,

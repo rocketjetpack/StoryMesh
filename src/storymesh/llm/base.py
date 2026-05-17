@@ -141,6 +141,52 @@ class LLMClient(ABC):
         """
         ...
 
+    def complete_text(
+            self,
+            prompt: str,
+            *,
+            system_prompt: str | None = None,
+            temperature: float,
+            max_tokens: int,
+        ) -> str:
+        """Call complete() and log the call record, returning raw text.
+
+        Mirrors complete_json() in timing and logging behaviour but returns
+        the raw string instead of parsing JSON. Use this for prose generation
+        calls where the response is not structured JSON.
+        """
+        t0 = time.perf_counter()
+        try:
+            raw = self.complete(
+                prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+        except Exception as exc:
+            latency_ms = round((time.perf_counter() - t0) * 1000)
+            self._write_call_record(
+                system_prompt=system_prompt,
+                user_prompt=prompt,
+                raw_response=f"<exception: {type(exc).__name__}: {exc}>",
+                temperature=temperature,
+                attempt=1,
+                latency_ms=latency_ms,
+                parse_success=False,
+            )
+            raise
+        latency_ms = round((time.perf_counter() - t0) * 1000)
+        self._write_call_record(
+            system_prompt=system_prompt,
+            user_prompt=prompt,
+            raw_response=raw,
+            temperature=temperature,
+            attempt=1,
+            latency_ms=latency_ms,
+            parse_success=True,
+        )
+        return raw
+
     def complete_json(
             self,
             prompt: str,

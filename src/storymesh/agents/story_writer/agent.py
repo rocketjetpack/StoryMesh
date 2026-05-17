@@ -433,7 +433,7 @@ class StoryWriterAgent:
         )
 
         try:
-            draft = self._llm_client.complete(
+            draft = self._llm_client.complete_text(
                 user_prompt_text,
                 system_prompt=formatted_system,
                 temperature=self._draft_temperature,
